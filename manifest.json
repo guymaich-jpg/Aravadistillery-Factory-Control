@@ -1,0 +1,10 @@
+{
+  "name": "Factory Control",
+  "short_name": "FactoryCtrl",
+  "description": "Alcohol Production Documentation App",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f0f1a",
+  "theme_color": "#1a1a2e",
+  "icons": []
+}

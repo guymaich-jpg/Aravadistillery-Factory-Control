@@ -1,0 +1,25 @@
+{
+  "name": "factory-control-app",
+  "version": "1.0.0",
+  "description": "Alcohol Production Documentation App - Bilingual (English/Thai) mobile-first web application for distillery production tracking",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080",
+    "test": "open tests.html"
+  },
+  "keywords": [
+    "distillery",
+    "production",
+    "tracking",
+    "bilingual",
+    "pwa",
+    "offline-first"
+  ],
+  "author": "Arava Distillery",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/factory-control.git"
+  }
+}
