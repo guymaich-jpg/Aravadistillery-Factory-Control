@@ -66,6 +66,14 @@ const I18N = {
     quickActions: "Quick Actions",
     productionOverview: "Production Overview",
     todayActivity: "Today's Activity",
+    lastActivity: "Last Activity",
+    releaseVersion: "Release Version",
+    inventoryHistory: "Inventory Versions",
+    gapAnalysis: "Gap Analysis",
+    addNewSupplier: "Add New Supplier…",
+    supplierName: "Supplier Name",
+    emailInvite: "Send Email Invitation",
+    permissions: "Permissions & Rules",
 
     // ---------- Backoffice ----------
     backoffice: "Backoffice",
@@ -296,6 +304,14 @@ const I18N = {
     quickActions: "פעולות מהירות",
     productionOverview: "סקירת ייצור",
     todayActivity: "פעילות היום",
+    lastActivity: "פעילות אחרונה",
+    releaseVersion: "שחרור גרסה",
+    inventoryHistory: "גרסאות מלאי",
+    gapAnalysis: "ניתוח פערים",
+    addNewSupplier: "הוסף ספק חדש…",
+    supplierName: "שם הספק",
+    emailInvite: "שלח הזמנה בדוא\"ל",
+    permissions: "הרשאות וכללים",
 
     // ---------- Backoffice ----------
     settings: "הגדרות",
@@ -525,6 +541,14 @@ const I18N = {
     quickActions: "การดำเนินการด่วน",
     productionOverview: "ภาพรวมการผลิต",
     todayActivity: "กิจกรรมของวันนี้",
+    lastActivity: "กิจกรรมล่าสุด",
+    releaseVersion: "ออกเวอร์ชัน",
+    inventoryHistory: "ประวัติรายการสินค้า",
+    gapAnalysis: "การวิเคราะห์ส่วนต่าง",
+    addNewSupplier: "เพิ่มผู้จำหน่ายใหม่…",
+    supplierName: "ชื่อผู้จำหน่าย",
+    emailInvite: "ส่งคำเชิญทางอีเมล",
+    permissions: "สิทธิ์และกฎการใช้งาน",
 
     // ---------- Backoffice ----------
     backoffice: "หลังบ้าน",

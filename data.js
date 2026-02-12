@@ -9,6 +9,9 @@ const STORE_KEYS = {
   distillation1: 'factory_distillation1',
   distillation2: 'factory_distillation2',
   bottling: 'factory_bottling',
+  inventoryVersions: 'factory_inventoryVersions',
+  customSuppliers: 'factory_customSuppliers',
+  users: 'factory_users',
 };
 
 function getData(key) {
@@ -17,6 +20,61 @@ function getData(key) {
 
 function setData(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
+  // Update last activity for current user
+  const session = JSON.parse(localStorage.getItem('factory_session') || 'null');
+  if (session && session.username) {
+    updateUserLastActivity(session.username);
+  }
+}
+
+function updateUserLastActivity(username) {
+  const users = JSON.parse(localStorage.getItem(STORE_KEYS.users) || '[]');
+  const idx = users.findIndex(u => u.username === username);
+  if (idx !== -1) {
+    users[idx].lastActivity = new Date().toISOString();
+    localStorage.setItem(STORE_KEYS.users, JSON.stringify(users));
+  }
+}
+
+function getCustomSuppliers() {
+  return getData(STORE_KEYS.customSuppliers);
+}
+
+function addCustomSupplier(name) {
+  const suppliers = getCustomSuppliers();
+  if (!suppliers.includes(name)) {
+    suppliers.push(name);
+    setData(STORE_KEYS.customSuppliers, suppliers);
+  }
+  return name;
+}
+
+function saveInventoryVersion(snapshot) {
+  const versions = getData(STORE_KEYS.inventoryVersions);
+  const prevVersion = versions.length > 0 ? versions[0] : null;
+
+  // Calculate gaps vs previous version
+  const gaps = {};
+  if (prevVersion) {
+    Object.keys(snapshot.items).forEach(key => {
+      const current = snapshot.items[key] || 0;
+      const previous = prevVersion.items[key] || 0;
+      gaps[key] = current - previous;
+    });
+  }
+
+  const record = {
+    version: versions.length + 1,
+    items: snapshot.items,
+    gaps: gaps,
+    note: snapshot.note || '',
+    createdAt: new Date().toISOString(),
+    createdBy: snapshot.createdBy || getSession()?.username || 'unknown'
+  };
+
+  versions.unshift(record);
+  setData(STORE_KEYS.inventoryVersions, versions);
+  return record;
 }
 
 function addRecord(key, record) {
@@ -137,25 +195,26 @@ const STILL_NAMES = ['d1_still_amiti', 'd1_still_aladdin'];
 const D2_PRODUCT_TYPES = ['drink_edv', 'drink_arak', 'drink_gin'];
 
 // ---------- CSV Export ----------
-function exportToCSV(key, filename) {
-  const data = getData(key);
-  if (!data.length) return;
-  const headers = Object.keys(data[0]);
-  const csv = [
-    headers.join(','),
-    ...data.map(row => headers.map(h => {
-      let val = row[h] ?? '';
-      if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
-        val = '"' + val.replace(/"/g, '""') + '"';
-      }
-      return val;
-    }).join(','))
-  ].join('\n');
+function exportToCSV(keyOrData, filename) {
+  let data = Array.isArray(keyOrData) ? keyOrData : getData(keyOrData);
+  if (data.length === 0) return;
 
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  // Flatten objects for CSV
+  const headers = Object.keys(data[0]);
+  const rowStrings = data.map(row => {
+    return headers.map(h => {
+      let val = row[h];
+      if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+      return '"' + (val === undefined || val === null ? '' : String(val).replace(/"/g, '""')) + '"';
+    }).join(',');
+  });
+
+  const csvContent = headers.join(',') + '\n' + rowStrings.join('\n');
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename || (key + '.csv');
+  link.href = url;
+  link.setAttribute('download', filename || 'export.csv');
   link.click();
 }
 

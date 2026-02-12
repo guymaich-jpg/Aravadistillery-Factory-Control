@@ -18,7 +18,7 @@
   --border: #2a2a4a;
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 
   /* Module colors */
   --color-receiving: #6366f1;
@@ -30,9 +30,14 @@
   --color-inventory: #14b8a6;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-html, body {
+html,
+body {
   height: 100%;
   font-family: 'Inter', 'Noto Sans Thai', -apple-system, sans-serif;
   background: var(--bg);
@@ -89,7 +94,7 @@ html[dir="rtl"] .toggle-slider::before {
   right: 3px;
 }
 
-html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
+html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   transform: translateX(-20px);
 }
 
@@ -195,7 +200,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   margin-top: 8px;
 }
 
-.login-btn:active { background: var(--accent-hover); }
+.login-btn:active {
+  background: var(--accent-hover);
+}
 
 .login-error {
   color: var(--danger);
@@ -319,7 +326,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   gap: 8px;
 }
 
-.lang-btn, .logout-btn {
+.lang-btn,
+.logout-btn {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text);
@@ -351,7 +359,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   background: var(--success);
 }
 
-.user-badge .role-dot.worker { background: var(--accent); }
+.user-badge .role-dot.worker {
+  background: var(--accent);
+}
 
 /* ============================================================
    BOTTOM NAV
@@ -384,8 +394,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   background: none;
 }
 
-.nav-item.active { color: var(--accent); }
-.nav-item svg { width: 20px; height: 20px; }
+.nav-item.active {
+  color: var(--accent);
+}
+
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+}
 
 /* ============================================================
    DASHBOARD
@@ -435,7 +451,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   overflow: hidden;
 }
 
-.module-card:active { transform: scale(0.97); }
+.module-card:active {
+  transform: scale(0.97);
+}
 
 .module-card::before {
   content: '';
@@ -446,13 +464,33 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   height: 3px;
 }
 
-.module-card[data-module="rawMaterials"]::before { background: var(--color-receiving); }
-.module-card[data-module="dateReceiving"]::before { background: var(--color-dates); }
-.module-card[data-module="fermentation"]::before { background: var(--color-fermentation); }
-.module-card[data-module="distillation1"]::before { background: var(--color-dist1); }
-.module-card[data-module="distillation2"]::before { background: var(--color-dist2); }
-.module-card[data-module="bottling"]::before { background: var(--color-bottling); }
-.module-card[data-module="inventory"]::before { background: var(--color-inventory); }
+.module-card[data-module="rawMaterials"]::before {
+  background: var(--color-receiving);
+}
+
+.module-card[data-module="dateReceiving"]::before {
+  background: var(--color-dates);
+}
+
+.module-card[data-module="fermentation"]::before {
+  background: var(--color-fermentation);
+}
+
+.module-card[data-module="distillation1"]::before {
+  background: var(--color-dist1);
+}
+
+.module-card[data-module="distillation2"]::before {
+  background: var(--color-dist2);
+}
+
+.module-card[data-module="bottling"]::before {
+  background: var(--color-bottling);
+}
+
+.module-card[data-module="inventory"]::before {
+  background: var(--color-inventory);
+}
 
 .module-card .mc-icon {
   width: 36px;
@@ -464,15 +502,39 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   margin-bottom: 10px;
 }
 
-.module-card .mc-icon svg { width: 18px; height: 18px; color: #fff; }
+.module-card .mc-icon svg {
+  width: 18px;
+  height: 18px;
+  color: #fff;
+}
 
-.module-card[data-module="rawMaterials"] .mc-icon { background: var(--color-receiving); }
-.module-card[data-module="dateReceiving"] .mc-icon { background: var(--color-dates); }
-.module-card[data-module="fermentation"] .mc-icon { background: var(--color-fermentation); }
-.module-card[data-module="distillation1"] .mc-icon { background: var(--color-dist1); }
-.module-card[data-module="distillation2"] .mc-icon { background: var(--color-dist2); }
-.module-card[data-module="bottling"] .mc-icon { background: var(--color-bottling); }
-.module-card[data-module="inventory"] .mc-icon { background: var(--color-inventory); }
+.module-card[data-module="rawMaterials"] .mc-icon {
+  background: var(--color-receiving);
+}
+
+.module-card[data-module="dateReceiving"] .mc-icon {
+  background: var(--color-dates);
+}
+
+.module-card[data-module="fermentation"] .mc-icon {
+  background: var(--color-fermentation);
+}
+
+.module-card[data-module="distillation1"] .mc-icon {
+  background: var(--color-dist1);
+}
+
+.module-card[data-module="distillation2"] .mc-icon {
+  background: var(--color-dist2);
+}
+
+.module-card[data-module="bottling"] .mc-icon {
+  background: var(--color-bottling);
+}
+
+.module-card[data-module="inventory"] .mc-icon {
+  background: var(--color-inventory);
+}
 
 .module-card .mc-title {
   font-size: 13px;
@@ -605,7 +667,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .toggle-slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: var(--border);
   border-radius: 28px;
   transition: 0.3s;
@@ -623,11 +688,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   transition: 0.3s;
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
   background: var(--success);
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
+.toggle-switch input:checked+.toggle-slider::before {
   transform: translateX(20px);
 }
 
@@ -667,7 +732,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   font-family: inherit;
 }
 
-.btn:active { transform: scale(0.97); }
+.btn:active {
+  transform: scale(0.97);
+}
 
 .btn-primary {
   background: var(--accent);
@@ -713,7 +780,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   transition: border-color 0.2s;
 }
 
-.record-item:active { border-color: var(--accent); }
+.record-item:active {
+  border-color: var(--accent);
+}
 
 .record-item .ri-top {
   display: flex;
@@ -746,8 +815,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   font-weight: 600;
 }
 
-.ri-badge.approved { background: rgba(52,211,153,0.15); color: var(--success); }
-.ri-badge.not-approved { background: rgba(248,113,113,0.15); color: var(--danger); }
+.ri-badge.approved {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--success);
+}
+
+.ri-badge.not-approved {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
 
 /* ============================================================
    INVENTORY DASHBOARD
@@ -787,11 +863,21 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   color: var(--text);
 }
 
-.inv-table tr:last-child td { border-bottom: none; }
+.inv-table tr:last-child td {
+  border-bottom: none;
+}
 
-.inv-table .stock-positive { color: var(--success); }
-.inv-table .stock-negative { color: var(--danger); }
-.inv-table .stock-zero { color: var(--text-muted); }
+.inv-table .stock-positive {
+  color: var(--success);
+}
+
+.inv-table .stock-negative {
+  color: var(--danger);
+}
+
+.inv-table .stock-zero {
+  color: var(--text-muted);
+}
 
 /* ============================================================
    TOAST
@@ -873,7 +959,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   #app {
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
-    box-shadow: 0 0 60px rgba(0,0,0,0.4);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.4);
     max-width: 600px;
   }
 }
@@ -883,12 +969,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   .module-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
   .stats-row {
     grid-template-columns: repeat(3, 1fr);
   }
+
   .login-form {
     max-width: 380px;
   }
+
   .form-actions {
     max-width: 400px;
     margin-left: auto;
@@ -903,6 +992,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
     align-items: center;
     justify-content: center;
   }
+
   #app {
     height: 90vh;
     max-height: 900px;
@@ -910,6 +1000,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
     overflow: hidden;
     border: 1px solid var(--border);
   }
+
   .bottom-nav {
     border-radius: 0 0 24px 24px;
   }
@@ -963,13 +1054,19 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(79,140,255,0.4);
+  box-shadow: 0 4px 16px rgba(79, 140, 255, 0.4);
   z-index: 50;
   transition: transform 0.15s;
 }
 
-.fab-add:active { transform: scale(0.9); }
-.fab-add svg { width: 24px; height: 24px; }
+.fab-add:active {
+  transform: scale(0.9);
+}
+
+.fab-add svg {
+  width: 24px;
+  height: 24px;
+}
 
 /* ============================================================
    TAB BAR (for sub-modules)
@@ -1014,7 +1111,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   font-size: 13px;
 }
 
-.detail-row:last-child { border-bottom: none; }
+.detail-row:last-child {
+  border-bottom: none;
+}
 
 .detail-row .dl {
   color: var(--text-secondary);
@@ -1046,10 +1145,58 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    ANIMATIONS
    ============================================================ */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.screen-content > * {
+.screen-content>* {
   animation: fadeIn 0.25s ease forwards;
+}
+
+/* ============================================================
+   STATS CARDS
+   ============================================================ */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ============================================================
+   REVISED RECORD ITEM
+   ============================================================ */
+.record-item.user-item .ri-details,
+.record-item.inv-ver-item .ri-details {
+  font-size: 11px;
+  line-height: 1.4;
 }

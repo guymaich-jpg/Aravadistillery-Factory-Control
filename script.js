@@ -75,6 +75,15 @@ function renderApp() {
 
   feather.replace();
   bindNav();
+  checkSecurity();
+}
+
+function checkSecurity() {
+  const session = getSession();
+  if (!session && currentScreen !== 'login') {
+    currentScreen = 'dashboard'; // Reset
+    renderApp();
+  }
 }
 
 // ============================================================
@@ -686,6 +695,24 @@ function renderModuleForm(container) {
   container.querySelector('#form-save').addEventListener('click', () => {
     saveCurrentForm();
   });
+
+  // Supplier Add New Logic
+  if (currentModule === 'rawMaterials') {
+    bindSupplierAddNew();
+  }
+}
+
+function bindSupplierAddNew() {
+  const supSelect = document.querySelector('#field-supplier');
+  const customSupGroup = document.querySelector('#field-supplier_custom')?.parentElement;
+  if (supSelect && customSupGroup) {
+    const updateVisibility = () => {
+      const isNew = supSelect.value === 'ADD_NEW';
+      customSupGroup.style.display = isNew ? '' : 'none';
+    };
+    supSelect.addEventListener('change', updateVisibility);
+    updateVisibility();
+  }
 }
 
 function renderFormField(f, val) {
@@ -707,11 +734,13 @@ function renderFormField(f, val) {
         </div>`;
 
     case 'text':
+      const display = f.hidden ? 'display:none' : '';
       return `
-        <div class="form-group">
+        <div class="form-group" style="${display}">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
           <input type="text" class="form-input" id="field-${f.key}" value="${val}" placeholder="${f.placeholder || ''}">
         </div>`;
+
 
     case 'select':
       return `
@@ -845,9 +874,18 @@ function saveCurrentForm() {
       record[f.key] = (startEl?.value || '') + '-' + (endEl?.value || '');
     } else {
       const el = document.querySelector(`#field-${f.key}`);
-      record[f.key] = el ? el.value : '';
+      record[f.key] = el ? (el.type === 'checkbox' ? el.checked : el.value) : '';
     }
   });
+
+  // Handle Custom Supplier
+  if (currentModule === 'rawMaterials' && record.supplier === 'ADD_NEW') {
+    const customName = document.querySelector('#field-supplier_custom')?.value.trim();
+    if (customName) {
+      addCustomSupplier(customName);
+      record.supplier = customName;
+    }
+  }
 
   // Notes
   const notesEl = document.querySelector('#field-notes');
@@ -918,7 +956,7 @@ function initSignaturePad() {
 // INVENTORY VIEW
 // ============================================================
 function renderInventory(container) {
-  // Calculate bottle inventory from bottling records
+  // Inventory calculations...
   const bottlingRecords = getData(STORE_KEYS.bottling);
   const bottleInv = {};
   DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
@@ -929,7 +967,6 @@ function renderInventory(container) {
     }
   });
 
-  // Raw material summary from receiving records
   const rawRecords = getData(STORE_KEYS.rawMaterials);
   const rawInv = {};
   rawRecords.forEach(r => {
@@ -938,18 +975,28 @@ function renderInventory(container) {
     rawInv[key] = (rawInv[key] || 0) + qty;
   });
 
-  // Date inventory
   const dateRecords = getData(STORE_KEYS.dateReceiving);
   const totalDates = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
-
-  // Fermentation active
   const fermRecords = getData(STORE_KEYS.fermentation);
   const activeFerm = fermRecords.filter(r => !r.sentToDistillation).length;
+
+  const currentSnapshot = {
+    items: {
+      ...bottleInv,
+      ...rawInv,
+      totalDates,
+      activeFerm
+    }
+  };
+
+  const versions = getData(STORE_KEYS.inventoryVersions);
+  const lastVersion = versions[0] || null;
 
   container.innerHTML = `
     <div class="tab-bar">
       <button class="tab-btn active" data-inv-tab="bottles">${t('mod_bottleInventory')}</button>
       <button class="tab-btn" data-inv-tab="raw">${t('mod_rawInventory')}</button>
+      <button class="tab-btn" data-inv-tab="versions">${t('inventoryHistory')}</button>
     </div>
 
     <div id="inv-bottles">
@@ -982,30 +1029,51 @@ function renderInventory(container) {
     <div id="inv-raw" style="display:none;">
       <div class="inv-section">
         <h3>${t('mod_rawInventory')}</h3>
-        ${Object.keys(rawInv).length === 0 ? `<div class="empty-state"><i data-feather="inbox"></i><p>${t('noData')}</p></div>` : `
-          <table class="inv-table">
-            <thead><tr><th>${t('inv_item')}</th><th style="text-align:right">${t('inv_stock')}</th></tr></thead>
-            <tbody>
-              ${Object.entries(rawInv).map(([item, qty]) => {
-    const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-    return `<tr><td>${item}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
-  }).join('')}
-            </tbody>
-          </table>
+        <table class="inv-table">
+          <thead><tr><th>${t('inv_item')}</th><th style="text-align:right">${t('inv_stock')}</th></tr></thead>
+          <tbody>
+            ${Object.entries(rawInv).length === 0 ? `<tr><td colspan="2" style="text-align:center">${t('noData')}</td></tr>` :
+      Object.entries(rawInv).map(([item, qty]) => {
+        const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
+        return `<tr><td>${item}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
+      }).join('')
+    }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="inv-versions" style="display:none;">
+      <div class="inv-section">
+        ${versions.length === 0 ? `<div class="empty-state"><i data-feather="clock"></i><p>${t('noRecords')}</p></div>` : `
+          <div class="record-list">
+            ${versions.map(v => `
+              <div class="record-item inv-ver-item" data-ver="${v.version}">
+                <div class="ri-top">
+                  <span class="ri-title">Version ${v.version}</span>
+                  <span class="ri-date">${formatDate(v.createdAt)}</span>
+                </div>
+                <div class="ri-details">
+                   ${v.createdBy} &bull; ${Object.keys(v.gaps).length > 0 ? t('gapAnalysis') : t('saved')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
         `}
       </div>
     </div>
 
-    ${hasPermission('canExportData') ? `
-      <div style="margin-top:16px;">
-        <button class="btn btn-secondary" id="export-inv-btn" style="width:100%;">
-          <i data-feather="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>${t('exportCSV')}
-        </button>
-      </div>
-    ` : ''}
+    <div class="inventory-actions" style="margin-top:24px; display:flex; gap:12px;">
+      <button class="btn btn-secondary" id="export-inv-btn" style="flex:1;">
+        <i data-feather="download"></i> ${t('exportCSV')}
+      </button>
+      <button class="btn btn-primary" id="release-ver-btn" style="flex:1;">
+        <i data-feather="check-circle"></i> ${t('releaseVersion')}
+      </button>
+    </div>
   `;
 
-  // Tab switching
+  // Bind tabs
   container.querySelectorAll('[data-inv-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1013,22 +1081,52 @@ function renderInventory(container) {
       const tab = btn.dataset.invTab;
       container.querySelector('#inv-bottles').style.display = tab === 'bottles' ? '' : 'none';
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
+      container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
     });
   });
 
-  // Export
-  const exportBtn = container.querySelector('#export-inv-btn');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-      // Export all modules
-      Object.entries(STORE_KEYS).forEach(([name, key]) => {
-        if (getData(key).length > 0) {
-          exportToCSV(key, name + '_' + todayStr() + '.csv');
-        }
-      });
-      showToast(t('exportCSV') + ' ✓');
+  // Bind Version Release
+  container.querySelector('#release-ver-btn').addEventListener('click', () => {
+    if (confirm(`${t('releaseVersion')}?`)) {
+      saveInventoryVersion(currentSnapshot);
+      showToast(t('saved'));
+      renderApp();
+    }
+  });
+
+  // Bind Export (with gaps if applicable)
+  container.querySelector('#export-inv-btn').addEventListener('click', () => {
+    if (lastVersion) {
+      // Export current state with gaps
+      const exportData = Object.keys(currentSnapshot.items).map(key => ({
+        Item: key,
+        CurrentQty: currentSnapshot.items[key],
+        PreviousQty: lastVersion.items[key] || 0,
+        Gap: (currentSnapshot.items[key] || 0) - (lastVersion.items[key] || 0)
+      }));
+      exportToCSV(exportData, `inventory_audit_${todayStr()}.csv`);
+    } else {
+      const exportData = Object.entries(currentSnapshot.items).map(([key, val]) => ({ Item: key, Qty: val }));
+      exportToCSV(exportData, `inventory_${todayStr()}.csv`);
+    }
+    showToast(t('exportCSV') + ' ✓');
+  });
+
+  // Version Detail View
+  container.querySelectorAll('.inv-ver-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const verId = item.dataset.ver;
+      const ver = versions.find(v => String(v.version) === verId);
+      if (ver) {
+        // Simple alert for gaps or render a detail view
+        let gapSummary = Object.entries(ver.gaps)
+          .filter(([_, diff]) => diff !== 0)
+          .map(([key, diff]) => `${key}: ${diff > 0 ? '+' : ''}${diff}`)
+          .join('\n');
+        alert(`Version ${ver.version} Gaps:\n${gapSummary || 'No gaps'}`);
+      }
     });
-  }
+  });
 }
 
 // ============================================================
@@ -1037,11 +1135,13 @@ function renderInventory(container) {
 function getModuleFields(mod) {
   switch (mod) {
     case 'rawMaterials':
+      const allSuppliers = [...SUPPLIERS_RAW, ...getCustomSuppliers()];
       return [
         {
           key: 'supplier', labelKey: 'rm_supplier', type: 'select', required: true,
-          options: SUPPLIERS_RAW.map(s => ({ value: s, labelKey: s }))
+          options: [...allSuppliers.map(s => ({ value: s, labelKey: s })), { value: 'ADD_NEW', labelKey: 'addNewSupplier' }]
         },
+        { key: 'supplier_custom', labelKey: 'supplierName', type: 'text', hidden: true },
         { key: 'date', labelKey: 'rm_receiveDate', type: 'date', required: true, default: todayStr() },
         {
           key: 'category', labelKey: 'rm_category', type: 'select', required: true,
@@ -1198,11 +1298,29 @@ function renderBackoffice(container) {
           </div>
           <div class="ri-details">
             ${u.name || '-'} &bull; ${u.nameHe || u.nameTh || '-'}
+            <div style="font-size:10px; margin-top:4px;">
+              ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) + ' ' + new Date(u.lastActivity).toLocaleTimeString() : '-'}
+            </div>
           </div>
         </div>
       `).join('')}
     </div>
+    
+    <div style="margin-top:20px;">
+       <button class="btn btn-secondary" id="btn-invite-user" style="width:100%;">
+         <i data-feather="mail"></i> ${t('emailInvite')}
+       </button>
+    </div>
   `;
+
+  // Bind invite
+  container.querySelector('#btn-invite-user').addEventListener('click', () => {
+    const email = prompt("Enter user email for invitation:");
+    if (email) {
+      alert(`Invitation link generated for ${email}:\nhttps://guymaich-jpg.github.io/factory-control/#invite=${btoa(email)}`);
+      showToast("Invitation sent (simulated)");
+    }
+  });
 
   // FAB 
   const fab = el('button', 'fab-add', '<i data-feather="user-plus"></i>');

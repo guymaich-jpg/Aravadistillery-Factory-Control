@@ -37,7 +37,7 @@ const PERMISSIONS = {
     canViewInventory: true,
     canApproveBottling: true,
     canViewAllModules: true,
-    canAccessBackoffice: false,
+    canAccessBackoffice: true,
   },
   worker: {
     canViewDashboard: true,
@@ -123,10 +123,26 @@ function getSession() {
   return JSON.parse(localStorage.getItem('factory_session') || 'null');
 }
 
-function logoutUser() {
+function logout() {
   localStorage.removeItem('factory_session');
+  // Clear any temporary state
+  if (typeof renderApp === 'function') {
+    currentScreen = 'dashboard';
+    currentModule = null;
+    renderApp();
+  }
 }
 
+// Security Wrapper for data actions
+function secureRecordAction(action) {
+  const session = getSession();
+  if (!session) {
+    alert("Session expired. Please log in.");
+    logout();
+    return false;
+  }
+  return action();
+}
 function hasPermission(perm) {
   const session = getSession();
   if (!session) return false;

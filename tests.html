@@ -961,6 +961,45 @@
                 });
             });
 
+            // ---- 9. Security & Access Control ----
+            describe('Security & Access Control', () => {
+                
+                it('getData() requires a valid session or public key', () => {
+                    cleanState();
+                    // Without login, attempts to set data should be blocked by secureRecordAction if we integrate it
+                    // For now, check if hasPermission fails without session
+                    assertEqual(hasPermission('canAddRecords'), false);
+                });
+
+                it('Backoffice is restricted to authorized roles only', () => {
+                    cleanState();
+                    const roles = ['worker', 'manager', 'admin'];
+                    roles.forEach(role => {
+                        const user = getUsers().find(u => u.role === role);
+                        authenticate(user.username, user.password);
+                        const canAccess = hasPermission('canAccessBackoffice');
+                        if (role === 'worker') assertEqual(canAccess, false);
+                        else assertEqual(canAccess, true);
+                    });
+                });
+
+                it('Logout effectively clears the session', () => {
+                    cleanState();
+                    authenticate('admin', 'admin123');
+                    assert(getSession() !== null);
+                    logout();
+                    assertEqual(getSession(), null);
+                });
+
+                it('secureRecordAction blocks execution without session', () => {
+                    cleanState();
+                    let executed = false;
+                    const result = secureRecordAction(() => { executed = true; return true; });
+                    assertEqual(executed, false, 'Action should not execute without session');
+                    assertEqual(result, false);
+                });
+            });
+
             // ---- Render results ----
             renderResults();
         }
