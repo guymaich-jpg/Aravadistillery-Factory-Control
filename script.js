@@ -66,6 +66,8 @@ function renderApp() {
     renderModuleDetail(content);
   } else if (currentModule && currentView === 'list') {
     renderModuleList(content);
+  } else if (currentScreen === 'backoffice') {
+    renderBackoffice(content);
   } else {
     renderDashboard(content);
   }
@@ -287,6 +289,10 @@ function renderBottomNav() {
     { id: 'bottling', icon: 'check-circle', label: 'nav_bottling' },
     { id: 'inventory', icon: 'database', label: 'nav_inventory' },
   ];
+
+  if (hasPermission('canAccessBackoffice')) {
+    items.push({ id: 'backoffice', icon: 'settings', label: 'nav_backoffice' });
+  }
   return `
     <nav class="bottom-nav">
       ${items.map(it => `
@@ -312,7 +318,9 @@ function bindNav() {
       else if (nav === 'receiving') { currentModule = 'rawMaterials'; }
       else if (nav === 'production') { currentModule = 'fermentation'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
+      else if (nav === 'bottling') { currentModule = 'bottling'; }
       else if (nav === 'inventory') { currentModule = 'inventory'; }
+      else if (nav === 'backoffice') { currentModule = null; }
 
       renderApp();
     });
@@ -535,8 +543,8 @@ function renderRecordItem(r) {
       badge = r.decision === 'approved'
         ? `<span class="ri-badge approved">${t('approved')}</span>`
         : r.decision === 'notApproved'
-        ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
-        : '';
+          ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
+          : '';
       break;
   }
 
@@ -710,10 +718,10 @@ function renderFormField(f, val) {
           <select class="form-select" id="field-${f.key}">
             <option value="">${t('selectOne')}</option>
             ${(f.options || []).map(o => {
-              const optVal = o.value || o;
-              const optLabel = o.labelKey ? t(o.labelKey) : (o.label || o);
-              return `<option value="${optVal}" ${val === optVal ? 'selected' : ''}>${optLabel}</option>`;
-            }).join('')}
+        const optVal = o.value || o;
+        const optLabel = o.labelKey ? t(o.labelKey) : (o.label || o);
+        return `<option value="${optVal}" ${val === optVal ? 'selected' : ''}>${optLabel}</option>`;
+      }).join('')}
           </select>
         </div>`;
 
@@ -960,10 +968,10 @@ function renderInventory(container) {
           <thead><tr><th>${t('inv_drinkType')}</th><th style="text-align:right">${t('inv_warehouseQty')}</th></tr></thead>
           <tbody>
             ${DRINK_TYPES.map(dt => {
-              const qty = bottleInv[dt] || 0;
-              const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-              return `<tr><td>${t(dt)}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
-            }).join('')}
+    const qty = bottleInv[dt] || 0;
+    const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
+    return `<tr><td>${t(dt)}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
+  }).join('')}
           </tbody>
         </table>
       </div>
@@ -977,9 +985,9 @@ function renderInventory(container) {
             <thead><tr><th>${t('inv_item')}</th><th style="text-align:right">${t('inv_stock')}</th></tr></thead>
             <tbody>
               ${Object.entries(rawInv).map(([item, qty]) => {
-                const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-                return `<tr><td>${item}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
-              }).join('')}
+    const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
+    return `<tr><td>${item}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
+  }).join('')}
             </tbody>
           </table>
         `}
@@ -1028,11 +1036,15 @@ function getModuleFields(mod) {
   switch (mod) {
     case 'rawMaterials':
       return [
-        { key: 'supplier', labelKey: 'rm_supplier', type: 'select', required: true,
-          options: SUPPLIERS_RAW.map(s => ({ value: s, labelKey: s })) },
+        {
+          key: 'supplier', labelKey: 'rm_supplier', type: 'select', required: true,
+          options: SUPPLIERS_RAW.map(s => ({ value: s, labelKey: s }))
+        },
         { key: 'date', labelKey: 'rm_receiveDate', type: 'date', required: true, default: todayStr() },
-        { key: 'category', labelKey: 'rm_category', type: 'select', required: true,
-          options: CATEGORIES.map(c => ({ value: c, labelKey: c })) },
+        {
+          key: 'category', labelKey: 'rm_category', type: 'select', required: true,
+          options: CATEGORIES.map(c => ({ value: c, labelKey: c }))
+        },
         { key: 'item', labelKey: 'rm_item', type: 'cascading-select', required: true, parentKey: 'category' },
         { key: 'weight', labelKey: 'rm_weight', type: 'number', required: true, step: '0.01', min: 0 },
         { key: 'expiry', labelKey: 'rm_expiry', type: 'date' },
@@ -1043,23 +1055,29 @@ function getModuleFields(mod) {
 
     case 'dateReceiving':
       return [
-        { key: 'supplier', labelKey: 'dr_supplier', type: 'select', required: true,
-          options: SUPPLIERS_DATES.map(s => ({ value: s, labelKey: s })) },
+        {
+          key: 'supplier', labelKey: 'dr_supplier', type: 'select', required: true,
+          options: SUPPLIERS_DATES.map(s => ({ value: s, labelKey: s }))
+        },
         { key: 'date', labelKey: 'dr_receiveDate', type: 'date', required: true, default: todayStr() },
         { key: 'weight', labelKey: 'dr_weight', type: 'number', required: true, step: '0.1', min: 0 },
         { key: 'tithing', labelKey: 'dr_tithing', type: 'toggle' },
-        { key: 'expiryPeriod', labelKey: 'dr_expiryPeriod', type: 'select',
+        {
+          key: 'expiryPeriod', labelKey: 'dr_expiryPeriod', type: 'select',
           options: [
             { value: '1year', labelKey: 'dr_expiryPeriod_1year' },
             { value: 'custom', labelKey: 'dr_expiryPeriod_custom' },
-          ] },
+          ]
+        },
       ];
 
     case 'fermentation':
       return [
         { key: 'date', labelKey: 'fm_date', type: 'date', required: true, default: todayStr() },
-        { key: 'tankSize', labelKey: 'fm_tankSize', type: 'select', required: true,
-          options: TANK_SIZES.map(s => ({ value: String(s), label: s + ' L' })) },
+        {
+          key: 'tankSize', labelKey: 'fm_tankSize', type: 'select', required: true,
+          options: TANK_SIZES.map(s => ({ value: String(s), label: s + ' L' }))
+        },
         { key: 'datesKg', labelKey: 'fm_datesKg', type: 'number', required: true, step: '0.1' },
         { key: 'quantity', labelKey: 'fm_quantity', type: 'number', step: '0.1' },
         { key: 'temperature', labelKey: 'fm_temperature', type: 'number', step: '0.1' },
@@ -1071,10 +1089,14 @@ function getModuleFields(mod) {
     case 'distillation1':
       return [
         { key: 'date', labelKey: 'd1_date', type: 'date', required: true, default: todayStr() },
-        { key: 'type', labelKey: 'd1_type', type: 'select', required: true,
-          options: D1_TYPES.map(t => ({ value: t, labelKey: t })) },
-        { key: 'stillName', labelKey: 'd1_stillName', type: 'select', required: true,
-          options: STILL_NAMES.map(s => ({ value: s, labelKey: s })) },
+        {
+          key: 'type', labelKey: 'd1_type', type: 'select', required: true,
+          options: D1_TYPES.map(t => ({ value: t, labelKey: t }))
+        },
+        {
+          key: 'stillName', labelKey: 'd1_stillName', type: 'select', required: true,
+          options: STILL_NAMES.map(s => ({ value: s, labelKey: s }))
+        },
         { key: 'fermDate', labelKey: 'd1_fermDate', type: 'date' },
         { key: 'distQty', labelKey: 'd1_distQty', type: 'number', step: '0.1' },
         { key: 'initAlcohol', labelKey: 'd1_initAlcohol', type: 'number', step: '0.1', min: 0, max: 100 },
@@ -1087,8 +1109,10 @@ function getModuleFields(mod) {
     case 'distillation2':
       return [
         { key: 'date', labelKey: 'd2_date', type: 'date', required: true, default: todayStr() },
-        { key: 'productType', labelKey: 'd2_productType', type: 'select', required: true,
-          options: D2_PRODUCT_TYPES.map(t => ({ value: t, labelKey: t })) },
+        {
+          key: 'productType', labelKey: 'd2_productType', type: 'select', required: true,
+          options: D2_PRODUCT_TYPES.map(t => ({ value: t, labelKey: t }))
+        },
         { key: 'd1Dates', labelKey: 'd2_d1Dates', type: 'text', placeholder: 'e.g. 1.1 / 2.1 / 5.1' },
         { key: 'batchNumber', labelKey: 'd2_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102, G7' },
         { key: 'initAlcohol', labelKey: 'd2_initAlcohol', type: 'number', step: '0.1', min: 0, max: 100 },
@@ -1101,24 +1125,30 @@ function getModuleFields(mod) {
 
     case 'bottling':
       return [
-        { key: 'drinkType', labelKey: 'bt_drinkType', type: 'select', required: true,
-          options: DRINK_TYPES.map(t => ({ value: t, labelKey: t })) },
+        {
+          key: 'drinkType', labelKey: 'bt_drinkType', type: 'select', required: true,
+          options: DRINK_TYPES.map(t => ({ value: t, labelKey: t }))
+        },
         { key: 'date', labelKey: 'bt_bottlingDate', type: 'date', required: true, default: todayStr() },
         { key: 'batchNumber', labelKey: 'bt_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102' },
         { key: 'barrelNumber', labelKey: 'bt_barrelNumber', type: 'text', placeholder: 'e.g. B1, B2' },
         { key: 'd2Date', labelKey: 'bt_d2Date', type: 'date' },
         { key: 'alcohol', labelKey: 'bt_alcohol', type: 'number', required: true, step: '0.001', min: 0, max: 1 },
         { key: 'filtered', labelKey: 'bt_filtered', type: 'toggle' },
-        { key: 'color', labelKey: 'bt_color', type: 'select',
+        {
+          key: 'color', labelKey: 'bt_color', type: 'select',
           options: [
             { value: 'normal', labelKey: 'normal' },
             { value: 'abnormal', labelKey: 'abnormal' },
-          ] },
-        { key: 'taste', labelKey: 'bt_taste', type: 'select',
+          ]
+        },
+        {
+          key: 'taste', labelKey: 'bt_taste', type: 'select',
           options: [
             { value: 'normal', labelKey: 'normal' },
             { value: 'abnormal', labelKey: 'abnormal' },
-          ] },
+          ]
+        },
         { key: 'contaminants', labelKey: 'bt_contaminants', type: 'toggle' },
         { key: 'bottleCount', labelKey: 'bt_bottleCount', type: 'number', required: true, min: 0 },
         { key: 'decision', labelKey: 'bt_decision', type: 'decision', required: true },
@@ -1127,6 +1157,210 @@ function getModuleFields(mod) {
     default:
       return [];
   }
+}
+
+// ============================================================
+// BACKOFFICE UI
+// ============================================================
+
+function renderBackoffice(container) {
+  if (!hasPermission('canAccessBackoffice')) {
+    container.innerHTML = `<div class="perm-overlay"><i data-feather="lock"></i><p>${t('perm_denied')}</p></div>`;
+    return;
+  }
+
+  const users = getUsers();
+
+  if (currentView === 'form') {
+    renderUserForm(container);
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="section-title">${t('userManagement')}</div>
+    
+    <div class="record-list">
+      ${users.map(u => `
+        <div class="record-item user-item" data-username="${u.username}">
+          <div class="ri-top">
+            <span class="ri-title">${u.username} <small style="color:var(--text-muted)">(${t('role_' + u.role)})</small></span>
+            <span class="ri-badge ${u.status === 'inactive' ? 'not-approved' : 'approved'}">
+              ${u.status === 'inactive' ? t('inactive') : t('active')}
+            </span>
+          </div>
+          <div class="ri-details">
+            ${u.name || '-'} &bull; ${u.nameHe || u.nameTh || '-'}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // FAB 
+  const fab = el('button', 'fab-add', '<i data-feather="user-plus"></i>');
+  fab.id = 'add-user-btn';
+  fab.addEventListener('click', () => {
+    editingRecord = null;
+    currentView = 'form';
+    renderApp();
+  });
+  container.appendChild(fab);
+
+  // Bind user items to edit
+  container.querySelectorAll('.user-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const username = item.dataset.username;
+      editingRecord = users.find(u => u.username === username);
+      currentView = 'form';
+      renderApp();
+    });
+  });
+}
+
+function renderUserForm(container) {
+  const isEdit = !!editingRecord;
+  const u = editingRecord || {};
+
+  container.innerHTML = `
+    <div class="section-title">${isEdit ? t('editUser') : t('addUser')}</div>
+    <div class="form-container">
+      
+      <div class="form-group">
+        <label class="form-label">${t('username')} <span class="req">*</span></label>
+        <input type="text" class="form-input" id="bo-username" value="${u.username || ''}" ${isEdit ? 'disabled style="opacity:0.7"' : ''}>
+      </div>
+      
+      ${!isEdit ? `
+      <div class="form-group">
+        <label class="form-label">${t('password')} <span class="req">*</span></label>
+        <input type="password" class="form-input" id="bo-password" placeholder="${t('password')}">
+      </div>
+      ` : `
+      <div class="form-group">
+        <label class="form-label">${t('password')} <small>(${t('optional')})</small></label>
+        <input type="password" class="form-input" id="bo-password" placeholder="Leave blank to keep current">
+      </div>
+      `}
+      
+      <div class="form-group">
+        <label class="form-label">${t('fullName')} (English) <span class="req">*</span></label>
+        <input type="text" class="form-input" id="bo-name" value="${u.name || ''}">
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">${t('fullName')} (Hebrew)</label>
+        <input type="text" class="form-input" id="bo-nameHe" value="${u.nameHe || u.nameTh || ''}" dir="rtl">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${t('selectRole')} <span class="req">*</span></label>
+        <select class="form-select" id="bo-role">
+          <option value="worker" ${u.role === 'worker' ? 'selected' : ''}>${t('role_worker')}</option>
+          <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>${t('role_manager')}</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role_admin')}</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">${t('status')}</label>
+        <select class="form-select" id="bo-status">
+          <option value="active" ${u.status !== 'inactive' ? 'selected' : ''}>${t('active')}</option>
+          <option value="inactive" ${u.status === 'inactive' ? 'selected' : ''}>${t('inactive')}</option>
+        </select>
+      </div>
+
+      <div class="login-error" id="bo-error"></div>
+
+      <div class="form-actions">
+        <button class="btn btn-secondary" id="bo-cancel">${t('cancel')}</button>
+        ${isEdit ? `<button class="btn btn-danger" id="bo-delete">${t('deleteUser')}</button>` : ''}
+        <button class="btn btn-primary" id="bo-save">${t('save')}</button>
+      </div>
+    </div>
+  `;
+
+  // Bind actions
+  const cancelBtn = container.querySelector('#bo-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => {
+    currentView = 'list';
+    editingRecord = null;
+    renderApp();
+  });
+
+  const deleteBtn = container.querySelector('#bo-delete');
+  if (deleteBtn) {
+    if (isEdit) {
+      deleteBtn.addEventListener('click', () => {
+        if (confirm(t('perm_deleteConfirm'))) {
+          if (u.username === 'admin') {
+            alert("Cannot delete the main admin user");
+            return;
+          }
+          if (u.username === getSession().username) {
+            alert("Cannot delete yourself");
+            return;
+          }
+          deleteUserByUsername(u.username);
+          showToast(t('delete') + ' ✓');
+          currentView = 'list';
+          editingRecord = null;
+          renderApp();
+        }
+      });
+    }
+  }
+
+  const saveBtn = container.querySelector('#bo-save');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    const errorEl = container.querySelector('#bo-error');
+    errorEl.textContent = '';
+
+    const usernameInput = container.querySelector('#bo-username');
+    const passwordInput = container.querySelector('#bo-password');
+    const nameInput = container.querySelector('#bo-name');
+    const nameHeInput = container.querySelector('#bo-nameHe');
+    const roleInput = container.querySelector('#bo-role');
+    const statusInput = container.querySelector('#bo-status');
+
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
+    const name = nameInput ? nameInput.value.trim() : '';
+    const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
+    const role = roleInput ? roleInput.value : '';
+    const status = statusInput ? statusInput.value : 'active';
+
+    if (!username || !name || (!isEdit && !password)) {
+      errorEl.textContent = t('signUpError_fillAll');
+      return;
+    }
+
+    if (isEdit) {
+      // Update
+      const updates = { name, nameHe, role, status };
+      if (password) updates.password = password;
+
+      const res = updateUser(username, updates);
+      if (res.success) {
+        showToast(t('saved'));
+        currentView = 'list';
+        editingRecord = null;
+        renderApp();
+      } else {
+        errorEl.textContent = res.error;
+      }
+    } else {
+      // Create
+      const res = createUser({ username, password, name, nameHe, role, status });
+      if (res.success) {
+        showToast(t('signUpSuccess'));
+        currentView = 'list';
+        editingRecord = null;
+        renderApp();
+      } else {
+        errorEl.textContent = t(res.error) || res.error;
+      }
+    }
+  });
 }
 
 // ============================================================
