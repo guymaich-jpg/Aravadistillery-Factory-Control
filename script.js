@@ -1376,11 +1376,6 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div class="inventory-actions" style="margin-top:24px;">
-      <button class="btn btn-secondary" id="export-inv-btn" style="width:100%;">
-        <i data-feather="download"></i> ${t('exportCSV')}
-      </button>
-    </div>
   `;
 
   // Bind tabs
@@ -1393,24 +1388,6 @@ function renderInventory(container) {
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
       container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
     });
-  });
-
-  // Bind Export (with gaps if applicable)
-  container.querySelector('#export-inv-btn').addEventListener('click', () => {
-    if (lastVersion) {
-      // Export current state with gaps
-      const exportData = Object.keys(currentSnapshot.items).map(key => ({
-        Item: key,
-        CurrentQty: currentSnapshot.items[key],
-        PreviousQty: lastVersion.items[key] || 0,
-        Gap: (currentSnapshot.items[key] || 0) - (lastVersion.items[key] || 0)
-      }));
-      exportToCSV(exportData, `inventory_audit_${todayStr()}.csv`);
-    } else {
-      const exportData = Object.entries(currentSnapshot.items).map(([key, val]) => ({ Item: key, Qty: val }));
-      exportToCSV(exportData, `inventory_${todayStr()}.csv`);
-    }
-    showToast(t('exportCSV') + ' ✓');
   });
 
   // Version Detail View
@@ -1849,9 +1826,32 @@ function renderUserForm(container) {
 }
 
 // ============================================================
+// AUTO HARD-REFRESH (every 5 minutes, only when not editing)
+// ============================================================
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+function scheduleHardRefresh() {
+  setTimeout(() => {
+    const active = document.activeElement;
+    const isEditing = active && (
+      active.tagName === 'INPUT' ||
+      active.tagName === 'TEXTAREA' ||
+      active.tagName === 'SELECT'
+    );
+    if (!isEditing) {
+      location.reload(true);
+    } else {
+      // User is actively typing — retry in 60 seconds
+      setTimeout(() => location.reload(true), 60 * 1000);
+    }
+  }, AUTO_REFRESH_MS);
+}
+
+// ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
   renderApp();
+  scheduleHardRefresh();
 });

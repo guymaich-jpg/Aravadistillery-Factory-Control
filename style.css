@@ -291,6 +291,7 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top));
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   min-height: 56px;
@@ -607,6 +608,7 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
 .form-textarea {
   width: 100%;
   padding: 12px 14px;
+  min-height: 48px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -616,6 +618,8 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   outline: none;
   transition: border-color 0.2s;
   -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .form-input:focus,
@@ -723,6 +727,7 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
 .btn {
   flex: 1;
   padding: 14px;
+  min-height: 48px;
   border: none;
   border-radius: var(--radius-sm);
   font-size: 15px;
@@ -730,6 +735,8 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   cursor: pointer;
   transition: transform 0.1s, opacity 0.2s;
   font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .btn:active {
@@ -960,12 +967,20 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
 /* ============================================================
    RESPONSIVE — WIDER SCREENS
    ============================================================ */
-@media (min-width: 601px) {
+
+/* Lock the app to a phone-width column on all non-mobile screens */
+@media (min-width: 481px) {
   #app {
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.4);
-    max-width: 600px;
+    max-width: 480px;
+  }
+
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
   }
 }
 
@@ -980,17 +995,17 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   }
 
   .login-form {
-    max-width: 380px;
+    max-width: 360px;
   }
 
   .form-actions {
-    max-width: 400px;
+    max-width: 380px;
     margin-left: auto;
     margin-right: auto;
   }
 }
 
-/* Large desktops — center the phone-like frame nicely */
+/* Large desktops — vertically center the phone frame */
 @media (min-width: 1024px) {
   body {
     display: flex;
