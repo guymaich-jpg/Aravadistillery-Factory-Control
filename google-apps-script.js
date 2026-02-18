@@ -39,6 +39,12 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (!records || records.length === 0) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true, rows: 0 }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ── Header row ──────────────────────────────────────────────
     sheet.getRange(1, 1, 1, labels.length).setValues([labels]);
 
