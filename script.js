@@ -41,6 +41,110 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+// ============================================================
+// GOOGLE SHEETS SYNC
+// ============================================================
+const SHEETS_URL_KEY = 'factory_sheets_url';
+
+function syncModuleToSheets(module) {
+  const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!url) return;
+
+  const storeKey = STORE_KEYS[module];
+  if (!storeKey) return;
+
+  const records = getData(storeKey);
+
+  // Build field definitions — bypass permission filter for sync
+  // so decision/all fields always appear in the sheet regardless of who is logged in
+  const allModuleFields = {
+    rawMaterials: [
+      { key: 'date', labelKey: 'rm_receiveDate' },
+      { key: 'supplier', labelKey: 'rm_supplier' },
+      { key: 'category', labelKey: 'rm_category' },
+      { key: 'item', labelKey: 'rm_item' },
+      { key: 'weight', labelKey: 'rm_weight' },
+      { key: 'unit', labelKey: 'rm_unit' },
+      { key: 'expiry', labelKey: 'rm_expiry' },
+      { key: 'tithing', labelKey: 'rm_tithing' },
+      { key: 'healthCert', labelKey: 'rm_healthCert' },
+      { key: 'kosher', labelKey: 'rm_kosher' },
+    ],
+    dateReceiving: [
+      { key: 'date', labelKey: 'dr_receiveDate' },
+      { key: 'supplier', labelKey: 'dr_supplier' },
+      { key: 'weight', labelKey: 'dr_weight' },
+      { key: 'tithing', labelKey: 'dr_tithing' },
+      { key: 'expiryPeriod', labelKey: 'dr_expiryPeriod' },
+      { key: 'qtyInDate', labelKey: 'dr_qtyInDate' },
+    ],
+    fermentation: [
+      { key: 'date', labelKey: 'fm_date' },
+      { key: 'tankSize', labelKey: 'fm_tankSize' },
+      { key: 'datesCrates', labelKey: 'fm_datesCrates' },
+      { key: 'temperature', labelKey: 'fm_temperature' },
+      { key: 'sugar', labelKey: 'fm_sugar' },
+      { key: 'ph', labelKey: 'fm_ph' },
+      { key: 'sentToDistillation', labelKey: 'fm_sentToDistillation' },
+    ],
+    distillation1: [
+      { key: 'date', labelKey: 'd1_date' },
+      { key: 'type', labelKey: 'd1_type' },
+      { key: 'stillName', labelKey: 'd1_stillName' },
+      { key: 'fermDate', labelKey: 'd1_fermDate' },
+      { key: 'distQty', labelKey: 'd1_distQty' },
+      { key: 'initAlcohol', labelKey: 'd1_initAlcohol' },
+      { key: 'finalAlcohol', labelKey: 'd1_finalAlcohol' },
+      { key: 'temp', labelKey: 'd1_temp' },
+      { key: 'timeRange', labelKey: 'd1_timeRange' },
+      { key: 'distilledQty', labelKey: 'd1_distilledQty' },
+    ],
+    distillation2: [
+      { key: 'date', labelKey: 'd2_date' },
+      { key: 'productType', labelKey: 'd2_productType' },
+      { key: 'd1Dates', labelKey: 'd2_d1Dates' },
+      { key: 'batchNumber', labelKey: 'd2_batchNumber' },
+      { key: 'initAlcohol', labelKey: 'd2_initAlcohol' },
+      { key: 'headSep', labelKey: 'd2_headSep' },
+      { key: 'tailAlcohol', labelKey: 'd2_tailAlcohol' },
+      { key: 'temp', labelKey: 'd2_temp' },
+      { key: 'timeRange', labelKey: 'd2_timeRange' },
+      { key: 'quantity', labelKey: 'd2_quantity' },
+    ],
+    bottling: [
+      { key: 'date', labelKey: 'bt_bottlingDate' },
+      { key: 'drinkType', labelKey: 'bt_drinkType' },
+      { key: 'batchNumber', labelKey: 'bt_batchNumber' },
+      { key: 'barrelNumber', labelKey: 'bt_barrelNumber' },
+      { key: 'd2Date', labelKey: 'bt_d2Date' },
+      { key: 'alcohol', labelKey: 'bt_alcohol' },
+      { key: 'filtered', labelKey: 'bt_filtered' },
+      { key: 'color', labelKey: 'bt_color' },
+      { key: 'taste', labelKey: 'bt_taste' },
+      { key: 'contaminants', labelKey: 'bt_contaminants' },
+      { key: 'bottleCount', labelKey: 'bt_bottleCount' },
+      { key: 'decision', labelKey: 'bt_decision' },
+    ],
+  };
+
+  const fields = allModuleFields[module];
+  if (!fields) return;
+
+  const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
+  const labels = [...fields.map(f => t(f.labelKey)), t('notes'), 'Created At'];
+
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      sheetName: t('mod_' + module),
+      keys,
+      labels,
+      records,
+    }),
+    mode: 'no-cors',
+  }).catch(() => {});
+}
+
 // ---- Manager Password Modal (required for any delete action) ----
 function showManagerPasswordModal(onSuccess) {
   // Remove any existing modal
@@ -567,6 +671,18 @@ function renderModuleList(container) {
     });
   }
 
+  // Bind approve buttons (bottling quick-approve for admin)
+  container.querySelectorAll('.approve-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (records.find(r => r.id === btn.dataset.id)) {
+        updateRecord(storeKey, btn.dataset.id, { decision: 'approved' });
+        syncModuleToSheets(currentModule);
+        renderApp();
+      }
+    });
+  });
+
   // Bind record items
   container.querySelectorAll('.record-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -591,10 +707,12 @@ function renderRecordItem(r) {
       title = r.supplier || '-';
       details = `${r.weight || '-'} kg`;
       break;
-    case 'fermentation':
+    case 'fermentation': {
+      const crates = r.datesCrates !== undefined ? r.datesCrates : Math.round((parseFloat(r.datesKg) || 0) / 20);
       title = `${r.tankSize || '-'}L ${t('fm_tankSize')}`;
-      details = `${r.datesKg || '-'} kg &bull; ${r.quantity || '-'} L`;
+      details = `${crates} ${t('fm_datesCrates').split('(')[0].trim()}`;
       break;
+    }
     case 'distillation1':
       title = r.type ? t(r.type) : '-';
       details = `${t('d1_stillName')}: ${r.stillName ? t(r.stillName) : '-'} &bull; ${r.distilledQty || '-'} L`;
@@ -610,7 +728,7 @@ function renderRecordItem(r) {
         ? `<span class="ri-badge approved">${t('approved')}</span>`
         : r.decision === 'notApproved'
           ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
-          : '';
+          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn" data-id="${r.id}" style="margin-inline-start:6px;padding:2px 10px;font-size:11px;background:#22c55e;color:#fff;border:none;border-radius:6px;cursor:pointer;">${t('bt_approve')}</button>` : ''}`;
       break;
   }
 
@@ -677,6 +795,7 @@ function renderModuleDetail(container) {
     delBtn.addEventListener('click', () => {
       showManagerPasswordModal(() => {
         deleteRecord(STORE_KEYS[currentModule], editingRecord.id);
+        syncModuleToSheets(currentModule);
         editingRecord = null;
         currentView = 'list';
         renderApp();
@@ -962,13 +1081,14 @@ function bindCascadingDropdowns() {
     });
   });
 
-  // Auto-calculate dates kg from tank size (fermentation)
+  // Auto-calculate number of crates from tank size (fermentation)
+  // Formula: tank_size * 0.28 kg of dates / 20 kg per crate
   const tankSelect = document.querySelector('#field-tankSize');
-  const datesKgInput = document.querySelector('#field-datesKg');
-  if (tankSelect && datesKgInput) {
+  const datesCratesInput = document.querySelector('#field-datesCrates');
+  if (tankSelect && datesCratesInput) {
     tankSelect.addEventListener('change', () => {
       const size = parseFloat(tankSelect.value) || 0;
-      datesKgInput.value = (size * 0.28).toFixed(0);
+      datesCratesInput.value = Math.round(size * 0.28 / 20).toString();
     });
   }
 }
@@ -1041,6 +1161,7 @@ function saveCurrentForm() {
   }
 
   showToast(t('saved'));
+  syncModuleToSheets(currentModule);
   editingRecord = null;
   currentView = 'list';
   renderApp();
@@ -1148,14 +1269,24 @@ function renderInventory(container) {
     rawInv[key] = (rawInv[key] || 0) + qty;
   });
 
-  const totalDates = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
+  const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
+  // Support both new records (datesCrates) and legacy records (datesKg stored as kg)
+  const totalDatesInFerm = fermRecords.reduce((sum, r) => {
+    if (r.datesCrates !== undefined && r.datesCrates !== '') {
+      return sum + (parseFloat(r.datesCrates) || 0) * 20;
+    }
+    return sum + (parseFloat(r.datesKg) || 0);
+  }, 0);
+  const availableDates = Math.max(0, totalDatesReceived - totalDatesInFerm);
   const activeFerm = fermRecords.filter(r => !r.sentToDistillation).length;
 
   const currentSnapshot = {
     items: {
       ...bottleInv,
       ...rawInv,
-      totalDates,
+      totalDatesReceived,
+      totalDatesInFerm,
+      availableDates,
       activeFerm
     }
   };
@@ -1178,14 +1309,19 @@ function renderInventory(container) {
 
     <div id="inv-bottles">
       <div class="inv-section">
-        <div class="stats-row" style="grid-template-columns:1fr 1fr;margin-bottom:16px;">
+        <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
           <div class="stat-card">
-            <div class="stat-num">${totalDates.toFixed(0)}</div>
-            <div class="stat-label">${t('inv_dates')} (kg)</div>
+            <div class="stat-num" style="color:var(--success)">${availableDates.toFixed(0)}</div>
+            <div class="stat-label">${t('inv_dates')}</div>
+            <div style="font-size:10px;opacity:0.6;margin-top:2px;">+${totalDatesReceived.toFixed(0)} / -${totalDatesInFerm.toFixed(0)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-num">${activeFerm}</div>
             <div class="stat-label">${t('mod_fermentation')}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" style="color:var(--warning,#f59e0b)">${totalDatesInFerm.toFixed(0)}</div>
+            <div class="stat-label">${t('inv_datesUsed')}</div>
           </div>
         </div>
 
@@ -1240,12 +1376,9 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div class="inventory-actions" style="margin-top:24px; display:flex; gap:12px;">
-      <button class="btn btn-secondary" id="export-inv-btn" style="flex:1;">
+    <div class="inventory-actions" style="margin-top:24px;">
+      <button class="btn btn-secondary" id="export-inv-btn" style="width:100%;">
         <i data-feather="download"></i> ${t('exportCSV')}
-      </button>
-      <button class="btn btn-primary" id="release-ver-btn" style="flex:1;">
-        <i data-feather="check-circle"></i> ${t('releaseVersion')}
       </button>
     </div>
   `;
@@ -1260,15 +1393,6 @@ function renderInventory(container) {
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
       container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
     });
-  });
-
-  // Bind Version Release
-  container.querySelector('#release-ver-btn').addEventListener('click', () => {
-    if (confirm(`${t('releaseVersion')}?`)) {
-      saveInventoryVersion(currentSnapshot);
-      showToast(t('saved'));
-      renderApp();
-    }
   });
 
   // Bind Export (with gaps if applicable)
@@ -1357,8 +1481,7 @@ function getModuleFields(mod) {
           key: 'tankSize', labelKey: 'fm_tankSize', type: 'select', required: true, noCustom: true,
           options: TANK_SIZES.map(s => ({ value: String(s), label: s + ' L' }))
         },
-        { key: 'datesKg', labelKey: 'fm_datesKg', type: 'number', required: true, step: '0.1' },
-        { key: 'quantity', labelKey: 'fm_quantity', type: 'number', step: '0.1' },
+        { key: 'datesCrates', labelKey: 'fm_datesCrates', type: 'number', required: true, step: '1', min: '0' },
         { key: 'temperature', labelKey: 'fm_temperature', type: 'number', step: '0.1' },
         { key: 'sugar', labelKey: 'fm_sugar', type: 'number', step: '0.1' },
         { key: 'ph', labelKey: 'fm_ph', type: 'number', step: '0.01', min: 0, max: 14 },
@@ -1430,7 +1553,9 @@ function getModuleFields(mod) {
         },
         { key: 'contaminants', labelKey: 'bt_contaminants', type: 'toggle' },
         { key: 'bottleCount', labelKey: 'bt_bottleCount', type: 'number', required: true, min: 0 },
-        { key: 'decision', labelKey: 'bt_decision', type: 'decision', required: true },
+        ...(hasPermission('canApproveBottling') ? [
+          { key: 'decision', labelKey: 'bt_decision', type: 'decision', required: true },
+        ] : []),
       ];
 
     default:
@@ -1492,7 +1617,27 @@ function renderBackoffice(container) {
       `).join('')}
     </div>
 
-    <div style="margin-top:20px; display:flex; gap:10px;">
+    <div style="margin-top:24px;">
+      <div class="section-title" style="margin-bottom:12px;">${t('sheetsIntegration')}</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">${t('sheetsUrlHint')}</p>
+      <div class="form-group">
+        <label class="form-label">${t('sheetsUrl')}</label>
+        <input type="url" id="sheets-url-input" class="form-control"
+          placeholder="${t('sheetsUrlPlaceholder')}"
+          value="${localStorage.getItem(SHEETS_URL_KEY) || ''}"
+          style="font-size:12px;">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-primary" id="btn-save-sheets-url" style="flex:1;">
+          <i data-feather="link"></i> ${t('sheetsSave')}
+        </button>
+        <button class="btn btn-secondary" id="btn-sync-all-sheets" style="flex:1;">
+          <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:10px;">
       <button class="btn btn-secondary" id="btn-export-all" style="flex:1;">
         <i data-feather="download"></i> ${t('exportAllData')}
       </button>
@@ -1516,6 +1661,29 @@ function renderBackoffice(container) {
       if (confirm(t('confirmExport'))) {
         exportAllData();
       }
+    });
+  }
+
+  // Bind Sheets URL save
+  const saveSheetsBtn = container.querySelector('#btn-save-sheets-url');
+  if (saveSheetsBtn) {
+    saveSheetsBtn.addEventListener('click', () => {
+      const input = container.querySelector('#sheets-url-input');
+      const url = input ? input.value.trim() : '';
+      localStorage.setItem(SHEETS_URL_KEY, url);
+      showToast(t('sheetsSaved'));
+    });
+  }
+
+  // Bind Sync All — pushes every module to Sheets at once
+  const syncAllBtn = container.querySelector('#btn-sync-all-sheets');
+  if (syncAllBtn) {
+    syncAllBtn.addEventListener('click', () => {
+      const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+      if (!url) { showToast(t('sheetsUrlPlaceholder')); return; }
+      ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling']
+        .forEach(m => syncModuleToSheets(m));
+      showToast(t('sheetsSyncAll') + ' ✓');
     });
   }
 
