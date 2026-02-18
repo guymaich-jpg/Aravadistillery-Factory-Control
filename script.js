@@ -1269,12 +1269,9 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div class="inventory-actions" style="margin-top:24px; display:flex; gap:12px;">
-      <button class="btn btn-secondary" id="export-inv-btn" style="flex:1;">
+    <div class="inventory-actions" style="margin-top:24px;">
+      <button class="btn btn-secondary" id="export-inv-btn" style="width:100%;">
         <i data-feather="download"></i> ${t('exportCSV')}
-      </button>
-      <button class="btn btn-primary" id="release-ver-btn" style="flex:1;">
-        <i data-feather="check-circle"></i> ${t('releaseVersion')}
       </button>
     </div>
   `;
@@ -1289,15 +1286,6 @@ function renderInventory(container) {
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
       container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
     });
-  });
-
-  // Bind Version Release
-  container.querySelector('#release-ver-btn').addEventListener('click', () => {
-    if (confirm(`${t('releaseVersion')}?`)) {
-      saveInventoryVersion(currentSnapshot);
-      showToast(t('saved'));
-      renderApp();
-    }
   });
 
   // Bind Export (with gaps if applicable)
