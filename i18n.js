@@ -118,6 +118,15 @@ const I18N = {
     exportAllData: "Export Full Database (CSV)",
     confirmExport: "Download full database backup?",
 
+    // ---------- Google Sheets ----------
+    sheetsIntegration: "Google Sheets Integration",
+    sheetsUrl: "Apps Script Web App URL",
+    sheetsUrlPlaceholder: "https://script.google.com/macros/s/...",
+    sheetsUrlHint: "Paste your Google Apps Script URL to sync all modules to Google Sheets automatically.",
+    sheetsSave: "Save URL",
+    sheetsSaved: "Google Sheets URL saved ✓",
+    sheetsSyncAll: "Sync All Now",
+
     // ---------- Raw Materials ----------
     rm_supplier: "Supplier",
     rm_receiveDate: "Receiving Date",
@@ -352,6 +361,15 @@ const I18N = {
     dataExport: "גיבוי נתונים",
     exportAllData: "ייצא מסד נתונים מלא (CSV)",
     confirmExport: "להוריד גיבוי מלא?",
+
+    // ---------- Google Sheets ----------
+    sheetsIntegration: "סנכרון Google Sheets",
+    sheetsUrl: "כתובת Web App של Apps Script",
+    sheetsUrlPlaceholder: "https://script.google.com/macros/s/...",
+    sheetsUrlHint: "הדבק את כתובת ה-URL כדי לסנכרן את כל הנתונים ל-Google Sheets באופן אוטומטי.",
+    sheetsSave: "שמור כתובת",
+    sheetsSaved: "כתובת Google Sheets נשמרה ✓",
+    sheetsSyncAll: "סנכרן הכל עכשיו",
 
     backoffice: "ניהול מערכת",
     userManagement: "ניהול משתמשים",
@@ -660,6 +678,15 @@ const I18N = {
     dataExport: "สำรองข้อมูล",
     exportAllData: "ส่งออกฐานข้อมูลทั้งหมด (CSV)",
     confirmExport: "ดาวน์โหลดสำรองข้อมูลทั้งหมด?",
+
+    // ---------- Google Sheets ----------
+    sheetsIntegration: "การซิงค์ Google Sheets",
+    sheetsUrl: "URL ของ Apps Script Web App",
+    sheetsUrlPlaceholder: "https://script.google.com/macros/s/...",
+    sheetsUrlHint: "วาง URL เพื่อซิงค์ข้อมูลทั้งหมดไปยัง Google Sheets โดยอัตโนมัติ",
+    sheetsSave: "บันทึก URL",
+    sheetsSaved: "บันทึก URL Google Sheets แล้ว ✓",
+    sheetsSyncAll: "ซิงค์ทั้งหมดตอนนี้",
 
     // ---------- Raw Materials ----------
     rm_supplier: "ผู้จำหน่าย",

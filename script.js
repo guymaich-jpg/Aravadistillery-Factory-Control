@@ -41,6 +41,110 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+// ============================================================
+// GOOGLE SHEETS SYNC
+// ============================================================
+const SHEETS_URL_KEY = 'factory_sheets_url';
+
+function syncModuleToSheets(module) {
+  const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!url) return;
+
+  const storeKey = STORE_KEYS[module];
+  if (!storeKey) return;
+
+  const records = getData(storeKey);
+
+  // Build field definitions — bypass permission filter for sync
+  // so decision/all fields always appear in the sheet regardless of who is logged in
+  const allModuleFields = {
+    rawMaterials: [
+      { key: 'date', labelKey: 'rm_receiveDate' },
+      { key: 'supplier', labelKey: 'rm_supplier' },
+      { key: 'category', labelKey: 'rm_category' },
+      { key: 'item', labelKey: 'rm_item' },
+      { key: 'weight', labelKey: 'rm_weight' },
+      { key: 'unit', labelKey: 'rm_unit' },
+      { key: 'expiry', labelKey: 'rm_expiry' },
+      { key: 'tithing', labelKey: 'rm_tithing' },
+      { key: 'healthCert', labelKey: 'rm_healthCert' },
+      { key: 'kosher', labelKey: 'rm_kosher' },
+    ],
+    dateReceiving: [
+      { key: 'date', labelKey: 'dr_receiveDate' },
+      { key: 'supplier', labelKey: 'dr_supplier' },
+      { key: 'weight', labelKey: 'dr_weight' },
+      { key: 'tithing', labelKey: 'dr_tithing' },
+      { key: 'expiryPeriod', labelKey: 'dr_expiryPeriod' },
+      { key: 'qtyInDate', labelKey: 'dr_qtyInDate' },
+    ],
+    fermentation: [
+      { key: 'date', labelKey: 'fm_date' },
+      { key: 'tankSize', labelKey: 'fm_tankSize' },
+      { key: 'datesCrates', labelKey: 'fm_datesCrates' },
+      { key: 'temperature', labelKey: 'fm_temperature' },
+      { key: 'sugar', labelKey: 'fm_sugar' },
+      { key: 'ph', labelKey: 'fm_ph' },
+      { key: 'sentToDistillation', labelKey: 'fm_sentToDistillation' },
+    ],
+    distillation1: [
+      { key: 'date', labelKey: 'd1_date' },
+      { key: 'type', labelKey: 'd1_type' },
+      { key: 'stillName', labelKey: 'd1_stillName' },
+      { key: 'fermDate', labelKey: 'd1_fermDate' },
+      { key: 'distQty', labelKey: 'd1_distQty' },
+      { key: 'initAlcohol', labelKey: 'd1_initAlcohol' },
+      { key: 'finalAlcohol', labelKey: 'd1_finalAlcohol' },
+      { key: 'temp', labelKey: 'd1_temp' },
+      { key: 'timeRange', labelKey: 'd1_timeRange' },
+      { key: 'distilledQty', labelKey: 'd1_distilledQty' },
+    ],
+    distillation2: [
+      { key: 'date', labelKey: 'd2_date' },
+      { key: 'productType', labelKey: 'd2_productType' },
+      { key: 'd1Dates', labelKey: 'd2_d1Dates' },
+      { key: 'batchNumber', labelKey: 'd2_batchNumber' },
+      { key: 'initAlcohol', labelKey: 'd2_initAlcohol' },
+      { key: 'headSep', labelKey: 'd2_headSep' },
+      { key: 'tailAlcohol', labelKey: 'd2_tailAlcohol' },
+      { key: 'temp', labelKey: 'd2_temp' },
+      { key: 'timeRange', labelKey: 'd2_timeRange' },
+      { key: 'quantity', labelKey: 'd2_quantity' },
+    ],
+    bottling: [
+      { key: 'date', labelKey: 'bt_bottlingDate' },
+      { key: 'drinkType', labelKey: 'bt_drinkType' },
+      { key: 'batchNumber', labelKey: 'bt_batchNumber' },
+      { key: 'barrelNumber', labelKey: 'bt_barrelNumber' },
+      { key: 'd2Date', labelKey: 'bt_d2Date' },
+      { key: 'alcohol', labelKey: 'bt_alcohol' },
+      { key: 'filtered', labelKey: 'bt_filtered' },
+      { key: 'color', labelKey: 'bt_color' },
+      { key: 'taste', labelKey: 'bt_taste' },
+      { key: 'contaminants', labelKey: 'bt_contaminants' },
+      { key: 'bottleCount', labelKey: 'bt_bottleCount' },
+      { key: 'decision', labelKey: 'bt_decision' },
+    ],
+  };
+
+  const fields = allModuleFields[module];
+  if (!fields) return;
+
+  const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
+  const labels = [...fields.map(f => t(f.labelKey)), t('notes'), 'Created At'];
+
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      sheetName: t('mod_' + module),
+      keys,
+      labels,
+      records,
+    }),
+    mode: 'no-cors',
+  }).catch(() => {});
+}
+
 // ---- Manager Password Modal (required for any delete action) ----
 function showManagerPasswordModal(onSuccess) {
   // Remove any existing modal
@@ -573,6 +677,7 @@ function renderModuleList(container) {
       e.stopPropagation();
       if (records.find(r => r.id === btn.dataset.id)) {
         updateRecord(storeKey, btn.dataset.id, { decision: 'approved' });
+        syncModuleToSheets(currentModule);
         renderApp();
       }
     });
@@ -690,6 +795,7 @@ function renderModuleDetail(container) {
     delBtn.addEventListener('click', () => {
       showManagerPasswordModal(() => {
         deleteRecord(STORE_KEYS[currentModule], editingRecord.id);
+        syncModuleToSheets(currentModule);
         editingRecord = null;
         currentView = 'list';
         renderApp();
@@ -1055,6 +1161,7 @@ function saveCurrentForm() {
   }
 
   showToast(t('saved'));
+  syncModuleToSheets(currentModule);
   editingRecord = null;
   currentView = 'list';
   renderApp();
@@ -1510,7 +1617,27 @@ function renderBackoffice(container) {
       `).join('')}
     </div>
 
-    <div style="margin-top:20px; display:flex; gap:10px;">
+    <div style="margin-top:24px;">
+      <div class="section-title" style="margin-bottom:12px;">${t('sheetsIntegration')}</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">${t('sheetsUrlHint')}</p>
+      <div class="form-group">
+        <label class="form-label">${t('sheetsUrl')}</label>
+        <input type="url" id="sheets-url-input" class="form-control"
+          placeholder="${t('sheetsUrlPlaceholder')}"
+          value="${localStorage.getItem(SHEETS_URL_KEY) || ''}"
+          style="font-size:12px;">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-primary" id="btn-save-sheets-url" style="flex:1;">
+          <i data-feather="link"></i> ${t('sheetsSave')}
+        </button>
+        <button class="btn btn-secondary" id="btn-sync-all-sheets" style="flex:1;">
+          <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:10px;">
       <button class="btn btn-secondary" id="btn-export-all" style="flex:1;">
         <i data-feather="download"></i> ${t('exportAllData')}
       </button>
@@ -1534,6 +1661,29 @@ function renderBackoffice(container) {
       if (confirm(t('confirmExport'))) {
         exportAllData();
       }
+    });
+  }
+
+  // Bind Sheets URL save
+  const saveSheetsBtn = container.querySelector('#btn-save-sheets-url');
+  if (saveSheetsBtn) {
+    saveSheetsBtn.addEventListener('click', () => {
+      const input = container.querySelector('#sheets-url-input');
+      const url = input ? input.value.trim() : '';
+      localStorage.setItem(SHEETS_URL_KEY, url);
+      showToast(t('sheetsSaved'));
+    });
+  }
+
+  // Bind Sync All — pushes every module to Sheets at once
+  const syncAllBtn = container.querySelector('#btn-sync-all-sheets');
+  if (syncAllBtn) {
+    syncAllBtn.addEventListener('click', () => {
+      const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+      if (!url) { showToast(t('sheetsUrlPlaceholder')); return; }
+      ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling']
+        .forEach(m => syncModuleToSheets(m));
+      showToast(t('sheetsSyncAll') + ' ✓');
     });
   }
 
