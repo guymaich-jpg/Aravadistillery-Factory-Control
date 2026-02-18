@@ -28,10 +28,7 @@ module.exports = defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 13'] },
-    },
+    // Mobile Safari (WebKit) disabled — webkit binaries unavailable in this environment
     {
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },

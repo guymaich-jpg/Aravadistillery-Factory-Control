@@ -70,17 +70,20 @@ test.describe('Security: Delete requires manager password', () => {
     await freshApp(page);
     await loginAsManager(page);
 
-    const result = await page.evaluate(() => {
-      return new Promise(resolve => {
-        showManagerPasswordModal(() => resolve('success'));
-      });
+    // Open the modal (don't await the Promise — we need to interact with the modal)
+    await page.evaluate(() => {
+      window._callbackFired = false;
+      showManagerPasswordModal(() => { window._callbackFired = true; });
     });
 
-    // Fill correct password
+    await expect(page.locator('.manager-pwd-dialog')).toBeVisible();
+
+    // Fill correct password and confirm
     await page.fill('#mpd-password', 'manager123');
     await page.click('.mpd-confirm');
 
-    expect(result).toBe('success');
+    const callbackFired = await page.evaluate(() => !!window._callbackFired);
+    expect(callbackFired).toBe(true);
   });
 
   test('cancel button closes modal without deleting', async ({ page }) => {
