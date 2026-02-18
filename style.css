@@ -39,6 +39,7 @@
 html,
 body {
   height: 100%;
+  height: 100dvh; /* Dynamic viewport height — handles mobile browser chrome appearing/disappearing */
   font-family: 'Inter', 'Noto Sans Thai', -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -100,6 +101,7 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
 
 #app {
   height: 100%;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   max-width: 600px;
@@ -383,7 +385,8 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 6px 4px;
+  padding: 8px 4px;       /* taller tap target for smartphones */
+  min-height: 52px;        /* guaranteed minimum touch target */
   text-decoration: none;
   color: var(--text-muted);
   font-size: 10px;
@@ -999,7 +1002,7 @@ html[dir="rtl"] .toggle-switch input:checked+.toggle-slider::before {
   }
 
   #app {
-    height: 90vh;
+    height: 90dvh;
     max-height: 900px;
     border-radius: 24px;
     overflow: hidden;

@@ -279,6 +279,7 @@ const I18N = {
 
     // ---------- Backoffice ----------
     backofficeSubtitle: "Manage team members, roles, and access levels.",
+    permAdmin: "Super admin — all permissions including approving bottling",
     permManager: "Full access — can view all pages, delete records, and manage users",
     permWorker: "Limited access — can add records, cannot delete or access management",
   },
@@ -559,6 +560,7 @@ const I18N = {
 
     // ---------- Backoffice ----------
     backofficeSubtitle: "נהל חברי צוות, תפקידים ורמות גישה.",
+    permAdmin: "מנהל-על — כל ההרשאות כולל אישור בקבוק",
     permManager: "גישה מלאה — יכול לצפות בכל העמודים, למחוק רשומות ולנהל משתמשים",
     permWorker: "גישה מוגבלת — יכול להוסיף רשומות, לא יכול למחוק או לגשת לניהול",
   },
@@ -840,6 +842,7 @@ const I18N = {
 
     // ---------- Backoffice ----------
     backofficeSubtitle: "จัดการสมาชิกทีม บทบาท และระดับการเข้าถึง",
+    permAdmin: "ผู้ดูแลสูงสุด — สิทธิ์ทั้งหมด รวมถึงการอนุมัติการบรรจุขวด",
     permManager: "การเข้าถึงเต็มรูปแบบ — สามารถดูทุกหน้า ลบบันทึก และจัดการผู้ใช้",
     permWorker: "การเข้าถึงจำกัด — สามารถเพิ่มบันทึก ไม่สามารถลบหรือเข้าถึงการจัดการ",
   }

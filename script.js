@@ -273,9 +273,6 @@ function renderLogin() {
       <div class="login-switch">
         ${t('dontHaveAccount')} <a href="#" id="go-signup">${t('signUp')}</a>
       </div>
-      <div class="login-hint">
-        <strong>Demo:</strong> manager / manager123 &bull; worker1 / worker123
-      </div>
     </div>
   `;
 }
@@ -490,7 +487,7 @@ function bindNav() {
       else if (nav === 'production') { currentModule = 'fermentation'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
       else if (nav === 'inventory') { currentModule = 'inventory'; }
-      else if (nav === 'settings') { currentModule = null; }
+      else if (nav === 'backoffice') { currentModule = null; }
 
       renderApp();
     });
@@ -1376,11 +1373,6 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div class="inventory-actions" style="margin-top:24px;">
-      <button class="btn btn-secondary" id="export-inv-btn" style="width:100%;">
-        <i data-feather="download"></i> ${t('exportCSV')}
-      </button>
-    </div>
   `;
 
   // Bind tabs
@@ -1393,24 +1385,6 @@ function renderInventory(container) {
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
       container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
     });
-  });
-
-  // Bind Export (with gaps if applicable)
-  container.querySelector('#export-inv-btn').addEventListener('click', () => {
-    if (lastVersion) {
-      // Export current state with gaps
-      const exportData = Object.keys(currentSnapshot.items).map(key => ({
-        Item: key,
-        CurrentQty: currentSnapshot.items[key],
-        PreviousQty: lastVersion.items[key] || 0,
-        Gap: (currentSnapshot.items[key] || 0) - (lastVersion.items[key] || 0)
-      }));
-      exportToCSV(exportData, `inventory_audit_${todayStr()}.csv`);
-    } else {
-      const exportData = Object.entries(currentSnapshot.items).map(([key, val]) => ({ Item: key, Qty: val }));
-      exportToCSV(exportData, `inventory_${todayStr()}.csv`);
-    }
-    showToast(t('exportCSV') + ' ✓');
   });
 
   // Version Detail View
@@ -1586,6 +1560,10 @@ function renderBackoffice(container) {
 
     <div class="permissions-legend">
       <div class="perm-legend-row">
+        <span class="role-pill role-pill-admin">${t('role_admin')}</span>
+        <span>${t('permAdmin')}</span>
+      </div>
+      <div class="perm-legend-row">
         <span class="role-pill role-pill-manager">${t('role_manager')}</span>
         <span>${t('permManager')}</span>
       </div>
@@ -1743,6 +1721,7 @@ function renderUserForm(container) {
         <select class="form-select" id="bo-role">
           <option value="worker" ${u.role === 'worker' ? 'selected' : ''}>${t('role_worker')}</option>
           <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>${t('role_manager')}</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role_admin') || 'Admin'}</option>
         </select>
       </div>
       
@@ -1847,6 +1826,26 @@ function renderUserForm(container) {
     }
   });
 }
+
+// ============================================================
+// PERIODIC HARD REFRESH
+// ============================================================
+// Reloads the page every 5 minutes to ensure the latest version is loaded.
+// Defers the reload if the user is actively filling a form.
+(function setupHardRefresh() {
+  const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+  function tryReload() {
+    if (typeof currentView !== 'undefined' && currentView === 'form') {
+      // User is in a form — check again in 60 seconds
+      setTimeout(tryReload, 60 * 1000);
+    } else {
+      location.reload(true);
+    }
+  }
+
+  setInterval(tryReload, INTERVAL_MS);
+})();
 
 // ============================================================
 // INIT

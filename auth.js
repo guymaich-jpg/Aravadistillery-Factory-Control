@@ -2,12 +2,10 @@
 // auth.js — Authentication & Role Management
 // ============================================================
 
-// Default users (in production, this would be a backend)
+// Default users
 const DEFAULT_USERS = [
-  { username: 'admin', password: 'admin123', role: 'admin', name: 'System Administrator', nameHe: 'מנהל מערכת', email: 'admin@arava.com', status: 'active' },
-  { username: 'manager', password: 'manager123', role: 'manager', name: 'Factory Manager', nameHe: 'מנהל מפעל', email: 'manager@arava.com', status: 'active' },
-  { username: 'worker1', password: 'worker123', role: 'worker', name: 'Worker 1', nameHe: 'עובד 1', email: 'worker1@arava.com', status: 'active' },
-  { username: 'worker2', password: 'worker123', role: 'worker', name: 'Worker 2', nameHe: 'עובד 2', email: 'worker2@arava.com', status: 'active' },
+  { username: 'GuyMaich', password: 'GuyMaich1234', role: 'admin', name: 'Guy Maich', nameHe: 'גיא מייך', email: 'guy@arava.com', status: 'active' },
+  { username: 'YonatanGarini', password: 'YonatanGarini1234', role: 'admin', name: 'Yonatan Garini', nameHe: 'יונתן גריני', email: 'yonatan@arava.com', status: 'active' },
   { username: 'qa', password: 'qa123', role: 'worker', name: 'QA Inspector', nameHe: 'בודק איכות', email: 'qa@arava.com', status: 'active' },
 ];
 
@@ -66,14 +64,15 @@ function getUsers() {
     users = DEFAULT_USERS;
     localStorage.setItem('factory_users', JSON.stringify(users));
   } else {
-    // Ensure admin user exists (migration)
-    if (!users.find(u => u.username === 'admin')) {
-      const adminUser = DEFAULT_USERS.find(u => u.username === 'admin');
-      if (adminUser) {
-        users.push(adminUser);
-        localStorage.setItem('factory_users', JSON.stringify(users));
+    // Migration: ensure required users always exist
+    let changed = false;
+    for (const required of DEFAULT_USERS) {
+      if (!users.find(u => u.username === required.username)) {
+        users.push(required);
+        changed = true;
       }
     }
+    if (changed) localStorage.setItem('factory_users', JSON.stringify(users));
   }
   return users;
 }
