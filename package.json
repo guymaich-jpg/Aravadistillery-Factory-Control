@@ -14,7 +14,7 @@
     "release:prod": "bash scripts/release-prod.sh"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.56.0"
   },
   "keywords": [
     "distillery",

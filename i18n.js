@@ -240,6 +240,9 @@ const I18N = {
 
     // ---------- Misc UI ----------
     modulesLabel: "Modules",
+    pendingApprovals: "Pending",
+    recentActivity: "Recent Activity",
+    tapPlusToAdd: "Tap + to add your first record",
     clearSignature: "Clear",
     keepCurrentPassword: "Leave blank to keep current",
     sessionExpired: "Session expired. Please log in.",
@@ -520,6 +523,9 @@ const I18N = {
 
     // ---------- Misc UI ----------
     modulesLabel: "מודולים",
+    pendingApprovals: "ממתין",
+    recentActivity: "פעילות אחרונה",
+    tapPlusToAdd: "לחץ + כדי להוסיף רשומה ראשונה",
     clearSignature: "נקה",
     keepCurrentPassword: "השאר ריק לשמירת הסיסמה הנוכחית",
     sessionExpired: "פג תוקף ההתחברות. אנא התחבר מחדש.",
@@ -801,6 +807,9 @@ const I18N = {
 
     // ---------- Misc UI ----------
     modulesLabel: "โมดูล",
+    pendingApprovals: "รอดำเนินการ",
+    recentActivity: "กิจกรรมล่าสุด",
+    tapPlusToAdd: "แตะ + เพื่อเพิ่มรายการแรก",
     clearSignature: "ล้าง",
     keepCurrentPassword: "ปล่อยว่างเพื่อเก็บรหัสผ่านเดิม",
     sessionExpired: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",

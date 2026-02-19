@@ -61,8 +61,7 @@ test.describe('Fermentation Module', () => {
   test('can add fermentation record', async ({ page }) => {
     await page.click('.fab-add');
     await page.selectOption('#field-tankSize', '400');
-    await page.fill('#field-datesKg', '112');
-    await page.fill('#field-quantity', '380');
+    await page.fill('#field-datesCrates', '6');
     await page.fill('#field-temperature', '25');
     await page.fill('#field-sugar', '18');
     await page.fill('#field-ph', '4.5');
