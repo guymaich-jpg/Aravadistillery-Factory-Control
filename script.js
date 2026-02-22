@@ -3,7 +3,6 @@
 // ============================================================
 
 // ---------- State ----------
-// ---------- State ----------
 let currentScreen = 'dashboard';
 let currentModule = null;   // which form/list is open
 let currentView = 'list';   // 'list' | 'form' | 'detail'
@@ -11,6 +10,8 @@ let editingRecord = null;
 let signatureCanvas = null;
 let sigCtx = null;
 let sigDrawing = false;
+let _navDirection = 'none'; // 'forward' | 'back' | 'none' — for iOS-style transitions
+const _scrollPositions = {}; // keyed by "screen:module" — preserves scroll on tab switch
 
 // ---------- Helpers ----------
 const $ = sel => document.querySelector(sel);
@@ -110,6 +111,7 @@ function syncModuleToSheets(module) {
       { key: 'temp', labelKey: 'd2_temp' },
       { key: 'timeRange', labelKey: 'd2_timeRange' },
       { key: 'quantity', labelKey: 'd2_quantity' },
+      { key: 'd1InputQty', labelKey: 'd2_d1InputQty' },
     ],
     bottling: [
       { key: 'date', labelKey: 'bt_bottlingDate' },
@@ -123,6 +125,7 @@ function syncModuleToSheets(module) {
       { key: 'taste', labelKey: 'bt_taste' },
       { key: 'contaminants', labelKey: 'bt_contaminants' },
       { key: 'bottleCount', labelKey: 'bt_bottleCount' },
+      { key: 'd2InputQty', labelKey: 'bt_d2InputQty' },
       { key: 'decision', labelKey: 'bt_decision' },
     ],
   };
@@ -188,6 +191,75 @@ function toggleTheme() {
   if (typeof feather !== 'undefined') feather.replace();
 }
 
+// Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
+// Called automatically after any record is saved, updated, or deleted.
+function syncInventorySnapshot(triggeredBy) {
+  const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!url) return;
+
+  const bottlingRecords = getData(STORE_KEYS.bottling);
+  const rawRecords = getData(STORE_KEYS.rawMaterials);
+  const dateRecords = getData(STORE_KEYS.dateReceiving);
+  const fermRecords = getData(STORE_KEYS.fermentation);
+  const d1Records = getData(STORE_KEYS.distillation1);
+  const d2Records = getData(STORE_KEYS.distillation2);
+
+  const bottleInv = {};
+  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
+  bottlingRecords.forEach(r => {
+    if (r.drinkType && r.decision === 'approved') {
+      bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+    }
+  });
+
+  const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
+  const totalDatesInFerm = fermRecords.reduce((sum, r) => {
+    if (r.datesCrates !== undefined && r.datesCrates !== '') return sum + (parseFloat(r.datesCrates) || 0) * 20;
+    return sum + (parseFloat(r.datesKg) || 0);
+  }, 0);
+
+  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
+  const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
+  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
+
+  const session = getSession();
+  const record = {
+    timestamp: new Date().toISOString(),
+    user: session?.username || 'unknown',
+    triggeredBy: triggeredBy || 'save',
+    dates_available: Math.max(0, totalDatesReceived - totalDatesInFerm),
+    dates_received: totalDatesReceived,
+    dates_in_ferm: totalDatesInFerm,
+    d1_produced: d1Produced,
+    d1_available: Math.max(0, d1Produced - d1Consumed),
+    d2_produced: d2Produced,
+    d2_available: Math.max(0, d2Produced - d2Consumed),
+    ...DRINK_TYPES.reduce((acc, dt) => ({ ...acc, [dt]: bottleInv[dt] || 0 }), {}),
+  };
+
+  const keys = Object.keys(record);
+  const labels = [
+    'Timestamp', 'User', 'Triggered By',
+    t('inv_dates'), 'Dates Received (kg)', t('inv_datesUsed'),
+    'D1 Produced (L)', 'D1 Available (L)',
+    'D2 Produced (L)', 'D2 Available (L)',
+    ...DRINK_TYPES.map(dt => t(dt)),
+  ];
+
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      sheetName: t('mod_inventory'),
+      action: 'append',
+      keys,
+      labels,
+      records: [record],
+    }),
+    mode: 'no-cors',
+  }).catch(() => {});
+}
+
 // ---- Manager Password Modal (required for any delete action) ----
 function showManagerPasswordModal(onSuccess) {
   // Remove any existing modal
@@ -251,7 +323,7 @@ function renderApp() {
 
   if (!session) {
     app.innerHTML = renderLogin();
-    feather.replace();
+    if (typeof feather !== 'undefined') feather.replace();
     bindLogin();
     return;
   }
@@ -263,6 +335,11 @@ function renderApp() {
   `;
 
   const content = $('#screen-content');
+
+  // Apply iOS-style transition direction class
+  if (_navDirection === 'forward') content.classList.add('nav-forward');
+  else if (_navDirection === 'back') content.classList.add('nav-back');
+  _navDirection = 'none'; // reset after applying
 
   if (currentModule && currentView === 'form') {
     renderModuleForm(content);
@@ -276,9 +353,15 @@ function renderApp() {
     renderDashboard(content);
   }
 
-  feather.replace();
+  if (typeof feather !== 'undefined') feather.replace();
   bindNav();
   checkSecurity();
+
+  // Restore scroll position if we saved one for this view
+  const scrollKey = (currentModule || currentScreen) + ':' + currentView;
+  if (_scrollPositions[scrollKey]) {
+    content.scrollTop = _scrollPositions[scrollKey];
+  }
 }
 
 function checkSecurity() {
@@ -491,10 +574,10 @@ function renderHeader() {
     <div class="app-header">
       <div class="header-left">
         ${showBack ? `<button class="header-back" id="header-back"><i data-feather="arrow-left"></i></button>` : ''}
-        <span class="header-title">${title}</span>
-      </div>
-      <div class="header-right">
         <span class="user-badge"><span class="role-dot ${roleClass}"></span>${getUserDisplayName()}</span>
+      </div>
+      <span class="header-title">${title}</span>
+      <div class="header-right">
         <button class="theme-btn" onclick="toggleTheme()">
           ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
             ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
@@ -516,6 +599,7 @@ function getModuleTitle(mod) {
     distillation2: 'mod_distillation2',
     bottling: 'mod_bottling',
     inventory: 'mod_inventory',
+    spiritStock: 'mod_spiritStock',
   };
   return t(map[mod] || mod);
 }
@@ -528,6 +612,7 @@ function renderBottomNav() {
     { id: 'dashboard', icon: 'grid', label: 'nav_dashboard' },
     { id: 'receiving', icon: 'package', label: 'nav_receiving' },
     { id: 'production', icon: 'activity', label: 'nav_production' },
+    { id: 'spiritStock', icon: 'droplet', label: 'nav_spiritStock' },
     { id: 'bottling', icon: 'check-circle', label: 'nav_bottling' },
     { id: 'inventory', icon: 'database', label: 'nav_inventory' },
   ];
@@ -549,17 +634,26 @@ function renderBottomNav() {
 }
 
 function bindNav() {
+  // Save current scroll before navigating away
+  function saveScroll() {
+    const sc = $('#screen-content');
+    if (sc) _scrollPositions[(currentModule || currentScreen) + ':' + currentView] = sc.scrollTop;
+  }
+
   // Bottom nav
   $$('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
+      saveScroll();
       const nav = btn.dataset.nav;
+      _navDirection = 'forward';
       currentScreen = nav;
       currentView = 'list';
       editingRecord = null;
 
-      if (nav === 'dashboard') { currentModule = null; }
+      if (nav === 'dashboard') { currentModule = null; _navDirection = 'back'; }
       else if (nav === 'receiving') { currentModule = 'rawMaterials'; }
       else if (nav === 'production') { currentModule = 'fermentation'; }
+      else if (nav === 'spiritStock') { currentModule = 'spiritStock'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
       else if (nav === 'inventory') { currentModule = 'inventory'; }
       else if (nav === 'backoffice') { currentModule = null; }
@@ -572,6 +666,8 @@ function bindNav() {
   const backBtn = $('#header-back');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
+      saveScroll();
+      _navDirection = 'back';
       if (currentView === 'form' || currentView === 'detail') {
         currentView = 'list';
         editingRecord = null;
@@ -599,17 +695,32 @@ function bindNav() {
 function renderDashboard(container) {
   const session = getSession();
   const modules = [
-    { key: 'rawMaterials', icon: 'package', store: STORE_KEYS.rawMaterials },
-    { key: 'dateReceiving', icon: 'sun', store: STORE_KEYS.dateReceiving },
-    { key: 'fermentation', icon: 'thermometer', store: STORE_KEYS.fermentation },
-    { key: 'distillation1', icon: 'droplet', store: STORE_KEYS.distillation1 },
-    { key: 'distillation2', icon: 'filter', store: STORE_KEYS.distillation2 },
-    { key: 'bottling', icon: 'check-circle', store: STORE_KEYS.bottling },
-    { key: 'inventory', icon: 'database', store: null },
+    { key: 'rawMaterials', icon: 'package', store: STORE_KEYS.rawMaterials, color: 'var(--color-receiving)' },
+    { key: 'dateReceiving', icon: 'sun', store: STORE_KEYS.dateReceiving, color: 'var(--color-dates)' },
+    { key: 'fermentation', icon: 'thermometer', store: STORE_KEYS.fermentation, color: 'var(--color-fermentation)' },
+    { key: 'distillation1', icon: 'droplet', store: STORE_KEYS.distillation1, color: 'var(--color-dist1)' },
+    { key: 'distillation2', icon: 'filter', store: STORE_KEYS.distillation2, color: 'var(--color-dist2)' },
+    { key: 'bottling', icon: 'check-circle', store: STORE_KEYS.bottling, color: 'var(--color-bottling)' },
+    { key: 'inventory', icon: 'database', store: null, color: 'var(--color-inventory)' },
   ];
 
   const totalRecords = Object.values(STORE_KEYS).reduce((sum, k) => sum + getRecordCount(k), 0);
   const todayTotal = Object.values(STORE_KEYS).reduce((sum, k) => sum + getTodayRecords(k).length, 0);
+
+  // Pending approvals: bottling records without a decision
+  const bottlingRecords = getData(STORE_KEYS.bottling);
+  const pendingApprovals = bottlingRecords.filter(r => !r.decision || (r.decision !== 'approved' && r.decision !== 'notApproved')).length;
+
+  // Recent activity: latest 5 records across all modules
+  const recentRecords = [];
+  const moduleEntries = modules.filter(m => m.store);
+  moduleEntries.forEach(m => {
+    getData(m.store).forEach(r => {
+      recentRecords.push({ ...r, _module: m.key, _icon: m.icon, _color: m.color });
+    });
+  });
+  recentRecords.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const topRecent = recentRecords.slice(0, 5);
 
   container.innerHTML = `
     <div class="welcome-card">
@@ -623,8 +734,8 @@ function renderDashboard(container) {
         <div class="chip-label">${t('todayActivity')}</div>
       </div>
       <div class="today-chip">
-        <div class="chip-num">${totalRecords}</div>
-        <div class="chip-label">${t('totalRecords')}</div>
+        <div class="chip-num">${pendingApprovals}</div>
+        <div class="chip-label">${t('pendingApprovals')}</div>
       </div>
     </div>
 
@@ -638,6 +749,22 @@ function renderDashboard(container) {
         </div>
       `).join('')}
     </div>
+
+    ${topRecent.length ? `
+      <div class="section-title" style="margin-top:24px;">${t('recentActivity')}</div>
+      ${topRecent.map(r => {
+        const title = r.item || r.supplier || r.drinkType || r.type || r.batchNumber || getModuleTitle(r._module);
+        const time = r.createdAt ? formatDate(r.createdAt) : '';
+        return `
+          <div class="recent-activity-item" data-ra-module="${r._module}" data-ra-id="${r.id}">
+            <div class="ra-icon" style="background:${r._color}20;color:${r._color}"><i data-feather="${r._icon}"></i></div>
+            <div class="ra-content">
+              <div class="ra-title">${title}</div>
+              <div class="ra-meta">${getModuleTitle(r._module)} &bull; ${time}</div>
+            </div>
+          </div>`;
+      }).join('')}
+    ` : ''}
   `;
 
   // Bind module cards
@@ -645,7 +772,27 @@ function renderDashboard(container) {
     card.addEventListener('click', () => {
       currentModule = card.dataset.module;
       currentView = 'list';
+      _navDirection = 'forward';
       renderApp();
+    });
+  });
+
+  // Bind recent activity items
+  container.querySelectorAll('.recent-activity-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const mod = item.dataset.raModule;
+      const id = item.dataset.raId;
+      const storeKey = STORE_KEYS[mod];
+      if (storeKey) {
+        const record = getData(storeKey).find(r => r.id === id);
+        if (record) {
+          currentModule = mod;
+          editingRecord = record;
+          currentView = 'detail';
+          _navDirection = 'forward';
+          renderApp();
+        }
+      }
     });
   });
 }
@@ -656,6 +803,10 @@ function renderDashboard(container) {
 function renderModuleList(container) {
   if (currentModule === 'inventory') {
     renderInventory(container);
+    return;
+  }
+  if (currentModule === 'spiritStock') {
+    renderSpiritStock(container);
     return;
   }
 
@@ -702,6 +853,7 @@ function renderModuleList(container) {
       <div class="empty-state">
         <i data-feather="inbox"></i>
         <p>${t('noData')}</p>
+        ${hasPermission('canAddRecords') ? `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
@@ -716,14 +868,17 @@ function renderModuleList(container) {
     fab.addEventListener('click', () => {
       editingRecord = null;
       currentView = 'form';
+      _navDirection = 'forward';
       renderApp();
     });
     container.appendChild(fab);
   }
 
-  // Bind tabs
+  // Bind tabs (save/restore scroll per tab)
   container.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const sc = $('#screen-content');
+      if (sc) _scrollPositions[(currentModule || currentScreen) + ':' + currentView] = sc.scrollTop;
       currentModule = btn.dataset.tab;
       currentView = 'list';
       renderApp();
@@ -746,6 +901,7 @@ function renderModuleList(container) {
       if (records.find(r => r.id === btn.dataset.id)) {
         updateRecord(storeKey, btn.dataset.id, { decision: 'approved' });
         syncModuleToSheets(currentModule);
+        syncInventorySnapshot('approve');
         renderApp();
       }
     });
@@ -756,6 +912,7 @@ function renderModuleList(container) {
     item.addEventListener('click', () => {
       editingRecord = records.find(r => r.id === item.dataset.id);
       currentView = 'detail';
+      _navDirection = 'forward';
       renderApp();
     });
   });
@@ -854,6 +1011,7 @@ function renderModuleDetail(container) {
   if (editBtn) {
     editBtn.addEventListener('click', () => {
       currentView = 'form';
+      _navDirection = 'forward';
       renderApp();
     });
   }
@@ -864,8 +1022,10 @@ function renderModuleDetail(container) {
       showManagerPasswordModal(() => {
         deleteRecord(STORE_KEYS[currentModule], editingRecord.id);
         syncModuleToSheets(currentModule);
+        syncInventorySnapshot('delete');
         editingRecord = null;
         currentView = 'list';
+        _navDirection = 'back';
         renderApp();
         showToast(t('delete') + ' ✓');
       });
@@ -931,6 +1091,7 @@ function renderModuleForm(container) {
   container.querySelector('#form-cancel').addEventListener('click', () => {
     currentView = editingRecord ? 'detail' : 'list';
     if (!editingRecord) editingRecord = null;
+    _navDirection = 'back';
     renderApp();
   });
 
@@ -1165,16 +1326,32 @@ function saveCurrentForm() {
   const fields = getModuleFields(currentModule);
   const record = {};
 
-  // Validate required fields
+  // Clear previous validation errors
+  document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+  document.querySelectorAll('.field-error-msg').forEach(el => el.remove());
+
+  // Validate required fields with inline error highlighting
   const missing = [];
   fields.forEach(f => {
     if (!f.required) return;
-    const el = document.querySelector(`#field-${f.key}`);
-    const val = el ? (el.type === 'checkbox' ? null : el.value) : null;
-    if (!val || val.trim() === '') missing.push(t(f.labelKey));
+    const fieldEl = document.querySelector(`#field-${f.key}`);
+    const val = fieldEl ? (fieldEl.type === 'checkbox' ? null : fieldEl.value) : null;
+    if (!val || val.trim() === '') {
+      missing.push(t(f.labelKey));
+      if (fieldEl) {
+        fieldEl.classList.add('field-error');
+        const errMsg = document.createElement('div');
+        errMsg.className = 'field-error-msg';
+        errMsg.textContent = t('required');
+        fieldEl.parentElement.appendChild(errMsg);
+      }
+    }
   });
   if (missing.length > 0) {
     showToast(`${t('required')}: ${missing.join(', ')}`);
+    // Scroll to first error
+    const firstErr = document.querySelector('.field-error');
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
@@ -1220,6 +1397,10 @@ function saveCurrentForm() {
   // Date field (use the date field or today)
   if (!record.date) record.date = todayStr();
 
+  // Show loading state on save button
+  const saveBtn = document.querySelector('#form-save');
+  if (saveBtn) saveBtn.classList.add('is-loading');
+
   const storeKey = STORE_KEYS[currentModule];
 
   if (editingRecord) {
@@ -1230,8 +1411,10 @@ function saveCurrentForm() {
 
   showToast(t('saved'));
   syncModuleToSheets(currentModule);
+  syncInventorySnapshot('save');
   editingRecord = null;
   currentView = 'list';
+  _navDirection = 'back';
   renderApp();
 }
 
@@ -1348,20 +1531,6 @@ function renderInventory(container) {
   const availableDates = Math.max(0, totalDatesReceived - totalDatesInFerm);
   const activeFerm = fermRecords.filter(r => !r.sentToDistillation).length;
 
-  const currentSnapshot = {
-    items: {
-      ...bottleInv,
-      ...rawInv,
-      totalDatesReceived,
-      totalDatesInFerm,
-      availableDates,
-      activeFerm
-    }
-  };
-
-  const versions = getData(STORE_KEYS.inventoryVersions);
-  const lastVersion = versions[0] || null;
-
   container.innerHTML = `
     ${totalPending > 0 ? `
     <div class="inv-pending-banner">
@@ -1372,7 +1541,6 @@ function renderInventory(container) {
     <div class="tab-bar">
       <button class="tab-btn active" data-inv-tab="bottles">${t('mod_bottleInventory')}</button>
       <button class="tab-btn" data-inv-tab="raw">${t('mod_rawInventory')}</button>
-      <button class="tab-btn" data-inv-tab="versions">${t('inventoryHistory')}</button>
     </div>
 
     <div id="inv-bottles">
@@ -1424,25 +1592,6 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div id="inv-versions" style="display:none;">
-      <div class="inv-section">
-        ${versions.length === 0 ? `<div class="empty-state"><i data-feather="clock"></i><p>${t('noData')}</p></div>` : `
-          <div class="record-list">
-            ${versions.map(v => `
-              <div class="record-item inv-ver-item" data-ver="${v.version}">
-                <div class="ri-top">
-                  <span class="ri-title">${t('versionLabel')} ${v.version}</span>
-                  <span class="ri-date">${formatDate(v.createdAt)}</span>
-                </div>
-                <div class="ri-details">
-                   ${v.createdBy} &bull; ${Object.keys(v.gaps).length > 0 ? t('gapAnalysis') : t('saved')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `}
-      </div>
-    </div>
 
   `;
 
@@ -1475,6 +1624,124 @@ function renderInventory(container) {
 
   // Schedule auto-refresh when pending records become visible
   scheduleInventoryRefresh(container);
+}
+
+// ============================================================
+// SPIRIT PIPELINE SCREEN
+// ============================================================
+function renderSpiritStock(container) {
+  const d1Records = getData(STORE_KEYS.distillation1);
+  const d2Records = getData(STORE_KEYS.distillation2);
+  const bottlingRecords = getData(STORE_KEYS.bottling);
+
+  // D1 totals
+  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
+  const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
+  const d1Available = Math.max(0, d1Produced - d1Consumed);
+  const d1HasConsumed = d1Consumed > 0;
+
+  // D2 totals
+  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
+  const d2Available = Math.max(0, d2Produced - d2Consumed);
+  const d2HasConsumed = d2Consumed > 0;
+
+  const hasAnyData = d1Records.length > 0 || d2Records.length > 0;
+
+  if (!hasAnyData) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i data-feather="droplet"></i>
+        <p>${t('spirit_noData')}</p>
+      </div>`;
+    return;
+  }
+
+  const fmtL = n => n.toFixed(1) + ' L';
+
+  container.innerHTML = `
+    <div class="section-title">${t('spirit_pipeline')}</div>
+
+    <div class="spirit-pipeline">
+
+      <!-- D1 Stage -->
+      <div class="spirit-stage">
+        <div class="spirit-stage-header">
+          <i data-feather="zap" style="width:16px;height:16px;"></i>
+          <span>${t('spirit_d1Label')}</span>
+        </div>
+        <div class="spirit-stage-stats">
+          <div class="spirit-stat">
+            <span class="spirit-stat-label">${t('spirit_produced')}</span>
+            <span class="spirit-stat-val">${fmtL(d1Produced)}</span>
+          </div>
+          ${d1HasConsumed ? `
+          <div class="spirit-stat">
+            <span class="spirit-stat-label">${t('spirit_consumed')}</span>
+            <span class="spirit-stat-val spirit-stat-out">− ${fmtL(d1Consumed)}</span>
+          </div>` : ''}
+          <div class="spirit-stat spirit-stat-available">
+            <span class="spirit-stat-label">${t('spirit_available')}</span>
+            <span class="spirit-stat-val spirit-stat-in">${fmtL(d1Available)}</span>
+          </div>
+        </div>
+        <div class="spirit-count-note">${d1Records.length} ${t('recentEntries').toLowerCase()}</div>
+      </div>
+
+      <div class="spirit-arrow"><i data-feather="arrow-down"></i></div>
+
+      <!-- D2 Stage -->
+      <div class="spirit-stage">
+        <div class="spirit-stage-header">
+          <i data-feather="filter" style="width:16px;height:16px;"></i>
+          <span>${t('spirit_d2Label')}</span>
+        </div>
+        <div class="spirit-stage-stats">
+          <div class="spirit-stat">
+            <span class="spirit-stat-label">${t('spirit_produced')}</span>
+            <span class="spirit-stat-val">${fmtL(d2Produced)}</span>
+          </div>
+          ${d2HasConsumed ? `
+          <div class="spirit-stat">
+            <span class="spirit-stat-label">${t('spirit_consumed')}</span>
+            <span class="spirit-stat-val spirit-stat-out">− ${fmtL(d2Consumed)}</span>
+          </div>` : ''}
+          <div class="spirit-stat spirit-stat-available">
+            <span class="spirit-stat-label">${t('spirit_available')}</span>
+            <span class="spirit-stat-val spirit-stat-in">${fmtL(d2Available)}</span>
+          </div>
+        </div>
+        <div class="spirit-count-note">${d2Records.length} ${t('recentEntries').toLowerCase()}</div>
+      </div>
+
+      <div class="spirit-arrow"><i data-feather="arrow-down"></i></div>
+
+      <!-- Ready to Bottle -->
+      <div class="spirit-stage spirit-stage-final">
+        <div class="spirit-stage-header">
+          <i data-feather="package" style="width:16px;height:16px;"></i>
+          <span>${t('spirit_readyToBottle')}</span>
+        </div>
+        <div class="spirit-stage-stats">
+          <div class="spirit-stat spirit-stat-available">
+            <span class="spirit-stat-label">${t('spirit_available')}</span>
+            <span class="spirit-stat-val spirit-stat-in" style="font-size:22px;">${fmtL(d2Available)}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    ${(!d1HasConsumed || !d2HasConsumed) ? `
+    <div class="spirit-hint">
+      <i data-feather="info" style="width:13px;height:13px;margin-inline-end:5px;vertical-align:middle;"></i>
+      ${!d1HasConsumed && !d2HasConsumed
+        ? 'Add "D1 Spirit Consumed" to D2 records and "D2 Spirit Consumed" to Bottling records to track net balances.'
+        : !d1HasConsumed
+          ? 'Add "D1 Spirit Consumed" to D2 records to track D1 net balance.'
+          : 'Add "D2 Spirit Consumed" to Bottling records to track D2 net balance.'}
+    </div>` : ''}
+  `;
 }
 
 // ============================================================
@@ -1568,6 +1835,7 @@ function getModuleFields(mod) {
         { key: 'temp', labelKey: 'd2_temp', type: 'number', step: '0.1', default: '99.9' },
         { key: 'timeRange', labelKey: 'd2_timeRange', type: 'time-range' },
         { key: 'quantity', labelKey: 'd2_quantity', type: 'number', required: true, step: '0.1' },
+        { key: 'd1InputQty', labelKey: 'd2_d1InputQty', type: 'number', step: '0.1', min: 0 },
       ];
 
     case 'bottling':
@@ -1598,6 +1866,7 @@ function getModuleFields(mod) {
         },
         { key: 'contaminants', labelKey: 'bt_contaminants', type: 'toggle' },
         { key: 'bottleCount', labelKey: 'bt_bottleCount', type: 'number', required: true, min: 0 },
+        { key: 'd2InputQty', labelKey: 'bt_d2InputQty', type: 'number', step: '0.1', min: 0 },
         ...(hasPermission('canApproveBottling') ? [
           { key: 'decision', labelKey: 'bt_decision', type: 'decision', required: true },
         ] : []),
@@ -1899,24 +2168,6 @@ function renderUserForm(container) {
 }
 
 // ============================================================
-// PERIODIC HARD REFRESH
-// ============================================================
-// Reloads the page every 5 minutes to ensure the latest version is loaded.
-// Defers the reload if the user is actively filling a form.
-(function setupHardRefresh() {
-  const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-
-  function tryReload() {
-    if (typeof currentView !== 'undefined' && currentView === 'form') {
-      // User is in a form — check again in 60 seconds
-      setTimeout(tryReload, 60 * 1000);
-    } else {
-      location.reload(true);
-    }
-  }
-
-  setInterval(tryReload, INTERVAL_MS);
-})();
 
 // ============================================================
 // INIT
@@ -1925,4 +2176,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
   if (typeof initGoogleSSO === 'function') initGoogleSSO(handleGoogleSSO);
   renderApp();
+  scheduleHardRefresh();
 });

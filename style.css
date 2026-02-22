@@ -386,15 +386,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
   background: var(--bg-card);
-  border-bottom: 1px solid var(--separator);
-  min-height: 56px;
+  border-bottom: 1px solid var(--border);
+  min-height: 52px;
   position: sticky;
   top: 0;
   z-index: 100;
+  gap: 8px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -406,7 +406,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .header-back {
@@ -419,30 +421,38 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   display: flex;
   align-items: center;
   transition: background 0.2s;
+  flex-shrink: 0;
+  touch-action: manipulation;
 }
 
 .header-back:active { background: var(--accent-bg2); }
 
 .header-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text);
+  flex: 2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 .lang-btn,
 .logout-btn,
 .theme-btn {
   background: var(--bg-surface);
-  border: 1px solid var(--separator);
-  color: var(--text-secondary);
-  padding: 6px 11px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  min-height: 36px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
@@ -450,7 +460,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .lang-btn:active,
@@ -610,9 +621,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -692,38 +703,93 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .module-card .mc-count { display: none; } /* hidden — clean look */
 
 /* ============================================================
+   RECENT ACTIVITY (Dashboard)
+   ============================================================ */
+.recent-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.recent-activity-item:active {
+  transform: scale(0.98);
+}
+
+.ra-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ra-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ra-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ra-title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ra-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ============================================================
    STATS ROW
    ============================================================ */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
-  margin-bottom: 22px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
   background: var(--bg-card);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   padding: 16px 12px;
   text-align: center;
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
 
-.stat-num {
-  font-size: 26px;
+.stat-card .stat-num {
+  font-size: 24px;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
-.stat-label {
-  font-size: 10px;
-  color: var(--text-muted);
+.stat-card .stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   font-weight: 600;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 /* ============================================================
@@ -735,45 +801,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 /* Visually group consecutive form-groups into a card */
 .form-group {
-  background: var(--bg-card);
-  border-radius: 0;
-  padding: 14px 16px;
-  margin-bottom: 0;
-  border-bottom: 1px solid var(--separator);
-  position: relative;
-}
+  margin-bottom: 16px;
 
-/* First field in a group: rounded top */
-.form-container > .form-group:first-of-type,
-.form-container > .form-group:first-child {
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-
-/* Last consecutive field: rounded bottom, no separator */
-.form-container > .form-group:last-of-type {
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  border-bottom: none;
-}
-
-/* Single field: fully rounded */
-.form-container > .form-group:only-of-type {
-  border-radius: var(--radius-sm);
-  border-bottom: none;
-}
-
-/* Card shadow on the group block */
-.form-container > .form-group:first-child {
-  box-shadow: var(--shadow);
-}
-
-/* Spacing between the action buttons and the field block */
 .form-actions {
   margin-top: 24px;
   padding-bottom: 20px;
   display: flex;
   gap: 10px;
-  background: transparent;
-  box-shadow: none;
+}
 }
 
 .form-label {
@@ -792,15 +827,61 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .form-select,
 .form-textarea {
   width: 100%;
-  padding: 10px 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
+  padding: 12px 14px;
+  min-height: 48px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 16px;
   font-family: inherit;
   outline: none;
   -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--accent);
+}
+
+/* Inline field validation error */
+.form-input.field-error,
+.form-select.field-error,
+.form-textarea.field-error {
+  border-color: var(--danger);
+}
+
+.field-error-msg {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+/* Save button loading spinner */
+.btn.is-loading {
+  pointer-events: none;
+  opacity: 0.7;
+  position: relative;
+}
+
+.btn.is-loading::after {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: btnSpin 0.6s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-start: 8px;
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
 }
 
 .form-select {
@@ -882,7 +963,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    ============================================================ */
 .btn {
   flex: 1;
-  padding: 15px;
+  padding: 14px;
+  min-height: 48px;
   border: none;
   border-radius: var(--radius-sm);
   font-size: 15px;
@@ -890,7 +972,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   cursor: pointer;
   transition: transform 0.1s, opacity 0.2s;
   font-family: inherit;
-  letter-spacing: -0.1px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .btn:active { transform: scale(0.97); }
@@ -1107,8 +1190,78 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   color: var(--text-muted);
 }
 
-.empty-state svg { width: 44px; height: 44px; margin-bottom: 14px; opacity: 0.35; }
-.empty-state p   { font-size: 15px; }
+.empty-state svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.empty-state p {
+  font-size: 14px;
+}
+
+/* ============================================================
+   RESPONSIVE — WIDER SCREENS
+   ============================================================ */
+
+/* Lock the app to a phone-width column on all non-mobile screens */
+@media (min-width: 481px) {
+  #app {
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.4);
+    max-width: 480px;
+  }
+
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+}
+
+/* Tablets and small desktops */
+@media (min-width: 768px) {
+  .module-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .login-form {
+    max-width: 360px;
+  }
+
+  .form-actions {
+    max-width: 380px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Large desktops — vertically center the phone frame */
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app {
+    height: 90vh;
+    max-height: 900px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .bottom-nav {
+    border-radius: 0 0 24px 24px;
+  }
+}
 
 /* ============================================================
    SIGNATURE PAD
@@ -1239,6 +1392,73 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   max-width: 58%;
 }
 
+.detail-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-card h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* iOS-style push/pop screen transitions */
+@keyframes slideInFromRight {
+  from { transform: translateX(30%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+
+@keyframes slideInFromLeft {
+  from { transform: translateX(-30%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.screen-content>* {
+  animation: fadeInUp 0.22s ease-out forwards;
+}
+
+.screen-content.nav-forward>* {
+  animation: slideInFromRight 0.25s ease-out forwards;
+}
+
+.screen-content.nav-back>* {
+  animation: slideInFromLeft 0.25s ease-out forwards;
+}
+
+/* (duplicate stat-card definitions removed — see STATS ROW section above) */
+
+/* ============================================================
+   REVISED RECORD ITEM
+   ============================================================ */
+.record-item.user-item .ri-details,
+.record-item.inv-ver-item .ri-details {
+  font-size: 11px;
+  line-height: 1.4;
+}
 /* ============================================================
    MANAGER PASSWORD MODAL
    ============================================================ */
@@ -1373,94 +1593,105 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   margin-top: 1px;
 }
 
-.record-item.user-item .ri-details,
-.record-item.inv-ver-item .ri-details {
+/* ============================================================
+   SPIRIT PIPELINE SCREEN
+   ============================================================ */
+.spirit-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 12px;
+}
+
+.spirit-stage {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 0;
+}
+
+.spirit-stage-final {
+  border-color: var(--success);
+}
+
+.spirit-stage-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.spirit-stage-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spirit-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.spirit-stat-available {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.spirit-stat-label {
+  color: var(--text-secondary);
+}
+
+.spirit-stat-val {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.spirit-stat-in {
+  color: var(--success);
+}
+
+.spirit-stat-out {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.spirit-arrow {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+  color: var(--text-muted, var(--text-secondary));
+  opacity: 0.5;
+}
+
+.spirit-count-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  opacity: 0.7;
+}
+
+.spirit-hint {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-size: 12px;
-  line-height: 1.4;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
+
 
 /* ============================================================
-   ANIMATIONS
-   ============================================================ */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.screen-content > * { animation: fadeIn 0.22s ease forwards; }
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-@media (min-width: 601px) {
-  #app {
-    border-left: 1px solid var(--separator);
-    border-right: 1px solid var(--separator);
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.10);
-    max-width: 600px;
-  }
-}
-
-@media (min-width: 768px) {
-  .module-grid    { grid-template-columns: repeat(3, 1fr); }
-  .stats-row      { grid-template-columns: repeat(3, 1fr); }
-  .login-form     { max-width: 380px; }
-}
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #app {
-    height: 90dvh;
-    max-height: 900px;
-    border-radius: 24px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.15);
-  }
-
-  .bottom-nav { border-radius: 0 0 24px 24px; }
-}
-
-/* ============================================================
-   FORM INPUT — standalone mode for modal inputs
-   (the .mpd-input inside the modal still needs a border)
-   ============================================================ */
-.manager-pwd-dialog .form-input {
-  background: var(--bg-input);
-  border: 1.5px solid var(--separator);
-  border-radius: var(--radius-sm);
-  padding: 13px 14px;
-  box-shadow: none;
-}
-
-.manager-pwd-dialog .form-input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-/* login-screen inputs already styled; backoffice form inputs need borders too */
-.form-container .form-input:focus,
-.form-container .form-select:focus,
-.form-container .form-textarea:focus {
-  outline: none;
-}
-
-.form-group:focus-within {
-  background: var(--bg-elevated);
-}
-
-/* ============================================================
-   EXPORT BUTTON (module list, non-inventory)
+   EXPORT BUTTON
    ============================================================ */
 .export-row {
   display: flex;
