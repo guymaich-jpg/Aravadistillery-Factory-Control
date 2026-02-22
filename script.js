@@ -148,32 +148,6 @@ function syncModuleToSheets(module) {
   }).catch(() => {});
 }
 
-// ============================================================
-// GOOGLE SSO HANDLER
-// ============================================================
-/**
- * Called by firebase.js after Google One Tap / Sign-In resolves.
- * Maps the Google email to a registered app user — no password needed.
- */
-function handleGoogleSSO(googleUser) {
-  const users = getUsers();
-  const matched = users.find(u =>
-    u.email && u.email.toLowerCase() === googleUser.email.toLowerCase() &&
-    u.status !== 'inactive'
-  );
-
-  if (!matched) {
-    const errEl = document.getElementById('login-error');
-    if (errEl) {
-      errEl.textContent = t('googleSSONotRegistered') ||
-        'This Google account is not registered in the system. Contact your admin.';
-    }
-    return;
-  }
-
-  createSession(matched);
-  renderApp();
-}
 
 // ============================================================
 // THEME
@@ -347,6 +321,8 @@ function renderApp() {
     renderModuleDetail(content);
   } else if (currentModule && currentView === 'list') {
     renderModuleList(content);
+  } else if (currentScreen === 'pendingRequests') {
+    renderPendingRequests(content);
   } else if (currentScreen === 'backoffice') {
     renderBackoffice(content);
   } else {
@@ -373,12 +349,12 @@ function checkSecurity() {
 }
 
 // ============================================================
-// LOGIN & SIGN UP
+// LOGIN & REQUEST ACCESS
 // ============================================================
-let authMode = 'login'; // 'login' | 'signup'
+let authMode = 'login'; // 'login' | 'request'
 
 function renderLogin() {
-  if (authMode === 'signup') return renderSignUp();
+  if (authMode === 'request') return renderRequestAccess();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
@@ -388,7 +364,7 @@ function renderLogin() {
       <p>${t('loginSubtitle')}</p>
       <div class="login-form">
         <div class="field">
-          <input type="text" id="login-user" placeholder="${t('username')}" autocomplete="username" autocapitalize="none">
+          <input type="email" id="login-user" placeholder="${t('emailAddress')}" autocomplete="email" autocapitalize="none">
         </div>
         <div class="field">
           <input type="password" id="login-pass" placeholder="${t('password')}" autocomplete="current-password">
@@ -396,58 +372,32 @@ function renderLogin() {
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error"></div>
       </div>
-
-      ${typeof GOOGLE_SSO_ENABLED !== 'undefined' && GOOGLE_SSO_ENABLED ? `
-      <div class="sso-divider"><span>${t('orContinueWith') || 'or'}</span></div>
-      <button class="google-sso-btn" id="google-sso-btn">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-        </svg>
-        ${t('signInWithGoogle') || 'Sign in with Google'}
-      </button>` : ''}
-
       <div class="login-switch">
-        ${t('dontHaveAccount')} <a href="#" id="go-signup">${t('signUp')}</a>
+        ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
       </div>
     </div>
   `;
 }
 
-function renderSignUp() {
+function renderRequestAccess() {
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
       <div class="login-logo">
         <i data-feather="user-plus" style="width:36px;height:36px;"></i>
       </div>
-      <h1>${t('signUpTitle')}</h1>
-      <p>${t('signUpSubtitle')}</p>
+      <h1>${t('requestAccessTitle')}</h1>
+      <p>${t('requestAccessSubtitle')}</p>
       <div class="login-form">
         <div class="field">
-          <input type="text" id="signup-name" placeholder="${t('fullName')}" autocomplete="name">
+          <input type="text" id="req-name" placeholder="${t('fullName')}" autocomplete="name">
         </div>
         <div class="field">
-          <input type="text" id="signup-user" placeholder="${t('username')}" autocomplete="username" autocapitalize="none">
+          <input type="email" id="req-email" placeholder="${t('emailAddress')}" autocomplete="email" autocapitalize="none">
         </div>
-        <div class="field">
-          <input type="password" id="signup-pass" placeholder="${t('password')}" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <input type="password" id="signup-pass2" placeholder="${t('confirmPassword')}" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <select class="signup-role-select" id="signup-role">
-            <option value="">${t('selectRole')}</option>
-            <option value="worker">${t('role_worker')}</option>
-            <option value="manager">${t('role_manager')}</option>
-          </select>
-        </div>
-        <button class="login-btn" id="signup-btn">${t('signUp')}</button>
-        <div class="login-error" id="signup-error"></div>
-        <div class="login-success" id="signup-success"></div>
+        <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
+        <div class="login-error" id="req-error"></div>
+        <div class="login-success" id="req-success"></div>
       </div>
       <div class="login-switch">
         ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
@@ -457,7 +407,7 @@ function renderSignUp() {
 }
 
 function bindLogin() {
-  // --- Login mode ---
+  // --- Login ---
   const loginBtn = $('#login-btn');
   if (loginBtn) {
     const userInput = $('#login-user');
@@ -465,10 +415,10 @@ function bindLogin() {
     const errEl = $('#login-error');
 
     const doLogin = () => {
-      const user = userInput.value.trim();
+      const email = userInput.value.trim();
       const pass = passInput.value;
-      if (!user || !pass) return;
-      const session = authenticate(user, pass);
+      if (!email || !pass) return;
+      const session = authenticate(email, pass);
       if (session) {
         currentScreen = 'dashboard';
         currentModule = null;
@@ -482,57 +432,42 @@ function bindLogin() {
     passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   }
 
-  // --- Sign Up mode ---
-  const signupBtn = $('#signup-btn');
-  if (signupBtn) {
-    const nameInput = $('#signup-name');
-    const userInput = $('#signup-user');
-    const passInput = $('#signup-pass');
-    const pass2Input = $('#signup-pass2');
-    const roleSelect = $('#signup-role');
-    const errEl = $('#signup-error');
-    const successEl = $('#signup-success');
+  // --- Request Access ---
+  const reqBtn = $('#req-btn');
+  if (reqBtn) {
+    const nameInput = $('#req-name');
+    const emailInput = $('#req-email');
+    const errEl = $('#req-error');
+    const successEl = $('#req-success');
 
-    const doSignup = () => {
+    const doRequest = () => {
       errEl.textContent = '';
       successEl.textContent = '';
 
-      const result = registerUser(
-        userInput.value.trim(),
-        passInput.value,
-        pass2Input.value,
-        nameInput.value.trim(),
-        roleSelect.value
-      );
+      const result = submitAccessRequest(nameInput.value.trim(), emailInput.value.trim());
 
       if (result.success) {
-        successEl.textContent = t('signUpSuccess');
-        // Clear form
+        // Notify admins via GAS webhook (fire-and-forget)
+        notifyAdminsOfRequest(result.request);
+        successEl.textContent = t('requestSent');
         nameInput.value = '';
-        userInput.value = '';
-        passInput.value = '';
-        pass2Input.value = '';
-        roleSelect.value = '';
-        // Switch to login after a short delay
-        setTimeout(() => {
-          authMode = 'login';
-          renderApp();
-        }, 1800);
+        emailInput.value = '';
+        setTimeout(() => { authMode = 'login'; renderApp(); }, 2500);
       } else {
-        errEl.textContent = t(result.error);
+        errEl.textContent = t(result.error) || result.error;
       }
     };
 
-    signupBtn.addEventListener('click', doSignup);
-    pass2Input.addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
+    reqBtn.addEventListener('click', doRequest);
+    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRequest(); });
   }
 
-  // --- Toggle between login / signup ---
-  const goSignup = $('#go-signup');
-  if (goSignup) {
-    goSignup.addEventListener('click', e => {
+  // --- Toggle login ↔ request access ---
+  const goRequest = $('#go-request');
+  if (goRequest) {
+    goRequest.addEventListener('click', e => {
       e.preventDefault();
-      authMode = 'signup';
+      authMode = 'request';
       renderApp();
     });
   }
@@ -545,20 +480,6 @@ function bindLogin() {
       renderApp();
     });
   }
-
-  // --- Google SSO button ---
-  const googleBtn = $('#google-sso-btn');
-  if (googleBtn) {
-    googleBtn.addEventListener('click', () => {
-      const errEl = $('#login-error');
-      if (errEl) errEl.textContent = '';
-      const triggered = triggerGoogleSignIn();
-      if (!triggered && errEl) {
-        errEl.textContent = t('googleSSONotReady') ||
-          'Google Sign-In is not ready yet. Please try again in a moment.';
-      }
-    });
-  }
 }
 
 // ============================================================
@@ -566,8 +487,11 @@ function bindLogin() {
 // ============================================================
 function renderHeader() {
   const session = getSession();
-  const showBack = currentModule !== null;
-  const title = currentModule ? getModuleTitle(currentModule) : (currentScreen === 'backoffice' ? t('nav_backoffice') : t('appName'));
+  const showBack = currentModule !== null || currentScreen === 'pendingRequests';
+  const title = currentModule ? getModuleTitle(currentModule)
+    : currentScreen === 'backoffice' ? t('nav_backoffice')
+    : currentScreen === 'pendingRequests' ? t('pendingRequestsTitle')
+    : t('appName');
   const roleClass = session.role === 'worker' ? 'worker' : '';
 
   return `
@@ -578,6 +502,15 @@ function renderHeader() {
       </div>
       <span class="header-title">${title}</span>
       <div class="header-right">
+        ${session.role === 'admin' ? (() => {
+          const pending = getPendingRequests().length;
+          return pending > 0
+            ? `<button class="notif-btn" onclick="currentScreen='pendingRequests';renderApp()" title="${t('pendingRequestsTitle')}">
+                <i data-feather="bell" style="width:16px;height:16px"></i>
+                <span class="notif-badge">${pending}</span>
+               </button>`
+            : '';
+        })() : ''}
         <button class="theme-btn" onclick="toggleTheme()">
           ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
             ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
@@ -2168,13 +2101,83 @@ function renderUserForm(container) {
 }
 
 // ============================================================
+// ACCESS REQUESTS
+// ============================================================
+
+// Fire-and-forget notification to GAS webhook so admins get an email
+function notifyAdminsOfRequest(request) {
+  const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'notify',
+      type: 'access_request',
+      name: request.name,
+      email: request.email,
+      requestedAt: request.requestedAt,
+    }),
+    mode: 'no-cors',
+  }).catch(() => {});
+}
+
+function renderPendingRequests(container) {
+  const requests = getPendingRequests();
+
+  container.innerHTML = `
+    <div style="padding:16px">
+      <h2 style="font-size:17px;font-weight:700;margin-bottom:16px">${t('pendingRequestsTitle')}</h2>
+      ${requests.length === 0
+        ? `<div class="empty-state"><p>${t('pendingRequestsEmpty')}</p></div>`
+        : requests.map(req => `
+          <div class="record-item" id="req-card-${req.id}">
+            <div class="ri-main">
+              <div class="ri-title">${req.name}</div>
+              <div class="ri-details">${req.email}<br><small>${new Date(req.requestedAt).toLocaleDateString()}</small></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px">
+              <div style="display:flex;gap:6px">
+                <input type="password" id="pwd-${req.id}" placeholder="${t('setPassword')}"
+                  style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
+                <select id="role-${req.id}"
+                  style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
+                  <option value="worker">${t('role_worker')}</option>
+                  <option value="manager">${t('role_manager')}</option>
+                  <option value="admin">${t('role_admin')}</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-primary" style="flex:1" onclick="handleApproveRequest('${req.id}')">${t('approveUser')}</button>
+                <button class="btn btn-danger" style="flex:1" onclick="handleDenyRequest('${req.id}')">${t('denyUser')}</button>
+              </div>
+            </div>
+          </div>`).join('')}
+    </div>
+  `;
+}
+
+function handleApproveRequest(requestId) {
+  const pwd = ($(`#pwd-${requestId}`) || {}).value || '';
+  const role = ($(`#role-${requestId}`) || {}).value || 'worker';
+  if (!pwd) { alert(t('setPassword')); return; }
+  const res = approveRequest(requestId, pwd, role);
+  if (res.success) {
+    renderApp();
+  } else {
+    alert(res.error || 'Error approving request');
+  }
+}
+
+function handleDenyRequest(requestId) {
+  denyRequest(requestId);
+  renderApp();
+}
 
 // ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
-  if (typeof initGoogleSSO === 'function') initGoogleSSO(handleGoogleSSO);
   renderApp();
   scheduleHardRefresh();
 });
