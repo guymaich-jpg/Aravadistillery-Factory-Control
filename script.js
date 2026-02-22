@@ -646,7 +646,6 @@ function getModuleTitle(mod) {
     distillation2: 'mod_distillation2',
     bottling: 'mod_bottling',
     inventory: 'mod_inventory',
-    spiritStock: 'mod_spiritStock',
   };
   return t(map[mod] || mod);
 }
@@ -659,7 +658,6 @@ function renderBottomNav() {
     { id: 'dashboard', icon: 'grid', label: 'nav_dashboard' },
     { id: 'receiving', icon: 'package', label: 'nav_receiving' },
     { id: 'production', icon: 'activity', label: 'nav_production' },
-    { id: 'spiritStock', icon: 'droplet', label: 'nav_spiritStock' },
     { id: 'bottling', icon: 'check-circle', label: 'nav_bottling' },
     { id: 'inventory', icon: 'database', label: 'nav_inventory' },
   ];
@@ -700,7 +698,6 @@ function bindNav() {
       if (nav === 'dashboard') { currentModule = null; _navDirection = 'back'; }
       else if (nav === 'receiving') { currentModule = 'rawMaterials'; }
       else if (nav === 'production') { currentModule = 'fermentation'; }
-      else if (nav === 'spiritStock') { currentModule = 'spiritStock'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
       else if (nav === 'inventory') { currentModule = 'inventory'; }
       else if (nav === 'backoffice') { currentModule = null; }
@@ -857,11 +854,6 @@ function renderModuleList(container) {
     renderInventory(container);
     return;
   }
-  if (currentModule === 'spiritStock') {
-    renderSpiritStock(container);
-    return;
-  }
-
   const storeKey = STORE_KEYS[currentModule];
   if (!storeKey) { container.innerHTML = '<p>Unknown module</p>'; return; }
 
@@ -1681,121 +1673,6 @@ function renderInventory(container) {
 // ============================================================
 // SPIRIT PIPELINE SCREEN
 // ============================================================
-function renderSpiritStock(container) {
-  const d1Records = getData(STORE_KEYS.distillation1);
-  const d2Records = getData(STORE_KEYS.distillation2);
-  const bottlingRecords = getData(STORE_KEYS.bottling);
-
-  // D1 totals
-  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
-  const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
-  const d1Available = Math.max(0, d1Produced - d1Consumed);
-  const d1HasConsumed = d1Consumed > 0;
-
-  // D2 totals
-  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
-  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
-  const d2Available = Math.max(0, d2Produced - d2Consumed);
-  const d2HasConsumed = d2Consumed > 0;
-
-  const hasAnyData = d1Records.length > 0 || d2Records.length > 0;
-
-  if (!hasAnyData) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i data-feather="droplet"></i>
-        <p>${t('spirit_noData')}</p>
-      </div>`;
-    return;
-  }
-
-  const fmtL = n => n.toFixed(1) + ' L';
-
-  container.innerHTML = `
-    <div class="section-title">${t('spirit_pipeline')}</div>
-
-    <div class="spirit-pipeline">
-
-      <!-- D1 Stage -->
-      <div class="spirit-stage">
-        <div class="spirit-stage-header">
-          <i data-feather="zap" style="width:16px;height:16px;"></i>
-          <span>${t('spirit_d1Label')}</span>
-        </div>
-        <div class="spirit-stage-stats">
-          <div class="spirit-stat">
-            <span class="spirit-stat-label">${t('spirit_produced')}</span>
-            <span class="spirit-stat-val">${fmtL(d1Produced)}</span>
-          </div>
-          ${d1HasConsumed ? `
-          <div class="spirit-stat">
-            <span class="spirit-stat-label">${t('spirit_consumed')}</span>
-            <span class="spirit-stat-val spirit-stat-out">− ${fmtL(d1Consumed)}</span>
-          </div>` : ''}
-          <div class="spirit-stat spirit-stat-available">
-            <span class="spirit-stat-label">${t('spirit_available')}</span>
-            <span class="spirit-stat-val spirit-stat-in">${fmtL(d1Available)}</span>
-          </div>
-        </div>
-        <div class="spirit-count-note">${d1Records.length} ${t('recentEntries').toLowerCase()}</div>
-      </div>
-
-      <div class="spirit-arrow"><i data-feather="arrow-down"></i></div>
-
-      <!-- D2 Stage -->
-      <div class="spirit-stage">
-        <div class="spirit-stage-header">
-          <i data-feather="filter" style="width:16px;height:16px;"></i>
-          <span>${t('spirit_d2Label')}</span>
-        </div>
-        <div class="spirit-stage-stats">
-          <div class="spirit-stat">
-            <span class="spirit-stat-label">${t('spirit_produced')}</span>
-            <span class="spirit-stat-val">${fmtL(d2Produced)}</span>
-          </div>
-          ${d2HasConsumed ? `
-          <div class="spirit-stat">
-            <span class="spirit-stat-label">${t('spirit_consumed')}</span>
-            <span class="spirit-stat-val spirit-stat-out">− ${fmtL(d2Consumed)}</span>
-          </div>` : ''}
-          <div class="spirit-stat spirit-stat-available">
-            <span class="spirit-stat-label">${t('spirit_available')}</span>
-            <span class="spirit-stat-val spirit-stat-in">${fmtL(d2Available)}</span>
-          </div>
-        </div>
-        <div class="spirit-count-note">${d2Records.length} ${t('recentEntries').toLowerCase()}</div>
-      </div>
-
-      <div class="spirit-arrow"><i data-feather="arrow-down"></i></div>
-
-      <!-- Ready to Bottle -->
-      <div class="spirit-stage spirit-stage-final">
-        <div class="spirit-stage-header">
-          <i data-feather="package" style="width:16px;height:16px;"></i>
-          <span>${t('spirit_readyToBottle')}</span>
-        </div>
-        <div class="spirit-stage-stats">
-          <div class="spirit-stat spirit-stat-available">
-            <span class="spirit-stat-label">${t('spirit_available')}</span>
-            <span class="spirit-stat-val spirit-stat-in" style="font-size:22px;">${fmtL(d2Available)}</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    ${(!d1HasConsumed || !d2HasConsumed) ? `
-    <div class="spirit-hint">
-      <i data-feather="info" style="width:13px;height:13px;margin-inline-end:5px;vertical-align:middle;"></i>
-      ${!d1HasConsumed && !d2HasConsumed
-        ? 'Add "D1 Spirit Consumed" to D2 records and "D2 Spirit Consumed" to Bottling records to track net balances.'
-        : !d1HasConsumed
-          ? 'Add "D1 Spirit Consumed" to D2 records to track D1 net balance.'
-          : 'Add "D2 Spirit Consumed" to Bottling records to track D2 net balance.'}
-    </div>` : ''}
-  `;
-}
-
 // ============================================================
 // MODULE FIELD DEFINITIONS
 // ============================================================
@@ -1950,21 +1827,6 @@ function renderBackoffice(container) {
     <div class="section-title">${t('userManagement')}</div>
     <p class="backoffice-subtitle">${t('backofficeSubtitle')}</p>
 
-    <div class="permissions-legend">
-      <div class="perm-legend-row">
-        <span class="role-pill role-pill-admin">${t('role_admin')}</span>
-        <span>${t('permAdmin')}</span>
-      </div>
-      <div class="perm-legend-row">
-        <span class="role-pill role-pill-manager">${t('role_manager')}</span>
-        <span>${t('permManager')}</span>
-      </div>
-      <div class="perm-legend-row">
-        <span class="role-pill role-pill-worker">${t('role_worker')}</span>
-        <span>${t('permWorker')}</span>
-      </div>
-    </div>
-
     <div class="record-list" style="margin-top:16px;">
       ${users.map(u => `
         <div class="record-item user-item" data-username="${u.username}">
@@ -1978,7 +1840,7 @@ function renderBackoffice(container) {
             </span>
           </div>
           <div class="ri-details">
-            ${u.nameHe || u.name || '-'}${u.name ? ' &bull; ' + u.name : ''}
+            ${currentLang === 'he' ? (u.nameHe || u.name || '-') : currentLang === 'th' ? (u.nameTh || u.name || '-') : (u.name || '-')}
             <div style="font-size:10px; margin-top:4px; color:var(--text-muted);">
               ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
             </div>
