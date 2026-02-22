@@ -13,8 +13,8 @@ test.describe('Security: Session Management', () => {
 
   test('clearing session redirects to login', async ({ page }) => {
     await freshApp(page);
-    await page.fill('#login-user', 'admin');
-    await page.fill('#login-pass', 'admin123');
+    await page.fill('#login-user', 'guymaich@gmail.com');
+    await page.fill('#login-pass', 'Guy1234');
     await page.click('#login-btn');
     await expect(page.locator('.app-header')).toBeVisible();
 
@@ -77,16 +77,14 @@ test.describe('Security: Input Handling', () => {
     await expect(page.locator('.app-header')).not.toBeVisible();
   });
 
-  test('duplicate username is rejected during signup', async ({ page }) => {
+  test('request access rejects existing user email', async ({ page }) => {
     await freshApp(page);
-    await page.click('#go-signup');
-    await page.fill('#signup-name', 'Admin Copy');
-    await page.fill('#signup-user', 'admin');
-    await page.fill('#signup-pass', 'pass1234');
-    await page.fill('#signup-pass2', 'pass1234');
-    await page.selectOption('#signup-role', 'worker');
-    await page.click('#signup-btn');
-    await expect(page.locator('#signup-error')).not.toBeEmpty();
+    await page.click('#go-request');
+    // Try to request access using an email that already belongs to a registered user
+    await page.fill('#req-name', 'Copy');
+    await page.fill('#req-email', 'guymaich@gmail.com');
+    await page.click('#req-btn');
+    await expect(page.locator('#req-error')).not.toBeEmpty();
   });
 });
 
