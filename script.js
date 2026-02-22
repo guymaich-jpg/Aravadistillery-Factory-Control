@@ -45,7 +45,7 @@ function showToast(msg) {
 // ============================================================
 // GOOGLE SHEETS SYNC
 // ============================================================
-const SHEETS_SYNC_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbw3dL8YRQ63TFJ4UzIAD5dUVVEJ4RX6z5dynQHU5thdrmmrjaRcS7VkQgSjqcECboha/exec';
+const SHEETS_SYNC_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbyMJ9pWds3hN3Oup_X-gwyDq0mX_CECdldtXcGXSn8-RsRDC6JNLhhPLoDSPXvjVK3O/exec';
 const INVENTORY_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
 
 // Read the GAS URL from localStorage so it can be updated from Settings without a code change
