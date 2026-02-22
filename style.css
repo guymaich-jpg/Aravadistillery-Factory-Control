@@ -35,10 +35,10 @@
   --border:     rgba(37, 37, 37, 0.14);
   --separator:  rgba(37, 37, 37, 0.08);
 
-  /* Radii — sharp, brand-aligned */
-  --radius:    8px;
-  --radius-sm: 6px;
-  --radius-xs: 4px;
+  /* Radii — sharp, artisanal brand-aligned */
+  --radius:    6px;
+  --radius-sm: 3px;
+  --radius-xs: 2px;
 
   /* Shadows — warm toned */
   --shadow:    0 2px 12px rgba(37, 37, 37, 0.06), 0 1px 3px rgba(37, 37, 37, 0.04);
@@ -118,14 +118,13 @@ html[lang="he"] body {
 /* Serif headings — Trirong for all languages */
 .header-title,
 .welcome-card h2,
-.section-title,
 .login-screen h1,
+.login-brand-name,
 .module-card .mc-title,
 .detail-card h3,
 .mpd-title,
 h3 {
   font-family: 'Trirong', Georgia, serif;
-  letter-spacing: 0;
 }
 
 /* RTL */
@@ -166,7 +165,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 /* ============================================================
-   LOGIN
+   LOGIN — Arava Distillery brand treatment
    ============================================================ */
 .login-screen {
   min-height: 100%;
@@ -174,46 +173,89 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 28px;
+  padding: 48px 32px;
   text-align: center;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg);
 }
 
-.login-logo {
-  width: 88px;
-  height: 88px;
+/* Brand section */
+.login-brand {
+  margin-bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-logo-mark {
+  width: 60px;
+  height: 60px;
   background: #2C332F;
-  border-radius: 14px;          /* sharper — brand aligned */
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+  /* Sharp — exactly like the Arava website's button corners */
+  border-radius: 2px;
+}
+
+.login-brand-name {
   font-size: 30px;
-  font-weight: 700;
-  font-family: 'Trirong', Georgia, serif;
+  font-weight: 400;          /* Regular weight — Trirong works best at 400 */
+  color: var(--text);
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+
+.login-brand-sub {
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+
+.login-brand-rule {
+  width: 36px;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Legacy login-logo for request-access icon */
+.login-logo {
+  width: 64px;
+  height: 64px;
+  background: #2C332F;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
   color: #EFEFEC;
-  letter-spacing: 1px;
-  box-shadow: 0 8px 24px rgba(44, 51, 47, 0.30);
 }
 
 .login-screen h1 {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 400;
   margin-bottom: 8px;
   color: var(--text);
-  letter-spacing: -0.4px;
+  letter-spacing: 0.5px;
 }
 
 .login-screen p {
   color: var(--text-secondary);
-  margin-bottom: 36px;
-  font-size: 15px;
+  margin-bottom: 32px;
+  font-size: 14px;
 }
 
 .login-form {
   width: 100%;
-  max-width: 340px;
+  max-width: 320px;
 }
 
 .login-form .field {
@@ -222,21 +264,19 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .login-form input {
   width: 100%;
-  padding: 15px 16px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--separator);
-  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 2px;          /* Sharp — Arava brand */
   color: var(--text);
-  font-size: 16px;
+  font-size: 16px;             /* 16px minimum — prevents iOS zoom */
   font-family: inherit;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow);
+  transition: border-color 0.2s;
 }
 
 .login-form input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  border-color: #2C332F;
   outline: none;
 }
 
@@ -248,18 +288,19 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   background: #2C332F;
   color: #EFEFEC;
   border: none;
-  border-radius: var(--radius-sm);
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 2px;          /* Sharp — matches Arava website CTA buttons */
+  font-size: 12px;
+  font-weight: 700;
   font-family: 'Quattrocento Sans', 'Inter', sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   cursor: pointer;
-  margin-top: 10px;
-  transition: opacity 0.2s, transform 0.1s;
-  letter-spacing: 0.5px;
-  box-shadow: 0 2px 10px rgba(44, 51, 47, 0.25);
+  margin-top: 12px;
+  transition: background 0.2s, transform 0.1s;
 }
 
-.login-btn:active  { opacity: 0.8; transform: scale(0.98); }
+.login-btn:hover  { background: #1E2420; }
+.login-btn:active { opacity: 0.85; transform: scale(0.98); }
 
 .login-error {
   color: var(--danger);
@@ -282,9 +323,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 .login-switch a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+  font-weight: 400;
 }
 
 .signup-role-select {
@@ -314,71 +357,20 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: var(--bg-card);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text-secondary);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
-
-/* ============================================================
-   GOOGLE SSO
-   ============================================================ */
-.sso-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 18px 0 4px;
-  color: var(--text-muted);
-  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  font-weight: 600;
-  width: 100%;
-  max-width: 340px;
-}
-
-.sso-divider::before,
-.sso-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--separator);
-}
-
-.google-sso-btn {
-  width: 100%;
-  max-width: 340px;
-  padding: 14px 16px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-  font-family: inherit;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
-  box-shadow: var(--shadow);
-  transition: background 0.2s, transform 0.1s, border-color 0.2s;
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
 }
 
-.google-sso-btn:hover  { background: var(--bg-surface); border-color: var(--border); }
-.google-sso-btn:active { transform: scale(0.98); }
-
-.google-sso-btn svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
+/* Google SSO removed */
 
 /* ============================================================
    HEADER
@@ -428,8 +420,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .header-back:active { background: var(--accent-bg2); }
 
 .header-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 400;            /* Trirong regular — brand style */
+  letter-spacing: 1px;
   flex: 2;
   text-align: center;
   white-space: nowrap;
@@ -521,13 +514,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   position: relative;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: color 0.2s;
   border: none;
   background: none;
-  font-family: inherit;
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
 }
 
 .nav-item.active { color: var(--accent); }
@@ -551,40 +546,38 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    DASHBOARD
    ============================================================ */
 .welcome-card {
-  background: #2C332F;  /* forest green — fixed, not accent, so it stays dark even in light mode */
-  border-radius: var(--radius);
-  padding: 22px 20px;
+  background: #2C332F;
+  border-radius: 3px;          /* Sharp — Arava brand */
+  padding: 24px 20px;
   margin-bottom: 20px;
   color: #EFEFEC;
-  box-shadow: 0 6px 24px rgba(44, 51, 47, 0.30);
   position: relative;
   overflow: hidden;
+  border-left: 3px solid #3F5147;  /* subtle sage-green accent bar */
 }
 
-.welcome-card::after {
+/* Grain texture overlay — artisanal feel */
+.welcome-card::before {
   content: '';
   position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 120px;
-  height: 120px;
-  background: rgba(239, 239, 236, 0.06);
-  border-radius: 50%;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
 }
 
-.welcome-card h2 { color: #EFEFEC; }
-.welcome-card p  { color: rgba(239, 239, 236, 0.70); }
-
 .welcome-card h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  letter-spacing: -0.3px;
+  color: #EFEFEC;
+  font-size: 19px;
+  font-weight: 400;            /* Trirong regular — artisanal */
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
 }
 
 .welcome-card p {
-  font-size: 13px;
-  opacity: 0.80;
+  color: rgba(239, 239, 236, 0.60);
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 
 /* Today stat strip */
@@ -597,36 +590,39 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .today-chip {
   flex: 1;
   background: var(--bg-card);
-  border-radius: var(--radius-sm);
+  border-radius: 3px;
   padding: 14px 12px;
   text-align: center;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--separator);
 }
 
 .today-chip .chip-num {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--accent);
+  font-family: 'Trirong', Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;            /* Trirong looks best at regular weight */
+  color: var(--text);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
 .today-chip .chip-label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-weight: 600;
-  margin-top: 5px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  margin-top: 6px;
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
 }
 
 .section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
   margin-bottom: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 2.5px;
   padding-left: 2px;
 }
 
@@ -640,28 +636,25 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .module-card {
   background: var(--bg-card);
-  border-radius: var(--radius);
+  border-radius: 3px;          /* Sharp — Arava brand */
   padding: 20px 16px 18px;
   cursor: pointer;
   box-shadow: var(--shadow);
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.12s, background 0.15s;
   position: relative;
   overflow: hidden;
-  border: none;
+  border: 1px solid var(--separator);
 }
 
-.module-card:active {
-  transform: scale(0.96);
-  box-shadow: var(--shadow-lg);
-}
+.module-card:hover  { background: var(--bg-surface); }
+.module-card:active { transform: scale(0.96); }
 
-/* Colored top accent bar */
+/* Colored left accent bar — craft/artisanal style */
 .module-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  border-radius: var(--radius) var(--radius) 0 0;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
 }
 
 .module-card[data-module="rawMaterials"]::before  { background: var(--color-receiving); }
@@ -673,13 +666,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .module-card[data-module="inventory"]::before     { background: var(--color-inventory); }
 
 .module-card .mc-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 2px;          /* Sharp — brand aligned */
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  opacity: 0.85;
 }
 
 .module-card .mc-icon svg { width: 20px; height: 20px; color: #fff; }
@@ -694,10 +688,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .module-card .mc-title {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;            /* Trirong regular — elegant */
   color: var(--text);
   line-height: 1.3;
-  letter-spacing: -0.1px;
+  letter-spacing: 0.3px;
 }
 
 .module-card .mc-count { display: none; } /* hidden — clean look */
@@ -769,27 +763,29 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .stat-card {
   background: var(--bg-card);
-  border-radius: var(--radius);
+  border-radius: 3px;
   padding: 16px 12px;
   text-align: center;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--separator);
 }
 
 .stat-card .stat-num {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--accent);
+  font-family: 'Trirong', Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--text);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
 .stat-card .stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 9px;
+  color: var(--text-muted);
   text-transform: uppercase;
-  font-weight: 600;
-  margin-top: 4px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  margin-top: 5px;
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
 }
 
 /* ============================================================
@@ -802,13 +798,13 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 /* Visually group consecutive form-groups into a card */
 .form-group {
   margin-bottom: 16px;
+}
 
 .form-actions {
   margin-top: 24px;
   padding-bottom: 20px;
   display: flex;
   gap: 10px;
-}
 }
 
 .form-label {
@@ -966,12 +962,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   padding: 14px;
   min-height: 48px;
   border: none;
-  border-radius: var(--radius-sm);
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: 2px;          /* Sharp — Arava brand */
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: transform 0.1s, opacity 0.2s;
-  font-family: inherit;
+  font-family: 'Quattrocento Sans', 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }

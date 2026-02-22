@@ -353,25 +353,44 @@ function checkSecurity() {
 // ============================================================
 let authMode = 'login'; // 'login' | 'request'
 
+// Date-palm SVG mark — the Arava region's signature crop + distillery theme
+const ARAVA_MARK_SVG = `
+  <svg viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <line x1="18" y1="46" x2="18" y2="22" stroke="#EFEFEC" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M18 22 C18 22 9 15 3 10 C9 13 15 20 18 24" fill="#EFEFEC" opacity="0.90"/>
+    <path d="M18 22 C18 22 27 15 33 10 C27 13 21 20 18 24" fill="#EFEFEC" opacity="0.90"/>
+    <path d="M18 28 C18 28 8 22 1 21 C8 22 15 27 18 30" fill="#EFEFEC" opacity="0.60"/>
+    <path d="M18 28 C18 28 28 22 35 21 C28 22 21 27 18 30" fill="#EFEFEC" opacity="0.60"/>
+    <path d="M18 22 C18 12 17 6 18 2 C19 6 18 12 18 22" fill="#EFEFEC" opacity="0.85"/>
+  </svg>`;
+
 function renderLogin() {
   if (authMode === 'request') return renderRequestAccess();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
-      <div class="login-logo">FC</div>
-      <h1>${t('loginTitle')}</h1>
-      <p>${t('loginSubtitle')}</p>
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <div class="login-brand-name">Arava</div>
+        <div class="login-brand-sub">${t('loginSubtitle')}</div>
+        <div class="login-brand-rule"></div>
+      </div>
+
       <div class="login-form">
         <div class="field">
-          <input type="email" id="login-user" placeholder="${t('emailAddress')}" autocomplete="email" autocapitalize="none">
+          <input type="email" id="login-user" placeholder="${t('emailAddress')}"
+            autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <div class="field">
-          <input type="password" id="login-pass" placeholder="${t('password')}" autocomplete="current-password">
+          <input type="password" id="login-pass" placeholder="${t('password')}"
+            autocomplete="current-password">
         </div>
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error"></div>
       </div>
+
       <div class="login-switch">
         ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
       </div>
@@ -383,22 +402,31 @@ function renderRequestAccess() {
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
-      <div class="login-logo">
-        <i data-feather="user-plus" style="width:36px;height:36px;"></i>
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <div class="login-brand-name">Arava</div>
+        <div class="login-brand-sub">${t('requestAccessTitle')}</div>
+        <div class="login-brand-rule"></div>
       </div>
-      <h1>${t('requestAccessTitle')}</h1>
-      <p>${t('requestAccessSubtitle')}</p>
+
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:280px;line-height:1.6">
+        ${t('requestAccessSubtitle')}
+      </p>
+
       <div class="login-form">
         <div class="field">
           <input type="text" id="req-name" placeholder="${t('fullName')}" autocomplete="name">
         </div>
         <div class="field">
-          <input type="email" id="req-email" placeholder="${t('emailAddress')}" autocomplete="email" autocapitalize="none">
+          <input type="email" id="req-email" placeholder="${t('emailAddress')}"
+            autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
         <div class="login-error" id="req-error"></div>
         <div class="login-success" id="req-success"></div>
       </div>
+
       <div class="login-switch">
         ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
       </div>
@@ -657,6 +685,7 @@ function renderDashboard(container) {
 
   container.innerHTML = `
     <div class="welcome-card">
+      <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(239,239,236,0.45);margin-bottom:10px;font-family:'Quattrocento Sans',sans-serif">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${getUserDisplayName()}</h2>
       <p>${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
