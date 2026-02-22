@@ -45,13 +45,8 @@ function showToast(msg) {
 // ============================================================
 // GOOGLE SHEETS SYNC
 // ============================================================
-const SHEETS_SYNC_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbw3dL8YRQ63TFJ4UzIAD5dUVVEJ4RX6z5dynQHU5thdrmmrjaRcS7VkQgSjqcECboha/exec';
+const SHEETS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyMJ9pWds3hN3Oup_X-gwyDq0mX_CECdldtXcGXSn8-RsRDC6JNLhhPLoDSPXvjVK3O/exec';
 const INVENTORY_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
-
-// Read the GAS URL from localStorage so it can be updated from Settings without a code change
-function getSheetsUrl() {
-  return localStorage.getItem('factory_sheetsUrl') || SHEETS_SYNC_URL_DEFAULT;
-}
 
 // Sync state for the visual indicator
 let _syncQueue = 0;
@@ -60,7 +55,7 @@ let _syncQueue = 0;
 
 // Sends a POST to GAS. Always fire-and-forget (no-cors), with 1 retry and console logging.
 async function postToSheets(payload) {
-  const url = getSheetsUrl();
+  const url = SHEETS_SYNC_URL;
   if (!url) {
     console.warn('[sync] No GAS URL configured — skipping sync');
     return;
@@ -104,7 +99,7 @@ async function postToSheets(payload) {
 
 // Verifies sync via GET request (GAS doGet supports CORS — we can read the response)
 async function verifySyncStatus(sheetName) {
-  const url = getSheetsUrl();
+  const url = SHEETS_SYNC_URL;
   if (!url) return { verified: false, error: 'no-url' };
   try {
     const resp = await fetch(`${url}?action=syncStatus&sheet=${encodeURIComponent(sheetName)}`);
@@ -147,7 +142,7 @@ function updateSyncIndicator(state) {
 // ── Module sync ───────────────────────────────────────────────
 
 function syncModuleToSheets(module) {
-  const url = getSheetsUrl();
+  const url = SHEETS_SYNC_URL;
   if (!url) return;
 
   const storeKey = STORE_KEYS[module];
@@ -1999,21 +1994,6 @@ function renderBackoffice(container) {
          style="display:flex;align-items:center;gap:8px;margin-bottom:12px;text-decoration:none;">
         <i data-feather="external-link"></i> ${t('viewInventorySheet')}
       </a>
-      <div class="form-group" style="margin-bottom:8px;">
-        <label class="form-label" style="font-size:12px;">${t('sheetsUrl')}</label>
-        <input type="url" id="sheets-url-input" class="form-input" style="font-size:12px;"
-          placeholder="${t('sheetsUrlPlaceholder')}"
-          value="${getSheetsUrl()}">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${t('sheetsUrlHint')}</div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <button class="btn btn-primary" id="btn-save-sheets-url" style="flex:1;font-size:13px;">
-          <i data-feather="save"></i> ${t('sheetsSave')}
-        </button>
-        <button class="btn btn-secondary" id="btn-test-connection" style="flex:1;font-size:13px;">
-          <i data-feather="wifi"></i> ${t('sheetsTestConnection')}
-        </button>
-      </div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-secondary" id="btn-sync-all-sheets" style="flex:1;">
           <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
@@ -2044,50 +2024,6 @@ function renderBackoffice(container) {
     exportBtn.addEventListener('click', () => {
       if (confirm(t('confirmExport'))) {
         exportAllData();
-      }
-    });
-  }
-
-  // Save GAS URL
-  const saveUrlBtn = container.querySelector('#btn-save-sheets-url');
-  if (saveUrlBtn) {
-    saveUrlBtn.addEventListener('click', () => {
-      const urlInput = container.querySelector('#sheets-url-input');
-      const val = (urlInput?.value || '').trim();
-      if (val) {
-        localStorage.setItem('factory_sheetsUrl', val);
-        showToast(t('sheetsSaved'));
-      }
-    });
-  }
-
-  // Test connection to GAS
-  const testBtn = container.querySelector('#btn-test-connection');
-  if (testBtn) {
-    testBtn.addEventListener('click', async () => {
-      const urlInput = container.querySelector('#sheets-url-input');
-      const url = (urlInput?.value || '').trim() || getSheetsUrl();
-      if (!url) { showToast(t('sheetsUrlPlaceholder')); return; }
-
-      testBtn.disabled = true;
-      const origHtml = testBtn.innerHTML;
-      testBtn.innerHTML = '<i data-feather="loader"></i>';
-      if (typeof feather !== 'undefined') feather.replace();
-
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        const data = await resp.json();
-        if (data.status === 'ok' || data.message) {
-          showToast('Connected ✓');
-        } else {
-          showToast('Unexpected response');
-        }
-      } catch (err) {
-        showToast(t('syncFailed') + ': ' + err.message);
-      } finally {
-        testBtn.disabled = false;
-        testBtn.innerHTML = origHtml;
-        if (typeof feather !== 'undefined') feather.replace();
       }
     });
   }
@@ -2290,7 +2226,7 @@ function renderUserForm(container) {
 
 // Fire-and-forget notification to GAS webhook so admins get an email
 function notifyAdminsOfRequest(request) {
-  const url = getSheetsUrl();
+  const url = SHEETS_SYNC_URL;
   if (!url) return;
   fetch(url, {
     method: 'POST',
