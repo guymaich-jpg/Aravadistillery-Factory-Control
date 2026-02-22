@@ -1,6 +1,27 @@
 // Shared helpers for all e2e tests
 const { expect } = require('@playwright/test');
 
+// Test users — seeded into localStorage for manager/worker tests
+const TEST_MANAGER = {
+  username: 'testmanager',
+  password: 'manager123',
+  email: 'testmanager@test.com',
+  role: 'manager',
+  name: 'Test Manager',
+  nameHe: 'מנהל בדיקה',
+  status: 'active',
+};
+
+const TEST_WORKER = {
+  username: 'testworker',
+  password: 'Worker123',
+  email: 'testworker@test.com',
+  role: 'worker',
+  name: 'Test Worker',
+  nameHe: 'עובד בדיקה',
+  status: 'active',
+};
+
 /**
  * Clear app state (localStorage) and navigate to the app
  */
@@ -15,34 +36,47 @@ async function freshApp(page) {
 }
 
 /**
- * Login with given credentials
+ * Seed test manager and worker users into localStorage (after freshApp)
  */
-async function login(page, username = 'admin', password = 'admin123') {
-  await page.fill('#login-user', username);
+async function seedTestUsers(page) {
+  await page.evaluate(([mgr, wrk]) => {
+    const existing = JSON.parse(localStorage.getItem('factory_users') || 'null') || [];
+    const toAdd = [mgr, wrk].filter(u => !existing.find(e => e.username === u.username));
+    localStorage.setItem('factory_users', JSON.stringify([...existing, ...toAdd]));
+  }, [TEST_MANAGER, TEST_WORKER]);
+}
+
+/**
+ * Login with given credentials (email or username)
+ */
+async function login(page, emailOrUser = 'guymaich@gmail.com', password = 'Guy1234') {
+  await page.fill('#login-user', emailOrUser);
   await page.fill('#login-pass', password);
   await page.click('#login-btn');
   await expect(page.locator('.app-header')).toBeVisible({ timeout: 5000 });
 }
 
 /**
- * Login as admin (full access)
+ * Login as admin (full access) — uses hardcoded owner account
  */
 async function loginAsAdmin(page) {
-  return login(page, 'admin', 'admin123');
+  return login(page, 'guymaich@gmail.com', 'Guy1234');
 }
 
 /**
- * Login as manager
+ * Login as manager — seeds test manager user first
  */
 async function loginAsManager(page) {
-  return login(page, 'manager', 'manager123');
+  await seedTestUsers(page);
+  return login(page, TEST_MANAGER.email, TEST_MANAGER.password);
 }
 
 /**
- * Login as worker
+ * Login as worker — seeds test worker user first
  */
 async function loginAsWorker(page) {
-  return login(page, 'worker1', 'worker123');
+  await seedTestUsers(page);
+  return login(page, TEST_WORKER.email, TEST_WORKER.password);
 }
 
 /**
@@ -53,4 +87,7 @@ async function logout(page) {
   await expect(page.locator('#login-btn')).toBeVisible({ timeout: 3000 });
 }
 
-module.exports = { freshApp, login, loginAsAdmin, loginAsManager, loginAsWorker, logout };
+module.exports = {
+  freshApp, login, loginAsAdmin, loginAsManager, loginAsWorker, logout, seedTestUsers,
+  TEST_MANAGER, TEST_WORKER,
+};

@@ -48,8 +48,8 @@ test.describe('Language Toggle: Hebrew → Thai', () => {
 test.describe('Language in app (logged in)', () => {
   test.beforeEach(async ({ page }) => {
     await freshApp(page);
-    await page.fill('#login-user', 'admin');
-    await page.fill('#login-pass', 'admin123');
+    await page.fill('#login-user', 'guymaich@gmail.com');
+    await page.fill('#login-pass', 'Guy1234');
     await page.click('#login-btn');
     await expect(page.locator('.app-header')).toBeVisible();
   });

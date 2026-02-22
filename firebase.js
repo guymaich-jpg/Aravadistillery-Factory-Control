@@ -248,6 +248,8 @@ async function fbDeleteUser(username) {
   }
 }
 
+// Google SSO removed — login is handled via email + password only.
+
 // ============================================================
 // Sync: push all localStorage data to Firestore (one-time migration)
 // ============================================================

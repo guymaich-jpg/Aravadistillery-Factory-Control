@@ -1,5 +1,5 @@
 // ============================================================
-// Auth Tests: Login, Logout, Sign Up, Session
+// Auth Tests: Login, Logout, Request Access, Session
 // ============================================================
 const { test, expect } = require('@playwright/test');
 const { freshApp, loginAsAdmin, loginAsManager, loginAsWorker, logout } = require('./helpers');
@@ -9,12 +9,13 @@ test.describe('Authentication', () => {
     await freshApp(page);
   });
 
-  test('shows Hebrew login screen by default', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('בקרת מפעל');
+  test('shows login screen by default', async ({ page }) => {
+    await expect(page.locator('#login-btn')).toBeVisible();
+    await expect(page.locator('.login-screen')).toBeVisible();
   });
 
   test('rejects wrong password', async ({ page }) => {
-    await page.fill('#login-user', 'admin');
+    await page.fill('#login-user', 'nobody@example.com');
     await page.fill('#login-pass', 'wrongpassword');
     await page.click('#login-btn');
     await expect(page.locator('#login-error')).not.toBeEmpty();
@@ -50,44 +51,42 @@ test.describe('Authentication', () => {
   });
 
   test('Enter key submits login form', async ({ page }) => {
-    await page.fill('#login-user', 'admin');
-    await page.fill('#login-pass', 'admin123');
+    await page.fill('#login-user', 'guymaich@gmail.com');
+    await page.fill('#login-pass', 'Guy1234');
     await page.press('#login-pass', 'Enter');
     await expect(page.locator('.app-header')).toBeVisible({ timeout: 5000 });
   });
 
-  test('can sign up a new user', async ({ page }) => {
-    await page.click('#go-signup');
-    await expect(page.locator('#signup-btn')).toBeVisible();
-    await page.fill('#signup-name', 'Test User');
-    await page.fill('#signup-user', 'testuser_e2e');
-    await page.fill('#signup-pass', 'pass1234');
-    await page.fill('#signup-pass2', 'pass1234');
-    await page.selectOption('#signup-role', 'worker');
-    await page.click('#signup-btn');
-    await expect(page.locator('#signup-success')).not.toBeEmpty();
+  test('can request access', async ({ page }) => {
+    await page.click('#go-request');
+    await expect(page.locator('#req-btn')).toBeVisible();
+    await page.fill('#req-name', 'New User');
+    await page.fill('#req-email', 'newuser@example.com');
+    await page.click('#req-btn');
+    await expect(page.locator('#req-success')).not.toBeEmpty();
   });
 
-  test('sign up rejects short password', async ({ page }) => {
-    await page.click('#go-signup');
-    await page.fill('#signup-name', 'Test User');
-    await page.fill('#signup-user', 'shortpwduser');
-    await page.fill('#signup-pass', '12');
-    await page.fill('#signup-pass2', '12');
-    await page.selectOption('#signup-role', 'worker');
-    await page.click('#signup-btn');
-    await expect(page.locator('#signup-error')).not.toBeEmpty();
+  test('request access rejects empty fields', async ({ page }) => {
+    await page.click('#go-request');
+    await page.click('#req-btn');
+    await expect(page.locator('#req-error')).not.toBeEmpty();
   });
 
-  test('sign up rejects mismatched passwords', async ({ page }) => {
-    await page.click('#go-signup');
-    await page.fill('#signup-name', 'Test User');
-    await page.fill('#signup-user', 'mismatchuser');
-    await page.fill('#signup-pass', 'pass1234');
-    await page.fill('#signup-pass2', 'pass9999');
-    await page.selectOption('#signup-role', 'worker');
-    await page.click('#signup-btn');
-    await expect(page.locator('#signup-error')).not.toBeEmpty();
+  test('request access rejects duplicate pending email', async ({ page }) => {
+    // First request
+    await page.click('#go-request');
+    await page.fill('#req-name', 'First Request');
+    await page.fill('#req-email', 'duplicate@example.com');
+    await page.click('#req-btn');
+    await expect(page.locator('#req-success')).not.toBeEmpty();
+
+    // Go back and try same email again
+    await page.click('#go-login');
+    await page.click('#go-request');
+    await page.fill('#req-name', 'Second Request');
+    await page.fill('#req-email', 'duplicate@example.com');
+    await page.click('#req-btn');
+    await expect(page.locator('#req-error')).not.toBeEmpty();
   });
 
   test('session persists on page reload', async ({ page }) => {

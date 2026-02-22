@@ -148,6 +148,23 @@ function syncModuleToSheets(module) {
   }).catch(() => {});
 }
 
+
+// ============================================================
+// THEME
+// ============================================================
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('factory_theme', next);
+  // Update icons without a full re-render
+  const btn = document.querySelector('.theme-btn');
+  if (btn) btn.innerHTML = next === 'dark'
+    ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
+    : '<i data-feather="moon" style="width:14px;height:14px"></i>';
+  if (typeof feather !== 'undefined') feather.replace();
+}
+
 // Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
 // Called automatically after any record is saved, updated, or deleted.
 function syncInventorySnapshot(triggeredBy) {
@@ -304,6 +321,8 @@ function renderApp() {
     renderModuleDetail(content);
   } else if (currentModule && currentView === 'list') {
     renderModuleList(content);
+  } else if (currentScreen === 'pendingRequests') {
+    renderPendingRequests(content);
   } else if (currentScreen === 'backoffice') {
     renderBackoffice(content);
   } else {
@@ -330,72 +349,84 @@ function checkSecurity() {
 }
 
 // ============================================================
-// LOGIN & SIGN UP
+// LOGIN & REQUEST ACCESS
 // ============================================================
-let authMode = 'login'; // 'login' | 'signup'
+let authMode = 'login'; // 'login' | 'request'
+
+// Date-palm SVG mark — the Arava region's signature crop + distillery theme
+const ARAVA_MARK_SVG = `
+  <svg viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <line x1="18" y1="46" x2="18" y2="22" stroke="#EFEFEC" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M18 22 C18 22 9 15 3 10 C9 13 15 20 18 24" fill="#EFEFEC" opacity="0.90"/>
+    <path d="M18 22 C18 22 27 15 33 10 C27 13 21 20 18 24" fill="#EFEFEC" opacity="0.90"/>
+    <path d="M18 28 C18 28 8 22 1 21 C8 22 15 27 18 30" fill="#EFEFEC" opacity="0.60"/>
+    <path d="M18 28 C18 28 28 22 35 21 C28 22 21 27 18 30" fill="#EFEFEC" opacity="0.60"/>
+    <path d="M18 22 C18 12 17 6 18 2 C19 6 18 12 18 22" fill="#EFEFEC" opacity="0.85"/>
+  </svg>`;
 
 function renderLogin() {
-  if (authMode === 'signup') return renderSignUp();
+  if (authMode === 'request') return renderRequestAccess();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
-      <div class="login-logo">FC</div>
-      <h1>${t('loginTitle')}</h1>
-      <p>${t('loginSubtitle')}</p>
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <h1 class="login-brand-name">${t('loginTitle')}</h1>
+        <p class="login-brand-sub">${t('loginSubtitle')}</p>
+        <div class="login-brand-rule"></div>
+      </div>
+
       <div class="login-form">
         <div class="field">
-          <input type="text" id="login-user" placeholder="${t('username')}" autocomplete="username" autocapitalize="none">
+          <input type="email" id="login-user" placeholder="${t('emailAddress')}"
+            autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <div class="field">
-          <input type="password" id="login-pass" placeholder="${t('password')}" autocomplete="current-password">
+          <input type="password" id="login-pass" placeholder="${t('password')}"
+            autocomplete="current-password">
         </div>
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error"></div>
       </div>
+
       <div class="login-switch">
-        ${t('dontHaveAccount')} <a href="#" id="go-signup">${t('signUp')}</a>
-      </div>
-      <div class="login-hint">
-        <strong>Demo:</strong> manager / manager123 &bull; worker1 / worker123
+        ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
       </div>
     </div>
   `;
 }
 
-function renderSignUp() {
+function renderRequestAccess() {
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
-      <div class="login-logo">
-        <i data-feather="user-plus" style="width:36px;height:36px;"></i>
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <div class="login-brand-name">Arava</div>
+        <div class="login-brand-sub">${t('requestAccessTitle')}</div>
+        <div class="login-brand-rule"></div>
       </div>
-      <h1>${t('signUpTitle')}</h1>
-      <p>${t('signUpSubtitle')}</p>
+
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:280px;line-height:1.6">
+        ${t('requestAccessSubtitle')}
+      </p>
+
       <div class="login-form">
         <div class="field">
-          <input type="text" id="signup-name" placeholder="${t('fullName')}" autocomplete="name">
+          <input type="text" id="req-name" placeholder="${t('fullName')}" autocomplete="name">
         </div>
         <div class="field">
-          <input type="text" id="signup-user" placeholder="${t('username')}" autocomplete="username" autocapitalize="none">
+          <input type="email" id="req-email" placeholder="${t('emailAddress')}"
+            autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
-        <div class="field">
-          <input type="password" id="signup-pass" placeholder="${t('password')}" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <input type="password" id="signup-pass2" placeholder="${t('confirmPassword')}" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <select class="signup-role-select" id="signup-role">
-            <option value="">${t('selectRole')}</option>
-            <option value="worker">${t('role_worker')}</option>
-            <option value="manager">${t('role_manager')}</option>
-          </select>
-        </div>
-        <button class="login-btn" id="signup-btn">${t('signUp')}</button>
-        <div class="login-error" id="signup-error"></div>
-        <div class="login-success" id="signup-success"></div>
+        <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
+        <div class="login-error" id="req-error"></div>
+        <div class="login-success" id="req-success"></div>
       </div>
+
       <div class="login-switch">
         ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
       </div>
@@ -404,7 +435,7 @@ function renderSignUp() {
 }
 
 function bindLogin() {
-  // --- Login mode ---
+  // --- Login ---
   const loginBtn = $('#login-btn');
   if (loginBtn) {
     const userInput = $('#login-user');
@@ -412,10 +443,10 @@ function bindLogin() {
     const errEl = $('#login-error');
 
     const doLogin = () => {
-      const user = userInput.value.trim();
+      const email = userInput.value.trim();
       const pass = passInput.value;
-      if (!user || !pass) return;
-      const session = authenticate(user, pass);
+      if (!email || !pass) return;
+      const session = authenticate(email, pass);
       if (session) {
         currentScreen = 'dashboard';
         currentModule = null;
@@ -429,57 +460,42 @@ function bindLogin() {
     passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   }
 
-  // --- Sign Up mode ---
-  const signupBtn = $('#signup-btn');
-  if (signupBtn) {
-    const nameInput = $('#signup-name');
-    const userInput = $('#signup-user');
-    const passInput = $('#signup-pass');
-    const pass2Input = $('#signup-pass2');
-    const roleSelect = $('#signup-role');
-    const errEl = $('#signup-error');
-    const successEl = $('#signup-success');
+  // --- Request Access ---
+  const reqBtn = $('#req-btn');
+  if (reqBtn) {
+    const nameInput = $('#req-name');
+    const emailInput = $('#req-email');
+    const errEl = $('#req-error');
+    const successEl = $('#req-success');
 
-    const doSignup = () => {
+    const doRequest = () => {
       errEl.textContent = '';
       successEl.textContent = '';
 
-      const result = registerUser(
-        userInput.value.trim(),
-        passInput.value,
-        pass2Input.value,
-        nameInput.value.trim(),
-        roleSelect.value
-      );
+      const result = submitAccessRequest(nameInput.value.trim(), emailInput.value.trim());
 
       if (result.success) {
-        successEl.textContent = t('signUpSuccess');
-        // Clear form
+        // Notify admins via GAS webhook (fire-and-forget)
+        notifyAdminsOfRequest(result.request);
+        successEl.textContent = t('requestSent');
         nameInput.value = '';
-        userInput.value = '';
-        passInput.value = '';
-        pass2Input.value = '';
-        roleSelect.value = '';
-        // Switch to login after a short delay
-        setTimeout(() => {
-          authMode = 'login';
-          renderApp();
-        }, 1800);
+        emailInput.value = '';
+        setTimeout(() => { authMode = 'login'; renderApp(); }, 2500);
       } else {
-        errEl.textContent = t(result.error);
+        errEl.textContent = t(result.error) || result.error;
       }
     };
 
-    signupBtn.addEventListener('click', doSignup);
-    pass2Input.addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
+    reqBtn.addEventListener('click', doRequest);
+    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRequest(); });
   }
 
-  // --- Toggle between login / signup ---
-  const goSignup = $('#go-signup');
-  if (goSignup) {
-    goSignup.addEventListener('click', e => {
+  // --- Toggle login ↔ request access ---
+  const goRequest = $('#go-request');
+  if (goRequest) {
+    goRequest.addEventListener('click', e => {
       e.preventDefault();
-      authMode = 'signup';
+      authMode = 'request';
       renderApp();
     });
   }
@@ -499,8 +515,11 @@ function bindLogin() {
 // ============================================================
 function renderHeader() {
   const session = getSession();
-  const showBack = currentModule !== null;
-  const title = currentModule ? getModuleTitle(currentModule) : (currentScreen === 'backoffice' ? t('nav_backoffice') : t('appName'));
+  const showBack = currentModule !== null || currentScreen === 'pendingRequests';
+  const title = currentModule ? getModuleTitle(currentModule)
+    : currentScreen === 'backoffice' ? t('nav_backoffice')
+    : currentScreen === 'pendingRequests' ? t('pendingRequestsTitle')
+    : t('appName');
   const roleClass = session.role === 'worker' ? 'worker' : '';
 
   return `
@@ -511,6 +530,20 @@ function renderHeader() {
       </div>
       <span class="header-title">${title}</span>
       <div class="header-right">
+        ${session.role === 'admin' ? (() => {
+          const pending = getPendingRequests().length;
+          return pending > 0
+            ? `<button class="notif-btn" onclick="currentScreen='pendingRequests';renderApp()" title="${t('pendingRequestsTitle')}">
+                <i data-feather="bell" style="width:16px;height:16px"></i>
+                <span class="notif-badge">${pending}</span>
+               </button>`
+            : '';
+        })() : ''}
+        <button class="theme-btn" onclick="toggleTheme()">
+          ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
+            ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
+            : '<i data-feather="moon" style="width:14px;height:14px"></i>'}
+        </button>
         <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
         <button class="logout-btn" id="logout-btn"><i data-feather="log-out" style="width:14px;height:14px"></i></button>
       </div>
@@ -584,7 +617,7 @@ function bindNav() {
       else if (nav === 'spiritStock') { currentModule = 'spiritStock'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
       else if (nav === 'inventory') { currentModule = 'inventory'; }
-      else if (nav === 'settings') { currentModule = null; }
+      else if (nav === 'backoffice') { currentModule = null; }
 
       renderApp();
     });
@@ -652,21 +685,22 @@ function renderDashboard(container) {
 
   container.innerHTML = `
     <div class="welcome-card">
+      <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(239,239,236,0.45);margin-bottom:10px;font-family:'Quattrocento Sans',sans-serif">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${getUserDisplayName()}</h2>
-      <p>${t('role_' + session.role)} &bull; ${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p>${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
 
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-num">${totalRecords}</div>
-        <div class="stat-label">${t('totalRecords')}</div>
-      </div>
+    <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
       <div class="stat-card">
         <div class="stat-num">${todayTotal}</div>
         <div class="stat-label">${t('todayActivity')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">${pendingApprovals}</div>
+        <div class="stat-num">${totalRecords}</div>
+        <div class="stat-label">${t('totalRecords')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:var(--warning,#f59e0b)">${pendingApprovals}</div>
         <div class="stat-label">${t('pendingApprovals')}</div>
       </div>
     </div>
@@ -1535,6 +1569,22 @@ function renderInventory(container) {
       const tab = btn.dataset.invTab;
       container.querySelector('#inv-bottles').style.display = tab === 'bottles' ? '' : 'none';
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
+      container.querySelector('#inv-versions').style.display = tab === 'versions' ? '' : 'none';
+    });
+  });
+
+  // Version Detail View
+  container.querySelectorAll('.inv-ver-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const verId = item.dataset.ver;
+      const ver = versions.find(v => String(v.version) === verId);
+      if (ver) {
+        let gapSummary = Object.entries(ver.gaps)
+          .filter(([_, diff]) => diff !== 0)
+          .map(([key, diff]) => `${key}: ${diff > 0 ? '+' : ''}${diff}`)
+          .join('\n');
+        alert(`${t('versionLabel')} ${ver.version} ${t('gapsLabel')}:\n${gapSummary || t('noGaps')}`);
+      }
     });
   });
 
@@ -1816,6 +1866,10 @@ function renderBackoffice(container) {
 
     <div class="permissions-legend">
       <div class="perm-legend-row">
+        <span class="role-pill role-pill-admin">${t('role_admin')}</span>
+        <span>${t('permAdmin')}</span>
+      </div>
+      <div class="perm-legend-row">
         <span class="role-pill role-pill-manager">${t('role_manager')}</span>
         <span>${t('permManager')}</span>
       </div>
@@ -1973,6 +2027,7 @@ function renderUserForm(container) {
         <select class="form-select" id="bo-role">
           <option value="worker" ${u.role === 'worker' ? 'selected' : ''}>${t('role_worker')}</option>
           <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>${t('role_manager')}</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role_admin') || 'Admin'}</option>
         </select>
       </div>
       
@@ -2079,25 +2134,83 @@ function renderUserForm(container) {
 }
 
 // ============================================================
-// AUTO HARD-REFRESH (every 5 minutes, only when not editing)
+// ACCESS REQUESTS
 // ============================================================
-const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
-function scheduleHardRefresh() {
-  setTimeout(() => {
-    const active = document.activeElement;
-    const isEditing = active && (
-      active.tagName === 'INPUT' ||
-      active.tagName === 'TEXTAREA' ||
-      active.tagName === 'SELECT'
-    );
-    if (!isEditing) {
-      location.reload(true);
-    } else {
-      // User is actively typing — retry in 60 seconds
-      setTimeout(() => location.reload(true), 60 * 1000);
-    }
-  }, AUTO_REFRESH_MS);
+// Fire-and-forget notification to GAS webhook so admins get an email
+function notifyAdminsOfRequest(request) {
+  const url = localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'notify',
+      type: 'access_request',
+      name: request.name,
+      email: request.email,
+      requestedAt: request.requestedAt,
+    }),
+    mode: 'no-cors',
+  }).catch(() => {});
+}
+
+function renderPendingRequests(container) {
+  const requests = getPendingRequests();
+
+  container.innerHTML = `
+    <div style="padding:16px">
+      <h2 style="font-size:17px;font-weight:700;margin-bottom:16px">${t('pendingRequestsTitle')}</h2>
+      ${requests.length === 0
+        ? `<div class="empty-state"><p>${t('pendingRequestsEmpty')}</p></div>`
+        : requests.map(req => `
+          <div class="record-item" id="req-card-${req.id}">
+            <div class="ri-main">
+              <div class="ri-title">${req.name}</div>
+              <div class="ri-details">${req.email}<br><small>${new Date(req.requestedAt).toLocaleDateString()}</small></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px">
+              <div style="display:flex;gap:6px">
+                <input type="password" id="pwd-${req.id}" placeholder="${t('setPassword')}"
+                  style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
+                <select id="role-${req.id}"
+                  style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
+                  <option value="worker">${t('role_worker')}</option>
+                  <option value="manager">${t('role_manager')}</option>
+                  <option value="admin">${t('role_admin')}</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-primary" style="flex:1" onclick="handleApproveRequest('${req.id}')">${t('approveUser')}</button>
+                <button class="btn btn-danger" style="flex:1" onclick="handleDenyRequest('${req.id}')">${t('denyUser')}</button>
+              </div>
+            </div>
+          </div>`).join('')}
+    </div>
+  `;
+}
+
+function handleApproveRequest(requestId) {
+  const pwd = ($(`#pwd-${requestId}`) || {}).value || '';
+  const role = ($(`#role-${requestId}`) || {}).value || 'worker';
+  if (!pwd) { alert(t('setPassword')); return; }
+  const res = approveRequest(requestId, pwd, role);
+  if (res.success) {
+    renderApp();
+  } else {
+    alert(res.error || 'Error approving request');
+  }
+}
+
+function handleDenyRequest(requestId) {
+  denyRequest(requestId);
+  renderApp();
+}
+
+// ============================================================
+// AUTO HARD-REFRESH
+// ============================================================
+function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
+  setTimeout(() => location.reload(true), intervalMs);
 }
 
 // ============================================================

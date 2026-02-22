@@ -6,21 +6,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#F5F5F7">
+    <meta name="theme-color" content="#EFEFEC" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1A1E1B" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="Arava Distillery — Production Control System">
     <link rel="manifest" href="manifest.json">
-    <title>בקרת מפעל | Factory Control</title>
+    <title>Arava Distillery · ייצור</title>
     <script>
       // Apply stored language/direction before first paint to avoid flash
       (function() {
         var lang = localStorage.getItem('factory_lang') || 'he';
         document.documentElement.lang = lang;
         document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+        // Apply stored theme (or system default) before paint to prevent flash
+        var storedTheme = localStorage.getItem('factory_theme');
+        if (storedTheme) {
+          document.documentElement.setAttribute('data-theme', storedTheme);
+        } else {
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+        }
       })();
     </script>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Trirong:ital,wght@0,400;0,600;0,700;1,400&family=Quattrocento+Sans:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="firebase.js"></script>

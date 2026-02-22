@@ -2,13 +2,26 @@
 // auth.js — Authentication & Role Management
 // ============================================================
 
-// Default users (in production, this would be a backend)
+// The two owner accounts — login is by email + password
 const DEFAULT_USERS = [
-  { username: 'admin', password: 'admin123', role: 'admin', name: 'System Administrator', nameHe: 'מנהל מערכת', email: 'admin@arava.com', status: 'active' },
-  { username: 'manager', password: 'manager123', role: 'manager', name: 'Factory Manager', nameHe: 'מנהל מפעל', email: 'manager@arava.com', status: 'active' },
-  { username: 'worker1', password: 'worker123', role: 'worker', name: 'Worker 1', nameHe: 'עובד 1', email: 'worker1@arava.com', status: 'active' },
-  { username: 'worker2', password: 'worker123', role: 'worker', name: 'Worker 2', nameHe: 'עובד 2', email: 'worker2@arava.com', status: 'active' },
-  { username: 'qa', password: 'qa123', role: 'worker', name: 'QA Inspector', nameHe: 'בודק איכות', email: 'qa@arava.com', status: 'active' },
+  {
+    username: 'guymaich',
+    password: 'Guy1234',
+    role: 'admin',
+    name: 'Guy Maich',
+    nameHe: 'גיא מייך',
+    email: 'guymaich@gmail.com',
+    status: 'active',
+  },
+  {
+    username: 'yonatangarini',
+    password: 'Yon1234',
+    role: 'admin',
+    name: 'Yonatan Garini',
+    nameHe: 'יונתן גריני',
+    email: 'yonatangarini@gmail.com',
+    status: 'active',
+  },
 ];
 
 // Permissions map
@@ -59,28 +72,36 @@ function getUsers() {
   try {
     users = JSON.parse(localStorage.getItem('factory_users') || 'null');
   } catch (e) {
-    // Corrupted data — reset to defaults
     users = null;
   }
   if (!users || !Array.isArray(users)) {
     users = DEFAULT_USERS;
     localStorage.setItem('factory_users', JSON.stringify(users));
   } else {
-    // Ensure admin user exists (migration)
-    if (!users.find(u => u.username === 'admin')) {
-      const adminUser = DEFAULT_USERS.find(u => u.username === 'admin');
-      if (adminUser) {
-        users.push(adminUser);
-        localStorage.setItem('factory_users', JSON.stringify(users));
+    // Migration: ensure the two owner accounts always exist
+    let changed = false;
+    for (const required of DEFAULT_USERS) {
+      if (!users.find(u => u.username === required.username)) {
+        users.push(required);
+        changed = true;
       }
     }
+    if (changed) localStorage.setItem('factory_users', JSON.stringify(users));
   }
   return users;
 }
 
-function authenticate(username, password) {
+// Authenticate by email (primary) or username, with password
+function authenticate(emailOrUsername, password) {
   const users = getUsers();
-  const user = users.find(u => u.username === username && u.password === password);
+  const user = users.find(u =>
+    u.status !== 'inactive' &&
+    u.password === password &&
+    (
+      (u.email && u.email.toLowerCase() === emailOrUsername.toLowerCase()) ||
+      u.username.toLowerCase() === emailOrUsername.toLowerCase()
+    )
+  );
   if (user) {
     const session = { ...user, loginTime: Date.now() };
     delete session.password;
@@ -90,38 +111,68 @@ function authenticate(username, password) {
   return null;
 }
 
-/**
- * Register a new user.
- * Returns { success: true } or { success: false, error: 'translationKey' }
- */
-function registerUser(username, password, confirmPassword, fullName, role) {
-  // Validation
-  if (!username || !password || !confirmPassword || !fullName || !role) {
-    return { success: false, error: 'signUpError_fillAll' };
-  }
-  if (password.length < 4) {
-    return { success: false, error: 'signUpError_passwordShort' };
-  }
-  if (password !== confirmPassword) {
-    return { success: false, error: 'signUpError_passwordMismatch' };
+// ============================================================
+// Access Request System
+// ============================================================
+const ACCESS_REQUESTS_KEY = 'factory_access_requests';
+
+function getPendingRequests() {
+  try {
+    return JSON.parse(localStorage.getItem(ACCESS_REQUESTS_KEY) || '[]');
+  } catch (e) { return []; }
+}
+
+function submitAccessRequest(name, email) {
+  if (!name || !email) return { success: false, error: 'requestError_fillAll' };
+
+  const requests = getPendingRequests();
+  if (requests.find(r => r.email.toLowerCase() === email.toLowerCase())) {
+    return { success: false, error: 'requestError_alreadyPending' };
   }
 
   const users = getUsers();
-  if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-    return { success: false, error: 'signUpError_userExists' };
+  if (users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase())) {
+    return { success: false, error: 'requestError_emailExists' };
   }
 
-  const newUser = {
-    username: username,
-    password: password,
-    role: role,
-    name: fullName,
-    nameTh: fullName, // user can update later
-    createdAt: new Date().toISOString(),
+  const request = {
+    id: Date.now().toString(),
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    requestedAt: new Date().toISOString(),
   };
 
-  users.push(newUser);
-  localStorage.setItem('factory_users', JSON.stringify(users));
+  requests.push(request);
+  localStorage.setItem(ACCESS_REQUESTS_KEY, JSON.stringify(requests));
+  return { success: true, request };
+}
+
+function approveRequest(requestId, password, role) {
+  const requests = getPendingRequests();
+  const req = requests.find(r => r.id === requestId);
+  if (!req) return { success: false, error: 'Request not found' };
+
+  const baseUsername = req.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+  const result = createUser({
+    username: baseUsername,
+    password: password || 'Welcome1',
+    role: role || 'worker',
+    name: req.name,
+    email: req.email,
+    status: 'active',
+  });
+
+  if (!result.success) return result;
+
+  const updated = requests.filter(r => r.id !== requestId);
+  localStorage.setItem(ACCESS_REQUESTS_KEY, JSON.stringify(updated));
+  return { success: true };
+}
+
+function denyRequest(requestId) {
+  const requests = getPendingRequests();
+  const updated = requests.filter(r => r.id !== requestId);
+  localStorage.setItem(ACCESS_REQUESTS_KEY, JSON.stringify(updated));
   return { success: true };
 }
 
@@ -138,14 +189,12 @@ function getSession() {
   }
   if (!session) return null;
 
-  // Check for session expiry
   const now = Date.now();
   if (session.loginTime && (now - session.loginTime) > SESSION_TIMEOUT_MS) {
     localStorage.removeItem('factory_session');
     return null;
   }
 
-  // Validate session has required fields
   if (!session.username || !session.role) {
     localStorage.removeItem('factory_session');
     return null;
@@ -156,7 +205,6 @@ function getSession() {
 
 function logout() {
   localStorage.removeItem('factory_session');
-  // Clear any temporary state
   if (typeof renderApp === 'function') {
     currentScreen = 'dashboard';
     currentModule = null;
@@ -164,7 +212,6 @@ function logout() {
   }
 }
 
-// Security Wrapper for data actions
 function secureRecordAction(action) {
   const session = getSession();
   if (!session) {
@@ -174,6 +221,7 @@ function secureRecordAction(action) {
   }
   return action();
 }
+
 function hasPermission(perm) {
   const session = getSession();
   if (!session) return false;
@@ -194,7 +242,6 @@ function getUserRole() {
   return session.role;
 }
 
-// User management functions for backoffice
 function updateUser(username, updates) {
   const users = getUsers();
   const idx = users.findIndex(u => u.username === username);
@@ -232,4 +279,3 @@ function createUser(userData) {
   localStorage.setItem('factory_users', JSON.stringify(users));
   return { success: true };
 }
-
