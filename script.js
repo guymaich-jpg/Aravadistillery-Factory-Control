@@ -373,8 +373,8 @@ function renderLogin() {
 
       <div class="login-brand">
         <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
-        <div class="login-brand-name">Arava</div>
-        <div class="login-brand-sub">${t('loginSubtitle')}</div>
+        <h1 class="login-brand-name">${t('loginTitle')}</h1>
+        <p class="login-brand-sub">${t('loginSubtitle')}</p>
         <div class="login-brand-rule"></div>
       </div>
 
@@ -690,14 +690,18 @@ function renderDashboard(container) {
       <p>${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
 
-    <div class="today-strip">
-      <div class="today-chip">
-        <div class="chip-num">${todayTotal}</div>
-        <div class="chip-label">${t('todayActivity')}</div>
+    <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+      <div class="stat-card">
+        <div class="stat-num">${todayTotal}</div>
+        <div class="stat-label">${t('todayActivity')}</div>
       </div>
-      <div class="today-chip">
-        <div class="chip-num">${pendingApprovals}</div>
-        <div class="chip-label">${t('pendingApprovals')}</div>
+      <div class="stat-card">
+        <div class="stat-num">${totalRecords}</div>
+        <div class="stat-label">${t('totalRecords')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:var(--warning,#f59e0b)">${pendingApprovals}</div>
+        <div class="stat-label">${t('pendingApprovals')}</div>
       </div>
     </div>
 
@@ -2200,6 +2204,13 @@ function handleApproveRequest(requestId) {
 function handleDenyRequest(requestId) {
   denyRequest(requestId);
   renderApp();
+}
+
+// ============================================================
+// AUTO HARD-REFRESH
+// ============================================================
+function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
+  setTimeout(() => location.reload(true), intervalMs);
 }
 
 // ============================================================

@@ -763,10 +763,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .stat-card {
   background: var(--bg-card);
-  border-radius: 3px;
+  border-radius: 12px;
   padding: 16px 12px;
   text-align: center;
   border: 1px solid var(--separator);
+  box-shadow: var(--shadow);
 }
 
 .stat-card .stat-num {
