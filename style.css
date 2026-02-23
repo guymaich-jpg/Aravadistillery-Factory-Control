@@ -328,6 +328,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   text-decoration-color: var(--border);
   text-underline-offset: 3px;
   font-weight: 400;
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
 }
 
 .signup-role-select {
@@ -361,6 +364,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border: 1px solid var(--border);
   color: var(--text-secondary);
   padding: 5px 12px;
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 2px;
   font-size: 10px;
   font-weight: 700;
@@ -368,6 +373,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   text-transform: uppercase;
   cursor: pointer;
   font-family: 'Quattrocento Sans', 'Inter', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Google SSO removed */
@@ -445,13 +453,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 14px;
-  min-height: 36px;
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
