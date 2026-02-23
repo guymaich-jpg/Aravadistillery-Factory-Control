@@ -93,6 +93,7 @@ const I18N = {
     inviteLoading: "Validating invitation…",
     inviteNetworkError: "Unable to validate invitation. Please check your connection and try again.",
     inviteRetry: "Try Again",
+    inviteDeleteConfirm: "Delete this pending invitation?",
     createAccount: "Create Account",
 
     welcome: "Welcome",
@@ -430,6 +431,7 @@ const I18N = {
     inviteLoading: "מאמת הזמנה…",
     inviteNetworkError: "לא ניתן לאמת את ההזמנה. נא לבדוק את החיבור ולנסות שוב.",
     inviteRetry: "נסה שוב",
+    inviteDeleteConfirm: "למחוק את ההזמנה הממתינה?",
     createAccount: "צור חשבון",
 
     welcome: "ברוך הבא",
@@ -762,6 +764,7 @@ const I18N = {
     inviteLoading: "กำลังตรวจสอบคำเชิญ…",
     inviteNetworkError: "ไม่สามารถตรวจสอบคำเชิญได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     inviteRetry: "ลองอีกครั้ง",
+    inviteDeleteConfirm: "ลบคำเชิญที่รอดำเนินการนี้?",
     createAccount: "สร้างบัญชี",
 
     welcome: "ยินดีต้อนรับ",

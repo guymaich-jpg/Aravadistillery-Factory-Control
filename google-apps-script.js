@@ -88,6 +88,27 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ── Delete Invitation action ──────────────────────────────────
+    if (action === 'delete_invite') {
+      const { token } = payload;
+      const SHEET_NAME = 'Invitations';
+      var delSheet = ss.getSheetByName(SHEET_NAME);
+      if (delSheet) {
+        var delData = delSheet.getDataRange().getValues();
+        for (var d = 1; d < delData.length; d++) {
+          if (delData[d][0] === token && delData[d][3] === 'pending') {
+            delSheet.deleteRow(d + 1);
+            return ContentService
+              .createTextOutput(JSON.stringify({ ok: true, action: 'delete_invite' }))
+              .setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: 'not_found' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ── Accept Invitation action ─────────────────────────────────
     if (action === 'accept_invite') {
       const { token, username } = payload;
