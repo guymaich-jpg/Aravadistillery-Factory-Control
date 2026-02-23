@@ -346,6 +346,18 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   line-height: 44px;
 }
 
+/* ── Invitation System ───────────────────────────────────── */
+.invite-email-locked {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background: var(--bg-elevated) !important;
+}
+
+.invite-section .form-input,
+.invite-section .form-select {
+  min-height: 44px;
+}
+
 .signup-role-select {
   width: 100%;
   padding: 15px 16px;
