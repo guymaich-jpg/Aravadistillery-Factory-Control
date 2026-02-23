@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This comprehensive QA audit covers the Factory Control web application across all 8 testing phases: smoke, functional, UI/UX, accessibility, security, performance, edge cases, and source code review. **42 issues were identified**, including **5 P0 blockers** (mostly critical security vulnerabilities), **8 P1 critical issues**, **17 P2 major issues**, **8 P3 minor issues**, and **4 P4 enhancements**.
+This comprehensive QA audit covers the Factory Control web application across all 8 testing phases: smoke, functional, UI/UX, accessibility, security, performance, edge cases, and source code review. **48 issues were identified**, including **5 P0 blockers** (critical security vulnerabilities), **9 P1 critical issues**, **20 P2 major issues**, **10 P3 minor issues**, and **4 P4 enhancements**.
 
 The most severe finding is that **the entire authentication system is client-side only** — admin credentials are hardcoded in plaintext in the JavaScript source, passwords are stored unencrypted in localStorage, and the session can be forged by any user with browser DevTools. Additionally, **pervasive innerHTML usage** across the rendering layer creates stored XSS attack vectors.
 
@@ -19,12 +19,12 @@ The most severe finding is that **the entire authentication system is client-sid
 
 | Category | Issues Found | P0 | P1 | P2 | P3 | P4 |
 |----------|-------------|----|----|----|----|-----|
-| Security | 24 | 4 | 6 | 10 | 3 | 1 |
-| Functional | 8 | 1 | 1 | 3 | 3 | 0 |
+| Security | 28 | 4 | 8 | 12 | 3 | 1 |
+| Functional | 10 | 1 | 1 | 4 | 4 | 0 |
 | Accessibility | 6 | 0 | 0 | 2 | 2 | 2 |
 | Performance | 3 | 0 | 0 | 2 | 0 | 1 |
-| UI/UX | 1 | 0 | 0 | 1 | 0 | 0 |
-| **Total** | **42** | **5** | **7** | **18** | **8** | **4** |
+| UI/UX | 1 | 0 | 0 | 0 | 1 | 0 |
+| **Total** | **48** | **5** | **9** | **20** | **10** | **4** |
 
 ---
 
@@ -607,6 +607,93 @@ const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 **File:** `data.js:28-34`
 
 **Description:** Every `setData()` call triggers 2 full JSON parse/stringify cycles on the users array.
+
+---
+
+## Additional Findings — Firebase (from source code audit)
+
+### BUG-043: FB-02 — No Firestore security rules enforced
+
+**Severity:** P1 (Critical)
+**Category:** Security
+**File:** `firebase.js:36-136`
+
+**Description:** The Firebase layer performs no authentication checks. All CRUD operations (`fbAdd`, `fbUpdate`, `fbDelete`, `fbGetAll`) operate directly on collections without user-context. If enabled with default test-mode rules, anyone with the API key can read/write/delete all data.
+
+**Suggested Fix:** Implement Firebase Authentication. Set Firestore security rules requiring auth and role-based access.
+
+---
+
+### BUG-044: FB-03 — User passwords stored in Firestore
+
+**Severity:** P1 (Critical)
+**Category:** Security
+**File:** `firebase.js:217-233`
+
+**Description:** `fbSaveUser(user)` writes the entire user object — including plaintext `password` — to Firestore. Combined with AUTH-02, passwords are now exposed in two locations.
+
+**Suggested Fix:** Never store passwords in Firestore. Use Firebase Authentication for credential management.
+
+---
+
+### BUG-045: FB-04 — No conflict resolution between localStorage and Firestore
+
+**Severity:** P2 (Major)
+**Category:** Functional
+**File:** `firebase.js:256-278`
+
+**Description:** No merge strategy exists. Two users on different devices can create divergent data. No reconciliation after initial migration.
+
+**Suggested Fix:** Implement last-write-wins with timestamps, or use Firestore as source of truth with localStorage as cache.
+
+---
+
+### BUG-046: HTML-02 — Missing X-Frame-Options (clickjacking)
+
+**Severity:** P2 (Major)
+**Category:** Security
+**File:** `index.html`
+
+**Description:** No `X-Frame-Options` or `frame-ancestors` CSP directive. The app can be embedded in an iframe for clickjacking attacks.
+
+**Suggested Fix:** Add `<meta http-equiv="X-Frame-Options" content="DENY">`.
+
+---
+
+### BUG-047: SCRIPT-14 — Save button not disabled during submission
+
+**Severity:** P3 (Minor)
+**Category:** Functional
+**File:** `script.js:1369-1463`
+
+**Description:** `saveCurrentForm()` adds an `is-loading` class but never disables the button. Rapid double-clicks create duplicate records.
+
+**Suggested Fix:** Disable save button immediately at start of `saveCurrentForm()`.
+
+---
+
+### BUG-048: DATA-07 — getData silently deletes corrupted data
+
+**Severity:** P3 (Minor)
+**Category:** Functional
+**File:** `data.js:18-26`
+
+**Description:** When `JSON.parse` fails, the corrupted key is removed from localStorage — silently destroying all data for that module.
+
+**Suggested Fix:** Back up raw string before removing. Notify user of data loss.
+
+---
+
+## Updated Totals
+
+| Severity | Count |
+|----------|-------|
+| P0 Blocker | 5 |
+| P1 Critical | 9 |
+| P2 Major | 20 |
+| P3 Minor | 10 |
+| P4 Enhancement | 4 |
+| **Total** | **48** |
 
 ---
 
