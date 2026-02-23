@@ -2086,16 +2086,6 @@ function renderBackoffice(container) {
     </div>
   `;
 
-  // FAB
-  const fab = el('button', 'fab-add', '<i data-feather="user-plus"></i>');
-  fab.id = 'add-user-btn';
-  fab.addEventListener('click', () => {
-    editingRecord = null;
-    currentView = 'form';
-    renderApp();
-  });
-  container.appendChild(fab);
-
   // Bind export
   const exportBtn = container.querySelector('#btn-export-all');
   if (exportBtn) {
@@ -2279,8 +2269,11 @@ function renderInvitationItems(listEl, invites) {
         <span class="ri-title" style="font-size:13px;">
           ${inv.username ? esc(inv.username) : esc(inv.email)}
         </span>
-        <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
-          ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
+        <span style="display:flex;align-items:center;gap:6px;">
+          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-muted);"><i data-feather="x-circle" style="width:16px;height:16px;"></i></button>` : ''}
+          <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
+            ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
+          </span>
         </span>
       </div>
       <div class="ri-details">
@@ -2292,6 +2285,35 @@ function renderInvitationItems(listEl, invites) {
       </div>
     </div>
   `).join('');
+
+  // Bind delete buttons
+  listEl.querySelectorAll('.inv-delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const token = btn.dataset.token;
+      if (!confirm(t('inviteDeleteConfirm'))) return;
+      deleteInvitation(token, listEl);
+    });
+  });
+
+  if (typeof feather !== 'undefined') feather.replace();
+}
+
+function deleteInvitation(token, listEl) {
+  // Remove from local storage
+  const invites = getInvitations().filter(i => i.token !== token);
+  saveInvitations(invites);
+  renderInvitationItems(listEl, invites);
+
+  // Remove from GAS (fire-and-forget)
+  const url = SHEETS_SYNC_URL;
+  if (url) {
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete_invite', token }),
+      mode: 'no-cors',
+    }).catch(() => {});
+  }
 }
 
 function renderUserForm(container) {
