@@ -40,8 +40,18 @@ function _restoreStateFromHash() {
   const segment = hash[0] || '';
   const view = hash[1] || 'list';
 
+  // Handle invitation links: #/invite/TOKEN
+  if (segment === 'invite' && hash[1]) {
+    authMode = 'invite';
+    _inviteToken = hash[1];
+    currentScreen = 'dashboard';
+    currentModule = null;
+    currentView = 'list';
+    return;
+  }
+
   const moduleNames = ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling', 'inventory'];
-  const screenNames = ['dashboard', 'backoffice', 'pendingRequests'];
+  const screenNames = ['dashboard', 'backoffice'];
 
   if (moduleNames.includes(segment)) {
     currentModule = segment;
@@ -487,8 +497,6 @@ function renderApp() {
     renderModuleDetail(content);
   } else if (currentModule && currentView === 'list') {
     renderModuleList(content);
-  } else if (currentScreen === 'pendingRequests') {
-    renderPendingRequests(content);
   } else if (currentScreen === 'backoffice') {
     renderBackoffice(content);
   } else {
@@ -517,7 +525,8 @@ function checkSecurity() {
 // ============================================================
 // LOGIN & REQUEST ACCESS
 // ============================================================
-let authMode = 'login'; // 'login' | 'request'
+let authMode = 'login'; // 'login' | 'invite'
+let _inviteToken = null;
 
 // Date-palm SVG mark — the Arava region's signature crop + distillery theme
 const ARAVA_MARK_SVG = `
@@ -531,7 +540,7 @@ const ARAVA_MARK_SVG = `
   </svg>`;
 
 function renderLogin() {
-  if (authMode === 'request') return renderRequestAccess();
+  if (authMode === 'invite') return renderInviteRegistration();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
@@ -556,15 +565,14 @@ function renderLogin() {
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error"></div>
       </div>
-
-      <div class="login-switch">
-        ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
-      </div>
     </div>
   `;
 }
 
-function renderRequestAccess() {
+// ============================================================
+// INVITE REGISTRATION SCREEN
+// ============================================================
+function renderInviteRegistration() {
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
     <div class="login-screen">
@@ -572,29 +580,44 @@ function renderRequestAccess() {
       <div class="login-brand">
         <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
         <div class="login-brand-name">Arava</div>
-        <div class="login-brand-sub">${t('requestAccessTitle')}</div>
+        <div class="login-brand-sub">${t('inviteRegistration')}</div>
         <div class="login-brand-rule"></div>
       </div>
 
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:280px;line-height:1.6">
-        ${t('requestAccessSubtitle')}
+        ${t('inviteRegistrationSubtitle')}
       </p>
 
-      <div class="login-form">
-        <div class="field">
-          <input type="text" id="req-name" placeholder="${t('fullName')}" autocomplete="name">
-        </div>
-        <div class="field">
-          <input type="email" id="req-email" placeholder="${t('emailAddress')}"
-            autocomplete="email" autocapitalize="none" spellcheck="false">
-        </div>
-        <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
-        <div class="login-error" id="req-error"></div>
-        <div class="login-success" id="req-success"></div>
+      <div id="invite-loading" style="text-align:center;padding:24px 0;">
+        <p style="font-size:13px;color:var(--text-secondary)">${t('inviteLoading')}</p>
       </div>
 
-      <div class="login-switch">
-        ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
+      <div id="invite-form-wrap" class="login-form" style="display:none;">
+        <div class="field">
+          <input type="email" id="inv-email" placeholder="${t('emailAddress')}" disabled
+            class="invite-email-locked" autocomplete="email">
+        </div>
+        <div class="field">
+          <input type="text" id="inv-name" placeholder="${t('nameEnglish')}" autocomplete="name">
+        </div>
+        <div class="field">
+          <input type="text" id="inv-nameHe" placeholder="${t('nameHebrew')}" dir="rtl" autocomplete="off">
+        </div>
+        <div class="field">
+          <input type="password" id="inv-password" placeholder="${t('password')}" autocomplete="new-password">
+        </div>
+        <button class="login-btn" id="inv-submit-btn">${t('createAccount')}</button>
+        <div class="login-error" id="inv-error"></div>
+        <div class="login-success" id="inv-success"></div>
+      </div>
+
+      <div id="invite-error-wrap" style="display:none;text-align:center;padding:24px 0;">
+        <p class="login-error" id="inv-token-error" style="display:block"></p>
+        <button class="login-btn" id="inv-retry-btn" style="margin-top:12px;display:none">${t('inviteRetry')}</button>
+      </div>
+
+      <div class="login-switch" style="margin-top:24px;">
+        <a href="#" id="inv-go-login">${t('login')}</a>
       </div>
     </div>
   `;
@@ -614,7 +637,6 @@ function bindLogin() {
       if (!email || !pass) return;
       const session = authenticate(email, pass);
       if (session && session.locked) {
-        // Show rate limit error
         const lockErrEl = document.querySelector('.login-error') || document.querySelector('#login-error');
         if (lockErrEl) {
           lockErrEl.textContent = t('loginLocked') || 'Too many failed attempts. Try again in 15 minutes.';
@@ -635,54 +657,142 @@ function bindLogin() {
     passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   }
 
-  // --- Request Access ---
-  const reqBtn = $('#req-btn');
-  if (reqBtn) {
-    const nameInput = $('#req-name');
-    const emailInput = $('#req-email');
-    const errEl = $('#req-error');
-    const successEl = $('#req-success');
-
-    const doRequest = () => {
-      errEl.textContent = '';
-      successEl.textContent = '';
-
-      const result = submitAccessRequest(nameInput.value.trim(), emailInput.value.trim());
-
-      if (result.success) {
-        // Notify admins via GAS webhook (fire-and-forget)
-        notifyAdminsOfRequest(result.request);
-        successEl.textContent = t('requestSent');
-        nameInput.value = '';
-        emailInput.value = '';
-        setTimeout(() => { authMode = 'login'; renderApp(); }, 2500);
-      } else {
-        errEl.textContent = t(result.error) || result.error;
-      }
-    };
-
-    reqBtn.addEventListener('click', doRequest);
-    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRequest(); });
+  // --- Invite Registration ---
+  if (authMode === 'invite' && _inviteToken) {
+    bindInviteRegistration(_inviteToken);
   }
 
-  // --- Toggle login ↔ request access ---
-  const goRequest = $('#go-request');
-  if (goRequest) {
-    goRequest.addEventListener('click', e => {
-      e.preventDefault();
-      authMode = 'request';
-      renderApp();
-    });
-  }
-
-  const goLogin = $('#go-login');
+  // --- "Go to login" link from invite screen ---
+  const goLogin = $('#inv-go-login');
   if (goLogin) {
     goLogin.addEventListener('click', e => {
       e.preventDefault();
       authMode = 'login';
+      _inviteToken = null;
+      history.replaceState(null, '', location.pathname);
       renderApp();
     });
   }
+}
+
+// Fetch invite details from GAS and bind the registration form
+function bindInviteRegistration(token) {
+  const loadingEl = $('#invite-loading');
+  const formWrap = $('#invite-form-wrap');
+  const errorWrap = $('#invite-error-wrap');
+  const tokenErrorEl = $('#inv-token-error');
+  const retryBtn = $('#inv-retry-btn');
+
+  function showError(msg, showRetry) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (formWrap) formWrap.style.display = 'none';
+    if (errorWrap) errorWrap.style.display = 'block';
+    if (tokenErrorEl) tokenErrorEl.textContent = msg;
+    if (retryBtn) retryBtn.style.display = showRetry ? 'inline-block' : 'none';
+  }
+
+  // Fetch invite details from GAS
+  const url = SHEETS_SYNC_URL;
+  if (!url) { showError(t('inviteNetworkError'), true); return; }
+
+  fetch(`${url}?action=getInvite&token=${encodeURIComponent(token)}`)
+    .then(resp => { if (!resp.ok) throw new Error('http'); return resp.json(); })
+    .then(data => {
+      if (data.status === 'not_found') {
+        showError(t('inviteTokenInvalid'), false);
+        return;
+      }
+      if (data.invite && data.invite.inviteStatus === 'accepted') {
+        showError(t('inviteAlreadyUsed'), false);
+        return;
+      }
+      if (data.invite) {
+        // Show form with email pre-filled
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (formWrap) formWrap.style.display = 'block';
+        const emailEl = $('#inv-email');
+        if (emailEl) emailEl.value = data.invite.email;
+
+        // Bind submit
+        const submitBtn = $('#inv-submit-btn');
+        const errEl = $('#inv-error');
+        const successEl = $('#inv-success');
+        const nameInput = $('#inv-name');
+        const nameHeInput = $('#inv-nameHe');
+        const passInput = $('#inv-password');
+
+        const doSubmit = () => {
+          errEl.textContent = '';
+          successEl.textContent = '';
+
+          const name = nameInput ? nameInput.value.trim() : '';
+          const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
+          const password = passInput ? passInput.value : '';
+          const email = data.invite.email;
+
+          if (!name) { errEl.textContent = t('signUpError_fillAll'); return; }
+          const pwCheck = validatePassword(password);
+          if (!pwCheck.valid) { errEl.textContent = pwCheck.error; return; }
+
+          // Generate username from email prefix
+          const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+
+          const result = createUser({
+            username: baseUsername,
+            password: password,
+            name: name,
+            nameHe: nameHe,
+            email: email,
+            role: data.invite.role || 'worker',
+            status: 'active',
+          });
+
+          if (!result.success) {
+            errEl.textContent = t(result.error) || result.error;
+            return;
+          }
+
+          // Notify GAS that invite was accepted (fire-and-forget)
+          notifyInviteAccepted(token, baseUsername);
+
+          // Show success and redirect to login
+          submitBtn.disabled = true;
+          successEl.textContent = t('inviteAccountCreated');
+          setTimeout(() => {
+            authMode = 'login';
+            _inviteToken = null;
+            history.replaceState(null, '', location.pathname);
+            renderApp();
+          }, 2500);
+        };
+
+        if (submitBtn) submitBtn.addEventListener('click', doSubmit);
+        if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
+      }
+    })
+    .catch(() => {
+      showError(t('inviteNetworkError'), true);
+    });
+
+  // Retry button
+  if (retryBtn) {
+    retryBtn.addEventListener('click', () => {
+      if (errorWrap) errorWrap.style.display = 'none';
+      if (loadingEl) loadingEl.style.display = 'block';
+      bindInviteRegistration(token);
+    });
+  }
+}
+
+// Fire-and-forget POST to GAS to mark invite as accepted
+function notifyInviteAccepted(token, username) {
+  const url = SHEETS_SYNC_URL;
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'accept_invite', token, username }),
+    mode: 'no-cors',
+  }).catch(() => {});
 }
 
 // ============================================================
@@ -690,10 +800,9 @@ function bindLogin() {
 // ============================================================
 function renderHeader() {
   const session = getSession();
-  const showBack = currentModule !== null || currentScreen === 'pendingRequests';
+  const showBack = currentModule !== null;
   const title = currentModule ? getModuleTitle(currentModule)
     : currentScreen === 'backoffice' ? t('nav_backoffice')
-    : currentScreen === 'pendingRequests' ? t('pendingRequestsTitle')
     : t('appName');
   const roleClass = session.role === 'worker' ? 'worker' : '';
 
@@ -705,15 +814,6 @@ function renderHeader() {
       </div>
       <span class="header-title">${esc(title)}</span>
       <div class="header-right">
-        ${session.role === 'admin' ? (() => {
-          const pending = getPendingRequests().length;
-          return pending > 0
-            ? `<button class="notif-btn" onclick="currentScreen='pendingRequests';renderApp()" title="${t('pendingRequestsTitle')}" aria-label="${t('pendingRequestsTitle')}">
-                <i data-feather="bell" style="width:16px;height:16px"></i>
-                <span class="notif-badge">${pending}</span>
-               </button>`
-            : '';
-        })() : ''}
         <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
           ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
             ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
@@ -1928,6 +2028,7 @@ function renderBackoffice(container) {
             </span>
           </div>
           <div class="ri-details">
+            ${u.email ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(u.email)}</div>` : ''}
             ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : currentLang === 'th' ? (u.nameTh || u.name || '-') : (u.name || '-'))}
             <div style="font-size:10px; margin-top:4px; color:var(--text-muted);">
               ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
@@ -1935,6 +2036,33 @@ function renderBackoffice(container) {
           </div>
         </div>
       `).join('')}
+    </div>
+
+    <div class="invite-section" style="margin-top:24px;">
+      <div class="section-title" style="margin-bottom:12px;">${t('inviteUser')}</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;">
+          <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
+            autocomplete="off" autocapitalize="none" spellcheck="false" style="margin:0;">
+        </div>
+        <select class="form-select" id="invite-role" style="width:auto;min-width:100px;margin:0;">
+          <option value="worker">${t('role_worker')}</option>
+          <option value="manager">${t('role_manager')}</option>
+          <option value="admin">${t('role_admin')}</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="btn-send-invite" style="margin-top:10px;width:100%;">
+        <i data-feather="send"></i> ${t('sendInvitation')}
+      </button>
+      <div class="login-error" id="invite-error" style="margin-top:8px;"></div>
+      <div class="login-success" id="invite-success" style="margin-top:8px;"></div>
+    </div>
+
+    <div style="margin-top:24px;">
+      <div class="section-title" style="margin-bottom:12px;">${t('invitationsTitle')}</div>
+      <div id="invitations-list" class="record-list">
+        <div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>
+      </div>
     </div>
 
     <div style="margin-top:24px;">
@@ -2017,6 +2145,153 @@ function renderBackoffice(container) {
       renderApp();
     });
   });
+
+  // --- Invitation bindings ---
+  const sendInviteBtn = container.querySelector('#btn-send-invite');
+  if (sendInviteBtn) {
+    sendInviteBtn.addEventListener('click', () => {
+      const emailInput = container.querySelector('#invite-email');
+      const roleInput = container.querySelector('#invite-role');
+      const errEl = container.querySelector('#invite-error');
+      const successEl = container.querySelector('#invite-success');
+      errEl.textContent = '';
+      successEl.textContent = '';
+
+      const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+      const role = roleInput ? roleInput.value : 'worker';
+
+      if (!email) { errEl.textContent = t('inviteError_fillEmail'); return; }
+      const emailCheck = validateEmail(email);
+      if (!emailCheck.valid) { errEl.textContent = t('inviteError_invalidEmail'); return; }
+
+      // Check duplicate in existing users
+      const existingUsers = getUsers();
+      if (existingUsers.find(u => u.email && u.email.toLowerCase() === email)) {
+        errEl.textContent = t('requestError_emailExists');
+        return;
+      }
+
+      // Check duplicate in local invitations
+      const invites = getInvitations();
+      if (invites.find(inv => inv.email === email && inv.status === 'pending')) {
+        errEl.textContent = t('inviteError_duplicate');
+        return;
+      }
+
+      // Generate token and send
+      const token = generateInviteToken();
+      const appUrl = location.origin + location.pathname;
+      const session = getSession();
+
+      // Save locally
+      addInvitation({
+        token,
+        email,
+        role,
+        status: 'pending',
+        sentAt: new Date().toISOString(),
+        sentBy: session ? session.username : '',
+        username: '',
+      });
+
+      // Send to GAS (fire-and-forget)
+      const url = SHEETS_SYNC_URL;
+      if (url) {
+        sendInviteBtn.disabled = true;
+        sendInviteBtn.innerHTML = `<i data-feather="loader"></i> ${t('inviteSending')}`;
+        if (typeof feather !== 'undefined') feather.replace();
+
+        fetch(url, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'send_invite',
+            email,
+            token,
+            role,
+            appUrl,
+            sentBy: session ? session.username : '',
+          }),
+          mode: 'no-cors',
+        }).then(() => {
+          successEl.textContent = t('inviteSent');
+          emailInput.value = '';
+          sendInviteBtn.disabled = false;
+          sendInviteBtn.innerHTML = `<i data-feather="send"></i> ${t('sendInvitation')}`;
+          if (typeof feather !== 'undefined') feather.replace();
+          // Refresh invitations list
+          loadInvitationsList(container);
+        }).catch(() => {
+          sendInviteBtn.disabled = false;
+          sendInviteBtn.innerHTML = `<i data-feather="send"></i> ${t('sendInvitation')}`;
+          if (typeof feather !== 'undefined') feather.replace();
+          successEl.textContent = t('inviteSent');
+          emailInput.value = '';
+          loadInvitationsList(container);
+        });
+      } else {
+        successEl.textContent = t('inviteSent');
+        emailInput.value = '';
+        loadInvitationsList(container);
+      }
+    });
+  }
+
+  // Load invitations from GAS on backoffice render
+  loadInvitationsList(container);
+}
+
+// Fetch invitations from GAS and render them in the backoffice
+function loadInvitationsList(container) {
+  const listEl = container.querySelector('#invitations-list');
+  if (!listEl) return;
+
+  // Show local invitations immediately
+  const localInvites = getInvitations();
+  renderInvitationItems(listEl, localInvites);
+
+  // Then fetch from GAS for latest status
+  const url = SHEETS_SYNC_URL;
+  if (!url) return;
+
+  fetch(`${url}?action=listInvites`)
+    .then(resp => { if (!resp.ok) throw new Error('http'); return resp.json(); })
+    .then(data => {
+      if (data.status === 'ok' && Array.isArray(data.invites)) {
+        // Update local cache with GAS data
+        saveInvitations(data.invites);
+        renderInvitationItems(listEl, data.invites);
+      }
+    })
+    .catch(() => {
+      // Keep showing local data on network failure
+    });
+}
+
+function renderInvitationItems(listEl, invites) {
+  if (!invites || invites.length === 0) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = invites.map(inv => `
+    <div class="record-item">
+      <div class="ri-top">
+        <span class="ri-title" style="font-size:13px;">
+          ${inv.username ? esc(inv.username) : esc(inv.email)}
+        </span>
+        <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
+          ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
+        </span>
+      </div>
+      <div class="ri-details">
+        ${inv.username ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(inv.email)}</div>` : ''}
+        <span class="role-pill role-pill-${esc(inv.role || 'worker')}" style="font-size:9px;">${t('role_' + (inv.role || 'worker'))}</span>
+        <span style="font-size:10px;color:var(--text-muted);margin-inline-start:8px;">
+          ${inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : ''}
+        </span>
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderUserForm(container) {
@@ -2173,75 +2448,6 @@ function renderUserForm(container) {
 // ============================================================
 // ACCESS REQUESTS
 // ============================================================
-
-// Fire-and-forget notification to GAS webhook so admins get an email
-function notifyAdminsOfRequest(request) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
-  fetch(url, {
-    method: 'POST',
-    body: JSON.stringify({
-      action: 'notify',
-      type: 'access_request',
-      name: request.name,
-      email: request.email,
-      requestedAt: request.requestedAt,
-    }),
-    mode: 'no-cors',
-  }).catch(() => {});
-}
-
-function renderPendingRequests(container) {
-  const requests = getPendingRequests();
-
-  container.innerHTML = `
-    <div style="padding:16px">
-      <h2 style="font-size:17px;font-weight:700;margin-bottom:16px">${t('pendingRequestsTitle')}</h2>
-      ${requests.length === 0
-        ? `<div class="empty-state"><p>${t('pendingRequestsEmpty')}</p></div>`
-        : requests.map(req => `
-          <div class="record-item" id="req-card-${esc(req.id)}">
-            <div class="ri-main">
-              <div class="ri-title">${esc(req.name)}</div>
-              <div class="ri-details">${esc(req.email)}<br><small>${new Date(req.requestedAt).toLocaleDateString()}</small></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px">
-              <div style="display:flex;gap:6px">
-                <input type="password" id="pwd-${esc(req.id)}" placeholder="${t('setPassword')}"
-                  style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
-                <select id="role-${esc(req.id)}"
-                  style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);font-size:13px">
-                  <option value="worker">${t('role_worker')}</option>
-                  <option value="manager">${t('role_manager')}</option>
-                  <option value="admin">${t('role_admin')}</option>
-                </select>
-              </div>
-              <div style="display:flex;gap:6px">
-                <button class="btn btn-primary" style="flex:1" onclick="handleApproveRequest('${esc(req.id)}')">${t('approveUser')}</button>
-                <button class="btn btn-danger" style="flex:1" onclick="handleDenyRequest('${esc(req.id)}')">${t('denyUser')}</button>
-              </div>
-            </div>
-          </div>`).join('')}
-    </div>
-  `;
-}
-
-function handleApproveRequest(requestId) {
-  const pwd = ($(`#pwd-${requestId}`) || {}).value || '';
-  const role = ($(`#role-${requestId}`) || {}).value || 'worker';
-  if (!pwd) { alert(t('setPassword')); return; }
-  const res = approveRequest(requestId, pwd, role);
-  if (res.success) {
-    renderApp();
-  } else {
-    alert(res.error || 'Error approving request');
-  }
-}
-
-function handleDenyRequest(requestId) {
-  denyRequest(requestId);
-  renderApp();
-}
 
 // ============================================================
 // AUTO HARD-REFRESH

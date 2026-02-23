@@ -427,3 +427,42 @@ function createUser(userData) {
   localStorage.setItem('factory_users', JSON.stringify(users));
   return { success: true };
 }
+
+// ============================================================
+// Invitation System
+// ============================================================
+const INVITATIONS_KEY = 'factory_invitations';
+
+function getInvitations() {
+  try {
+    return JSON.parse(localStorage.getItem(INVITATIONS_KEY) || '[]');
+  } catch (e) { return []; }
+}
+
+function saveInvitations(list) {
+  localStorage.setItem(INVITATIONS_KEY, JSON.stringify(list));
+}
+
+function addInvitation(invite) {
+  const invites = getInvitations();
+  invites.push(invite);
+  saveInvitations(invites);
+}
+
+function updateInvitationStatus(token, status, username) {
+  const invites = getInvitations();
+  const idx = invites.findIndex(i => i.token === token);
+  if (idx !== -1) {
+    invites[idx].status = status;
+    if (username) invites[idx].username = username;
+    saveInvitations(invites);
+  }
+}
+
+function generateInviteToken() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+    + Math.random().toString(36).slice(2, 9);
+}
