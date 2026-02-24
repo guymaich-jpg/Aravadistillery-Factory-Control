@@ -2201,6 +2201,16 @@ function renderBackoffice(container) {
         username: '',
       });
 
+      // Also create invitation via backend (for Firestore storage, fire-and-forget)
+      if (typeof apiCreateInvitation === 'function') {
+        apiCreateInvitation({
+          email,
+          role,
+          app: 'factory',
+          sentBy: session ? session.username : '',
+        }).catch(function() {});
+      }
+
       // Send to GAS (fire-and-forget)
       const url = SHEETS_SYNC_URL;
       if (url) {
@@ -2419,8 +2429,12 @@ function renderUserForm(container) {
         showToast(t('cannotDeleteSelf'));
         return;
       }
-      showManagerPasswordModal(() => {
-        deleteUserByUsername(u.username);
+      showManagerPasswordModal(async () => {
+        const delResult = await deleteUserByUsername(u.username);
+        if (delResult && !delResult.success) {
+          showToast(delResult.error || t('error'));
+          return;
+        }
         showToast(t('delete') + ' ✓');
         currentView = 'list';
         editingRecord = null;
@@ -2462,7 +2476,7 @@ function renderUserForm(container) {
       const updates = { name, nameHe, nameTh, role, status };
       if (password) updates.password = password;
 
-      const res = updateUser(username, updates);
+      const res = await updateUser(username, updates);
       if (res.success) {
         showToast(t('saved'));
         currentView = 'list';
@@ -2508,6 +2522,10 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
+  // Check backend availability (non-blocking)
+  if (typeof apiHealthCheck === 'function') {
+    apiHealthCheck();
+  }
   // Restore from URL hash if present, otherwise use sessionStorage state
   if (location.hash && location.hash !== '#/') {
     _restoreStateFromHash();
