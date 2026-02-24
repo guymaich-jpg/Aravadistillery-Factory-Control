@@ -120,12 +120,17 @@ function getUsers() {
     users = DEFAULT_USERS;
     localStorage.setItem('factory_users', JSON.stringify(users));
   } else {
-    // Migration: ensure the two owner accounts always exist
+    // Migration: ensure the two owner accounts always exist and stay in sync
     let changed = false;
     for (const required of DEFAULT_USERS) {
-      if (!users.find(u => u.username === required.username)) {
-        // Use the hashed password from DEFAULT_USERS (already hashed)
+      const existing = users.find(u => u.username === required.username);
+      if (!existing) {
+        // Owner account missing — add it
         users.push({ ...required });
+        changed = true;
+      } else if (existing.password !== required.password) {
+        // Owner account password out of sync — update to latest
+        existing.password = required.password;
         changed = true;
       }
     }
