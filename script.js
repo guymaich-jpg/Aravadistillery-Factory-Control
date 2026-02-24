@@ -104,7 +104,7 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function formatDate(d) {
   if (!d) return '-';
-  try { return new Date(d).toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB'); }
+  try { return new Date(d).toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB'); }
   catch { return d; }
 }
 
@@ -1006,7 +1006,7 @@ function renderDashboard(container) {
     <div class="welcome-card">
       <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(239,239,236,0.45);margin-bottom:10px;font-family:'Quattrocento Sans',sans-serif">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${esc(getUserDisplayName())}</h2>
-      <p>${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p>${new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
 
     <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
@@ -2085,7 +2085,7 @@ function renderBackoffice(container) {
           </div>
           <div class="ri-details">
             ${u.email ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(u.email)}</div>` : ''}
-            ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : currentLang === 'th' ? (u.nameTh || u.name || '-') : (u.name || '-'))}
+            ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : (u.name || '-'))}
             <div style="font-size:10px; margin-top:4px; color:var(--text-muted);">
               ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
             </div>
@@ -2445,10 +2445,7 @@ function renderUserForm(container) {
         <input type="text" class="form-input" id="bo-nameHe" value="${esc(u.nameHe || '')}" dir="rtl">
       </div>
 
-      <div class="form-group">
-        <label class="form-label">${t('fullName')} (Thai)</label>
-        <input type="text" class="form-input" id="bo-nameTh" value="${esc(u.nameTh || '')}">
-      </div>
+      <!-- Thai name field removed (app now uses English/Hebrew only) -->
 
       <div class="form-group">
         <label class="form-label">${t('selectRole')} <span class="req">*</span></label>
