@@ -351,28 +351,3 @@ async function fbAuthSignOut() {
   }
 }
 
-// ============================================================
-// Sync: push all localStorage data to Firestore (one-time migration)
-// ============================================================
-async function migrateLocalStorageToFirebase() {
-  if (!isFirebaseReady()) return;
-  const keys = [
-    'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
-    'factory_distillation1', 'factory_distillation2', 'factory_bottling',
-    'factory_inventoryVersions'
-  ];
-  for (const key of keys) {
-    const local = JSON.parse(localStorage.getItem(key) || '[]');
-    for (const record of local) {
-      try {
-        const existing = await _db.collection(key)
-          .where('id', '==', record.id).get();
-        if (existing.empty) {
-          await _db.collection(key).add(record);
-        }
-      } catch (e) {
-        // skip
-      }
-    }
-  }
-}

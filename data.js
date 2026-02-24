@@ -142,20 +142,6 @@ async function addCustomOption(fieldKey, value) {
   return value;
 }
 
-// Legacy: keep getCustomSuppliers for backward compat
-function getCustomSuppliers() {
-  return getCustomOptions('supplier');
-}
-
-function addCustomSupplier(name) {
-  const suppliers = getCustomOptions('supplier');
-  if (!suppliers.includes(name)) {
-    suppliers.push(name);
-    localStorage.setItem('factory_customOptions_supplier', JSON.stringify(suppliers));
-  }
-  return name;
-}
-
 // ---- Inventory Versioning ----
 function saveInventoryVersion(snapshot) {
   const versions = getData(STORE_KEYS.inventoryVersions);
