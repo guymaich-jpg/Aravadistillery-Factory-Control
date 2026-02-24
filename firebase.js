@@ -11,16 +11,17 @@
 // ============================================================
 
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDkUt6_q5s8vKOXedEG142U-uQgY_49SGI",
+  authDomain: "aravadistillery-crm.firebaseapp.com",
+  projectId: "aravadistillery-crm",
+  storageBucket: "aravadistillery-crm.firebasestorage.app",
+  messagingSenderId: "806102108846",
+  appId: "1:806102108846:web:ea6efb2363c1459dbdfb3f",
+  measurementId: "G-JQ437N3LG4"
 };
 
 // ---- Feature flag: set to true after filling in config above ----
-const FIREBASE_ENABLED = false;
+const FIREBASE_ENABLED = true;
 
 // ============================================================
 // Internal state
