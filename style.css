@@ -806,6 +806,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 24px;
+  min-width: 0;
 }
 
 .stat-card {
@@ -815,6 +816,8 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   text-align: center;
   border: 1px solid var(--separator);
   box-shadow: var(--shadow);
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .stat-card .stat-num {
