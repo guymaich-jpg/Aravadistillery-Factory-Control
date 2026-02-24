@@ -189,6 +189,12 @@ function authenticate(emailOrUsername, password) {
     const session = { ...user, loginTime: Date.now(), lastActivity: Date.now() };
     delete session.password;
     localStorage.setItem('factory_session', JSON.stringify(session));
+
+    // Sign in to Firebase Auth (enables Firestore security rules)
+    if (user.email && typeof fbAuthSignIn === 'function') {
+      fbAuthSignIn(user.email, password).catch(() => {});
+    }
+
     return session;
   }
 
@@ -322,6 +328,10 @@ function refreshSession() {
 
 function logout() {
   localStorage.removeItem('factory_session');
+  // Sign out of Firebase Auth
+  if (typeof fbAuthSignOut === 'function') {
+    fbAuthSignOut().catch(() => {});
+  }
   if (typeof renderApp === 'function') {
     currentScreen = 'dashboard';
     currentModule = null;

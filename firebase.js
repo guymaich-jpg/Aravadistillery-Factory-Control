@@ -27,6 +27,7 @@ const FIREBASE_ENABLED = true;
 // Internal state
 // ============================================================
 let _db = null;
+let _auth = null;
 let _firebaseReady = false;
 
 // ---- Real-time listeners registry ----
@@ -56,14 +57,16 @@ function initFirebase() {
   Promise.all([
     loadScript(BASE + '/firebase-app-compat.js'),
     loadScript(BASE + '/firebase-firestore-compat.js'),
+    loadScript(BASE + '/firebase-auth-compat.js'),
   ]).then(() => {
     try {
       if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
       }
       _db = firebase.firestore();
+      _auth = firebase.auth();
       _firebaseReady = true;
-      console.log('[Firebase] Firestore connected');
+      console.log('[Firebase] Firestore + Auth connected');
     } catch (e) {
       console.warn('[Firebase] Init failed, using localStorage fallback:', e.message);
     }
@@ -258,6 +261,55 @@ async function fbDeleteUser(username) {
 }
 
 // Google SSO removed — login is handled via email + password only.
+
+// ============================================================
+// Firebase Authentication — enables Firestore security rules
+// ============================================================
+
+/**
+ * Sign in to Firebase Auth (or auto-create account if user exists locally but
+ * not yet in Firebase Auth). Called on every successful local login so existing
+ * users are transparently migrated to Firebase Auth.
+ */
+async function fbAuthSignIn(email, password) {
+  if (!_firebaseReady || !_auth) return null;
+  try {
+    const result = await _auth.signInWithEmailAndPassword(email, password);
+    console.log('[Firebase] Auth signed in:', email);
+    return result.user;
+  } catch (e) {
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+      // User exists locally but not in Firebase Auth — auto-create (lazy migration)
+      try {
+        const result = await _auth.createUserWithEmailAndPassword(email, password);
+        console.log('[Firebase] Auth user auto-created:', email);
+        return result.user;
+      } catch (createErr) {
+        if (createErr.code === 'auth/email-already-in-use') {
+          console.warn('[Firebase] Auth password out of sync for', email);
+        } else {
+          console.warn('[Firebase] Auth create error:', createErr.message);
+        }
+        return null;
+      }
+    }
+    if (e.code === 'auth/wrong-password') {
+      console.warn('[Firebase] Auth password out of sync for', email);
+      return null;
+    }
+    console.warn('[Firebase] Auth sign-in error:', e.code, e.message);
+    return null;
+  }
+}
+
+async function fbAuthSignOut() {
+  if (!_auth) return;
+  try {
+    await _auth.signOut();
+  } catch (e) {
+    console.warn('[Firebase] Auth sign-out error:', e.message);
+  }
+}
 
 // ============================================================
 // Sync: push all localStorage data to Firestore (one-time migration)
