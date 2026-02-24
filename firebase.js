@@ -302,6 +302,53 @@ async function fbAuthSignIn(email, password) {
   }
 }
 
+/**
+ * Create a new Firebase Auth account for an invited/new user.
+ * Returns the Firebase user on success, null on failure.
+ */
+async function fbAuthCreateUser(email, password) {
+  if (!_firebaseReady || !_auth) return null;
+  try {
+    const result = await _auth.createUserWithEmailAndPassword(email, password);
+    console.log('[Firebase] Auth user created:', email);
+    return result.user;
+  } catch (e) {
+    if (e.code === 'auth/email-already-in-use') {
+      console.log('[Firebase] Auth user already exists:', email);
+      return 'exists';
+    }
+    console.warn('[Firebase] Auth create error:', e.code, e.message);
+    return null;
+  }
+}
+
+/**
+ * Update password in Firebase Auth for an existing user.
+ * Requires the user to be currently signed in, or we sign in first.
+ */
+async function fbAuthUpdatePassword(email, oldPassword, newPassword) {
+  if (!_firebaseReady || !_auth) return false;
+  try {
+    // Sign in as the user first to get a fresh credential
+    const cred = firebase.auth.EmailAuthProvider.credential(email, oldPassword);
+    const currentUser = _auth.currentUser;
+    if (currentUser && currentUser.email === email) {
+      await currentUser.reauthenticateWithCredential(cred);
+      await currentUser.updatePassword(newPassword);
+      console.log('[Firebase] Auth password updated for:', email);
+      return true;
+    }
+    // If not currently signed in as this user, sign in then update
+    const result = await _auth.signInWithEmailAndPassword(email, oldPassword);
+    await result.user.updatePassword(newPassword);
+    console.log('[Firebase] Auth password updated for:', email);
+    return true;
+  } catch (e) {
+    console.warn('[Firebase] Auth password update error:', e.code, e.message);
+    return false;
+  }
+}
+
 async function fbAuthSignOut() {
   if (!_auth) return;
   try {
