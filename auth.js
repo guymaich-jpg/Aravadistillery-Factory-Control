@@ -48,7 +48,7 @@ const _loginAttempts = {};
 const DEFAULT_USERS = [
   {
     username: 'guymaich',
-    password: 'hashed:13mry6n',
+    password: 'hashed:1ap7bdv',
     role: 'admin',
     name: 'Guy Maich',
     nameHe: 'גיא מייך',
@@ -57,7 +57,7 @@ const DEFAULT_USERS = [
   },
   {
     username: 'yonatangarini',
-    password: 'hashed:111kxly',
+    password: 'hashed:1ekzbmw',
     role: 'admin',
     name: 'Yonatan Garini',
     nameHe: 'יונתן גריני',
