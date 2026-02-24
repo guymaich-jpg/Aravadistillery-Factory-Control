@@ -631,25 +631,40 @@ function bindLogin() {
     const passInput = $('#login-pass');
     const errEl = $('#login-error');
 
-    const doLogin = () => {
+    const doLogin = async () => {
       const email = userInput.value.trim();
       const pass = passInput.value;
       if (!email || !pass) return;
-      const session = authenticate(email, pass);
-      if (session && session.locked) {
-        const lockErrEl = document.querySelector('.login-error') || document.querySelector('#login-error');
-        if (lockErrEl) {
-          lockErrEl.textContent = t('loginLocked') || 'Too many failed attempts. Try again in 15 minutes.';
-          lockErrEl.style.display = 'block';
+
+      // Disable button and show loading state while authenticating
+      loginBtn.disabled = true;
+      errEl.textContent = '';
+      const origText = loginBtn.textContent;
+      loginBtn.textContent = '...';
+
+      try {
+        const session = await authenticate(email, pass);
+        if (session && session.locked) {
+          const lockErrEl = document.querySelector('.login-error') || document.querySelector('#login-error');
+          if (lockErrEl) {
+            lockErrEl.textContent = t('loginLocked') || 'Too many failed attempts. Try again in 15 minutes.';
+            lockErrEl.style.display = 'block';
+          }
+          return;
         }
-        return;
-      }
-      if (session) {
-        currentScreen = 'dashboard';
-        currentModule = null;
-        renderApp();
-      } else {
+        if (session) {
+          currentScreen = 'dashboard';
+          currentModule = null;
+          renderApp();
+        } else {
+          errEl.textContent = t('loginError');
+        }
+      } catch (e) {
+        console.error('[Auth] Login error:', e);
         errEl.textContent = t('loginError');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = origText;
       }
     };
 
@@ -721,7 +736,7 @@ function bindInviteRegistration(token) {
         const nameHeInput = $('#inv-nameHe');
         const passInput = $('#inv-password');
 
-        const doSubmit = () => {
+        const doSubmit = async () => {
           errEl.textContent = '';
           successEl.textContent = '';
 
@@ -737,7 +752,9 @@ function bindInviteRegistration(token) {
           // Generate username from email prefix
           const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
 
-          const result = createUser({
+          // Disable button while creating account (async — creates Firebase Auth account)
+          submitBtn.disabled = true;
+          const result = await createUser({
             username: baseUsername,
             password: password,
             name: name,
@@ -748,6 +765,7 @@ function bindInviteRegistration(token) {
           });
 
           if (!result.success) {
+            submitBtn.disabled = false;
             errEl.textContent = t(result.error) || result.error;
             return;
           }
@@ -756,7 +774,6 @@ function bindInviteRegistration(token) {
           notifyInviteAccepted(token, baseUsername);
 
           // Show success and redirect to login
-          submitBtn.disabled = true;
           successEl.textContent = t('inviteAccountCreated');
           setTimeout(() => {
             authMode = 'login';
@@ -2413,7 +2430,7 @@ function renderUserForm(container) {
   }
 
   const saveBtn = container.querySelector('#bo-save');
-  if (saveBtn) saveBtn.addEventListener('click', () => {
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
     const errorEl = container.querySelector('#bo-error');
     errorEl.textContent = '';
 
@@ -2438,6 +2455,8 @@ function renderUserForm(container) {
       return;
     }
 
+    saveBtn.disabled = true;
+
     if (isEdit) {
       // Update
       const updates = { name, nameHe, nameTh, role, status };
@@ -2450,17 +2469,19 @@ function renderUserForm(container) {
         editingRecord = null;
         renderApp();
       } else {
+        saveBtn.disabled = false;
         errorEl.textContent = res.error;
       }
     } else {
-      // Create
-      const res = createUser({ username, password, name, nameHe, nameTh, role, status });
+      // Create (async — may create Firebase Auth account)
+      const res = await createUser({ username, password, name, nameHe, nameTh, role, status });
       if (res.success) {
         showToast(t('signUpSuccess'));
         currentView = 'list';
         editingRecord = null;
         renderApp();
       } else {
+        saveBtn.disabled = false;
         errorEl.textContent = t(res.error) || res.error;
       }
     }

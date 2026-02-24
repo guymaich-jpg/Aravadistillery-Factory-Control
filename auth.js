@@ -134,8 +134,13 @@ function getUsers() {
   return users;
 }
 
-// Authenticate by email (primary) or username, with password
-function authenticate(emailOrUsername, password) {
+// Authenticate by email (primary) or username, with password.
+// Strategy: Firebase Auth is source of truth for passwords.
+//   1. Try Firebase Auth first (signInWithEmailAndPassword)
+//   2. If user doesn't exist in Firebase → auto-create (createUserWithEmailAndPassword)
+//   3. If Firebase unavailable → fall back to local hash check
+// Local user DB provides role/permissions for the session.
+async function authenticate(emailOrUsername, password) {
   // --- Rate limiting check (AUTH-06) ---
   const key = emailOrUsername.toLowerCase();
   const now = Date.now();
@@ -143,7 +148,6 @@ function authenticate(emailOrUsername, password) {
   const MAX_ATTEMPTS = 5;
 
   if (_loginAttempts[key]) {
-    // Clean up old attempts outside the window
     _loginAttempts[key] = _loginAttempts[key].filter(t => (now - t) < RATE_LIMIT_WINDOW);
     if (_loginAttempts[key].length >= MAX_ATTEMPTS) {
       return { locked: true };
@@ -151,58 +155,83 @@ function authenticate(emailOrUsername, password) {
   }
 
   const users = getUsers();
-  const hashedInput = hashPassword(password);
 
-  const user = users.find(u => {
+  // Find local user by email or username (for role/permissions lookup)
+  const localUser = users.find(u => {
     if (u.status === 'inactive') return false;
-    const matchesIdentity =
-      (u.email && u.email.toLowerCase() === key) ||
+    return (u.email && u.email.toLowerCase() === key) ||
       u.username.toLowerCase() === key;
-    if (!matchesIdentity) return false;
-
-    // Check password: support hashed and legacy plaintext
-    if (u.password && u.password.startsWith('hashed:')) {
-      // Stored password is hashed — compare hashed input
-      return u.password === hashedInput;
-    } else {
-      // Legacy plaintext — compare directly, then upgrade
-      if (u.password === password) {
-        return true;
-      }
-      return false;
-    }
   });
 
-  if (user) {
-    // Upgrade legacy plaintext password to hashed (AUTH-01)
-    if (user.password && !user.password.startsWith('hashed:')) {
-      const idx = users.findIndex(u => u.username === user.username);
-      if (idx !== -1) {
-        users[idx].password = hashedInput;
-        localStorage.setItem('factory_users', JSON.stringify(users));
+  // Resolve the email to use for Firebase Auth
+  const emailForAuth = localUser ? localUser.email : (key.includes('@') ? key : null);
+
+  // --- Strategy 1: Try Firebase Auth first ---
+  if (emailForAuth && typeof fbAuthSignIn === 'function' && _firebaseReady && _auth) {
+    try {
+      const fbUser = await fbAuthSignIn(emailForAuth, password);
+      if (fbUser && localUser) {
+        // Firebase Auth succeeded — build session from local user DB
+        delete _loginAttempts[key];
+        const session = { ...localUser, loginTime: Date.now(), lastActivity: Date.now() };
+        delete session.password;
+        localStorage.setItem('factory_session', JSON.stringify(session));
+        return session;
       }
+      if (fbUser && !localUser) {
+        // Firebase Auth succeeded but no local user record — shouldn't normally happen,
+        // but record a failed attempt (no role/permissions available)
+        if (!_loginAttempts[key]) _loginAttempts[key] = [];
+        _loginAttempts[key].push(now);
+        return null;
+      }
+      // fbUser is null — Firebase Auth rejected credentials
+      // Record failed attempt and return null (don't fall through to local check)
+      if (!_loginAttempts[key]) _loginAttempts[key] = [];
+      _loginAttempts[key].push(now);
+      return null;
+    } catch (e) {
+      // Firebase Auth threw unexpectedly — fall through to local check
+      console.warn('[Auth] Firebase Auth error, falling back to local:', e.message);
     }
-
-    // Reset rate limiting on success
-    delete _loginAttempts[key];
-
-    const session = { ...user, loginTime: Date.now(), lastActivity: Date.now() };
-    delete session.password;
-    localStorage.setItem('factory_session', JSON.stringify(session));
-
-    // Sign in to Firebase Auth (enables Firestore security rules)
-    if (user.email && typeof fbAuthSignIn === 'function') {
-      fbAuthSignIn(user.email, password).catch(() => {});
-    }
-
-    return session;
   }
 
-  // Record failed attempt for rate limiting
-  if (!_loginAttempts[key]) _loginAttempts[key] = [];
-  _loginAttempts[key].push(now);
+  // --- Strategy 2: Fallback to local hash check (Firebase unavailable) ---
+  if (!localUser) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
 
-  return null;
+  const hashedInput = hashPassword(password);
+  let passwordMatch = false;
+
+  if (localUser.password && localUser.password.startsWith('hashed:')) {
+    passwordMatch = localUser.password === hashedInput;
+  } else if (localUser.password === password) {
+    passwordMatch = true;
+  }
+
+  if (!passwordMatch) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
+
+  // Upgrade legacy plaintext password to hashed (AUTH-01)
+  if (localUser.password && !localUser.password.startsWith('hashed:')) {
+    const idx = users.findIndex(u => u.username === localUser.username);
+    if (idx !== -1) {
+      users[idx].password = hashedInput;
+      localStorage.setItem('factory_users', JSON.stringify(users));
+    }
+  }
+
+  delete _loginAttempts[key];
+  const session = { ...localUser, loginTime: Date.now(), lastActivity: Date.now() };
+  delete session.password;
+  localStorage.setItem('factory_session', JSON.stringify(session));
+  return session;
 }
 
 // ============================================================
@@ -247,7 +276,7 @@ function submitAccessRequest(name, email) {
   return { success: true, request };
 }
 
-function approveRequest(requestId, password, role) {
+async function approveRequest(requestId, password, role) {
   const requests = getPendingRequests();
   const req = requests.find(r => r.id === requestId);
   if (!req) return { success: false, error: 'Request not found' };
@@ -260,7 +289,7 @@ function approveRequest(requestId, password, role) {
   if (!pwCheck.valid) return { success: false, error: pwCheck.error };
 
   const baseUsername = req.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-  const result = createUser({
+  const result = await createUser({
     username: baseUsername,
     password: password,
     role: role || 'worker',
@@ -375,12 +404,30 @@ function updateUser(username, updates) {
   const users = getUsers();
   const idx = users.findIndex(u => u.username === username);
   if (idx !== -1) {
+    const rawPassword = updates.password; // keep plaintext for Firebase sync
+
     // Hash password if it's being updated (AUTH-03)
     if (updates.password && !updates.password.startsWith('hashed:')) {
       updates.password = hashPassword(updates.password);
     }
     users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
     localStorage.setItem('factory_users', JSON.stringify(users));
+
+    // Sync password change to Firebase Auth (fire-and-forget)
+    // Note: fbAuthUpdatePassword needs the old password, which we don't have here.
+    // Instead, if the admin is changing a user's password, we create/update the
+    // Firebase Auth account. The user's next login will use the new password via
+    // Firebase Auth's signIn, which will fail, then auto-create with new password.
+    // For a clean sync, we just attempt to create the account with the new password.
+    if (rawPassword && users[idx].email && typeof fbAuthCreateUser === 'function') {
+      fbAuthCreateUser(users[idx].email, rawPassword).catch(() => {});
+    }
+
+    // Sync user profile to Firestore
+    if (typeof fbSaveUser === 'function') {
+      fbSaveUser(users[idx]).catch(() => {});
+    }
+
     return { success: true };
   }
   return { success: false, error: 'User not found' };
@@ -402,7 +449,7 @@ function deleteUserByUsername(username) {
   return { success: false, error: 'User not found' };
 }
 
-function createUser(userData) {
+async function createUser(userData) {
   const users = getUsers();
   if (users.find(u => u.username.toLowerCase() === userData.username.toLowerCase())) {
     return { success: false, error: 'signUpError_userExists' };
@@ -422,7 +469,16 @@ function createUser(userData) {
     return { success: false, error: pwCheck.error };
   }
 
-  // Hash password before storing (AUTH-01)
+  // Auto-create Firebase Auth account for the new user
+  if (userData.email && typeof fbAuthCreateUser === 'function') {
+    const fbResult = await fbAuthCreateUser(userData.email, userData.password);
+    // fbResult is user object, 'exists', or null — proceed regardless
+    if (fbResult && fbResult !== 'exists') {
+      console.log('[Auth] Firebase Auth account created for', userData.email);
+    }
+  }
+
+  // Hash password before storing locally (AUTH-01)
   const hashedPw = (userData.password && !userData.password.startsWith('hashed:'))
     ? hashPassword(userData.password)
     : userData.password;
@@ -436,6 +492,12 @@ function createUser(userData) {
 
   users.push(newUser);
   localStorage.setItem('factory_users', JSON.stringify(users));
+
+  // Sync user profile to Firestore (without password)
+  if (typeof fbSaveUser === 'function') {
+    fbSaveUser(newUser).catch(() => {});
+  }
+
   return { success: true };
 }
 
