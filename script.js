@@ -2201,6 +2201,16 @@ function renderBackoffice(container) {
         username: '',
       });
 
+      // Also create invitation via backend (for Firestore storage, fire-and-forget)
+      if (typeof apiCreateInvitation === 'function') {
+        apiCreateInvitation({
+          email,
+          role,
+          app: 'factory',
+          sentBy: session ? session.username : '',
+        }).catch(function() {});
+      }
+
       // Send to GAS (fire-and-forget)
       const url = SHEETS_SYNC_URL;
       if (url) {
@@ -2512,6 +2522,10 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
+  // Check backend availability (non-blocking)
+  if (typeof apiHealthCheck === 'function') {
+    apiHealthCheck();
+  }
   // Restore from URL hash if present, otherwise use sessionStorage state
   if (location.hash && location.hash !== '#/') {
     _restoreStateFromHash();
