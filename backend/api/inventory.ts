@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../lib/cors';
 import { verifyRequest } from '../lib/auth';
 import { adminDb } from '../lib/firebase-admin';
+import { syncToCrmStockLevels } from '../lib/crm-sync';
 
 const DRINK_TYPES = [
   'drink_arak', 'drink_gin', 'drink_edv', 'drink_licorice',
@@ -105,6 +106,13 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
     };
 
     await adminDb.collection('factory_inventory').doc('current').set(inventoryDoc);
+
+    // Sync to CRM stockLevels collection (real-time listener picks this up)
+    try {
+      await syncToCrmStockLevels(cleanBottles, callerEmail);
+    } catch {
+      // CRM sync is best-effort — don't fail the factory write
+    }
 
     return res.status(200).json({ success: true, ...inventoryDoc });
   } catch (e: any) {
