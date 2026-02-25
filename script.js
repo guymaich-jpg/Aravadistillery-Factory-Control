@@ -389,6 +389,16 @@ function syncInventorySnapshot(triggeredBy) {
     labels,
     records: [record],
   });
+
+  // Write bottle inventory to Firestore for CRM real-time reads
+  const inventoryDoc = {
+    bottles: { ...bottleInv },
+    total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+    updatedAt: new Date().toISOString(),
+    updatedBy: session?.username || 'system',
+    trigger: triggeredBy || 'save',
+  };
+  fbSetDoc('factory_inventory', 'current', inventoryDoc);
 }
 
 // ---- Manager Password Modal (required for any delete action) ----
