@@ -80,6 +80,7 @@ const PERMISSIONS = {
     canApproveBottling: true,
     canViewAllModules: true,
     canAccessBackoffice: true,
+    canImportInventory: true,
   },
   manager: {
     canViewDashboard: true,
@@ -93,6 +94,7 @@ const PERMISSIONS = {
     canApproveBottling: false,
     canViewAllModules: true,
     canAccessBackoffice: true,
+    canImportInventory: true,
   },
   worker: {
     canViewDashboard: true,
@@ -106,6 +108,7 @@ const PERMISSIONS = {
     canApproveBottling: false,
     canViewAllModules: true,
     canAccessBackoffice: false,
+    canImportInventory: false,
   }
 };
 
