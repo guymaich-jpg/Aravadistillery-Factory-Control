@@ -342,6 +342,20 @@ async function fbGetIdToken() {
   }
 }
 
+/**
+ * Write (or overwrite) a specific document by ID in a Firestore collection.
+ * Used for singleton documents like inventory snapshots.
+ */
+async function fbSetDoc(collectionName, docId, data) {
+  if (!isFirebaseReady()) return null;
+  try {
+    await _db.collection(collectionName).doc(docId).set(data);
+    return true;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function fbAuthSignOut() {
   if (!_auth) return;
   try {

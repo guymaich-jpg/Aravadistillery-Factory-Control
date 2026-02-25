@@ -192,3 +192,15 @@ async function apiAcceptInvitation(data) {
 async function apiDeleteInvitation(id) {
   return apiCall('DELETE', '/api/invitations/' + encodeURIComponent(id));
 }
+
+// ============================================================
+// Inventory API
+// ============================================================
+
+/**
+ * Get current bottle inventory computed from factory_bottling records.
+ * Returns { bottles: { drink_arak: N, ... }, total: N, updatedAt: string } or null.
+ */
+async function apiGetInventory() {
+  return apiCall('GET', '/api/inventory');
+}
