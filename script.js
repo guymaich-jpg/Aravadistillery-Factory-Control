@@ -563,6 +563,8 @@ function renderApp() {
     renderModuleList(content);
   } else if (currentScreen === 'backoffice') {
     renderBackoffice(content);
+  } else if (currentScreen === 'spiritStock') {
+    renderSpiritStock(content);
   } else {
     renderDashboard(content);
   }
@@ -589,7 +591,7 @@ function checkSecurity() {
 // ============================================================
 // LOGIN & REQUEST ACCESS
 // ============================================================
-let authMode = 'login'; // 'login' | 'invite'
+let authMode = 'login'; // 'login' | 'request' | 'invite'
 let _inviteToken = null;
 
 // Date-palm SVG mark — the Arava region's signature crop + distillery theme
@@ -605,6 +607,7 @@ const ARAVA_MARK_SVG = `
 
 function renderLogin() {
   if (authMode === 'invite') return renderInviteRegistration();
+  if (authMode === 'request') return renderRequestAccess();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
@@ -628,6 +631,41 @@ function renderLogin() {
         </div>
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error" role="alert" aria-live="polite"></div>
+        <div class="login-switch">
+          ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequestAccess() {
+  return `
+    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <div class="login-screen">
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <h1 class="login-brand-name">${t('requestAccessTitle')}</h1>
+        <p class="login-brand-sub">${t('requestAccessSubtitle')}</p>
+        <div class="login-brand-rule"></div>
+      </div>
+
+      <div class="login-form">
+        <div class="field">
+          <input type="text" id="req-name" placeholder="${t('fullName')}"
+            aria-label="${t('fullName')}" autocomplete="name">
+        </div>
+        <div class="field">
+          <input type="email" id="req-email" placeholder="${t('emailAddress')}"
+            aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
+        </div>
+        <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
+        <div class="login-error" id="req-error" role="alert" aria-live="polite"></div>
+        <div class="login-success" id="req-success" role="status" aria-live="polite"></div>
+        <div class="login-switch">
+          ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
+        </div>
       </div>
     </div>
   `;
@@ -735,15 +773,59 @@ function bindLogin() {
     passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   }
 
+  // --- "Go to request access" link from login screen ---
+  const goRequest = $('#go-request');
+  if (goRequest) {
+    goRequest.addEventListener('click', e => {
+      e.preventDefault();
+      authMode = 'request';
+      renderApp();
+    });
+  }
+
+  // --- Request Access form ---
+  const reqBtn = $('#req-btn');
+  if (reqBtn) {
+    reqBtn.addEventListener('click', () => {
+      const nameInput = $('#req-name');
+      const emailInput = $('#req-email');
+      const errEl = $('#req-error');
+      const successEl = $('#req-success');
+      errEl.textContent = '';
+      successEl.textContent = '';
+      const result = submitAccessRequest(
+        nameInput ? nameInput.value.trim() : '',
+        emailInput ? emailInput.value.trim() : ''
+      );
+      if (result.success) {
+        successEl.textContent = t('requestSent');
+      } else {
+        errEl.textContent = t(result.error) || result.error;
+      }
+    });
+  }
+
+  // --- "Go to login" link from request access or invite screen ---
+  const goLogin = $('#go-login') || $('#inv-go-login');
+  if (goLogin) {
+    goLogin.addEventListener('click', e => {
+      e.preventDefault();
+      authMode = 'login';
+      _inviteToken = null;
+      history.replaceState(null, '', location.pathname);
+      renderApp();
+    });
+  }
+
   // --- Invite Registration ---
   if (authMode === 'invite' && _inviteToken) {
     bindInviteRegistration(_inviteToken);
   }
 
-  // --- "Go to login" link from invite screen ---
-  const goLogin = $('#inv-go-login');
-  if (goLogin) {
-    goLogin.addEventListener('click', e => {
+  // --- "Go to login" link from invite screen (if separate from #go-login) ---
+  const invGoLogin = $('#inv-go-login');
+  if (invGoLogin && invGoLogin !== goLogin) {
+    invGoLogin.addEventListener('click', e => {
       e.preventDefault();
       authMode = 'login';
       _inviteToken = null;
@@ -956,6 +1038,7 @@ function renderBottomNav() {
     { id: 'dashboard', icon: 'grid', label: 'nav_dashboard' },
     { id: 'receiving', icon: 'package', label: 'nav_receiving' },
     { id: 'production', icon: 'activity', label: 'nav_production' },
+    { id: 'spiritStock', icon: 'droplet', label: 'nav_spiritStock' },
     { id: 'bottling', icon: 'check-circle', label: 'nav_bottling' },
     { id: 'inventory', icon: 'database', label: 'nav_inventory' },
   ];
@@ -2214,6 +2297,42 @@ function showImportBaseInventoryModal() {
 // ============================================================
 // SPIRIT PIPELINE SCREEN
 // ============================================================
+function renderSpiritStock(container) {
+  const d1Records = getData('distillation1');
+  const d2Records = getData('distillation2');
+
+  if (!d1Records.length && !d2Records.length) {
+    container.innerHTML = `
+      <div class="screen-header"><h2>${t('mod_spiritStock')}</h2></div>
+      <div class="empty-state">
+        <p>${t('spirit_noData')}</p>
+      </div>`;
+    return;
+  }
+
+  // Calculate D1 produced and D2 consumed/produced
+  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
+  const d2Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
+  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+  const d1Available = d1Produced - d2Consumed;
+
+  container.innerHTML = `
+    <div class="screen-header"><h2>${t('mod_spiritStock')}</h2></div>
+    <div class="spirit-pipeline">
+      <div class="spirit-card">
+        <h3>${t('spirit_d1Label')}</h3>
+        <p>${t('spirit_produced')}: ${d1Produced.toFixed(1)}</p>
+        <p>${t('spirit_consumed')}: ${d2Consumed.toFixed(1)}</p>
+        <p><strong>${t('spirit_available')}: ${d1Available.toFixed(1)}</strong></p>
+      </div>
+      <div class="spirit-card">
+        <h3>${t('spirit_d2Label')}</h3>
+        <p>${t('spirit_produced')}: ${d2Produced.toFixed(1)}</p>
+        ${d1Available > 0 ? `<p class="spirit-ready">${t('spirit_readyToBottle')}</p>` : ''}
+      </div>
+    </div>`;
+}
+
 // ============================================================
 // MODULE FIELD DEFINITIONS
 // ============================================================
