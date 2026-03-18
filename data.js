@@ -10,6 +10,8 @@ const STORE_KEYS = {
   distillation2: 'factory_distillation2',
   bottling: 'factory_bottling',
   inventoryVersions: 'factory_inventoryVersions',
+  inventoryCounts: 'factory_inventoryCounts',
+  inventoryBase: 'factory_inventoryBase',
   customSuppliers: 'factory_customSuppliers',
   users: 'factory_users',
 };
@@ -289,7 +291,8 @@ function exportAllData() {
   const keys = [
     'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
     'factory_distillation1', 'factory_distillation2', 'factory_bottling',
-    'factory_inventoryVersions', 'factory_customSuppliers'
+    'factory_inventoryVersions', 'factory_inventoryCounts', 'factory_inventoryBase',
+    'factory_customSuppliers'
   ];
   const today = new Date().toISOString().slice(0, 10);
   keys.forEach(key => {
