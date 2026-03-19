@@ -299,13 +299,37 @@ function syncModuleToSheets(module) {
   if (!fields) return;
 
   const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
-  const labels = [...fields.map(f => t(f.labelKey)), t('notes'), 'Created At'];
+  const labels = [...fields.map(f => tHe(f.labelKey)), tHe('notes'), 'Created At'];
+
+  // Map of dropdown field keys to their i18n option lists per module
+  const dropdownFields = {
+    rawMaterials: { supplier: SUPPLIERS_RAW, category: CATEGORIES, unit: null },
+    dateReceiving: { supplier: SUPPLIERS_DATES },
+    fermentation: {},
+    distillation1: { type: D1_TYPES, stillName: STILL_NAMES },
+    distillation2: { productType: D2_PRODUCT_TYPES },
+    bottling: { drinkType: DRINK_TYPES, filtered: null, color: null, taste: null, decision: null },
+  };
+  const dropdowns = dropdownFields[module] || {};
+
+  // Format dropdown values as "key (Hebrew label)" for the sheet
+  const formattedRecords = records.map(r => {
+    const copy = { ...r };
+    Object.keys(dropdowns).forEach(fieldKey => {
+      const val = copy[fieldKey];
+      if (val && typeof val === 'string' && I18N.he[val]) {
+        copy[fieldKey] = val + ' (' + tHe(val) + ')';
+      }
+    });
+    return copy;
+  });
 
   postToSheets({
-    sheetName: t('mod_' + module),
+    sheetName: tHe('mod_' + module),
     keys,
     labels,
-    records,
+    records: formattedRecords,
+    freeTextKeys: ['notes'],
   });
 }
 
@@ -409,15 +433,15 @@ function syncInventorySnapshot(triggeredBy) {
   const keys = Object.keys(record);
   const labels = [
     'Timestamp', 'User', 'Triggered By',
-    t('inv_dates'), 'Dates Received (kg)', t('inv_datesUsed'),
+    tHe('inv_dates'), 'Dates Received (kg)', tHe('inv_datesUsed'),
     'D1 Produced (L)', 'D1 Available (L)',
     'D2 Produced (L)', 'D2 Available (L)',
-    ...DRINK_TYPES.map(dt => t(dt)),
+    ...DRINK_TYPES.map(dt => tHe(dt)),
   ];
 
   if (SHEETS_SYNC_URL) {
     postToSheets({
-      sheetName: t('mod_inventory'),
+      sheetName: tHe('mod_inventory'),
       action: 'append',
       keys,
       labels,

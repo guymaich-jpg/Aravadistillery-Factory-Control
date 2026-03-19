@@ -20,10 +20,27 @@
 // That's it. Every time a record is saved, the sheet updates automatically.
 // ================================================================
 
+// Translate non-Hebrew free-text to Hebrew using LanguageApp.
+// Returns "original (Hebrew translation)" or original if already Hebrew.
+function translateFreeText(text) {
+  if (!text || String(text).trim() === '') return text;
+  var s = String(text);
+  // Already Hebrew (and no Thai) → keep as-is
+  if (/[\u0590-\u05FF]/.test(s) && !/[\u0E00-\u0E7F]/.test(s)) return s;
+  try {
+    var translated = LanguageApp.translate(s, '', 'he');
+    if (translated === s) return s;
+    return s + ' (' + translated + ')';
+  } catch (e) {
+    return s;
+  }
+}
+
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
     const { sheetName, labels, keys, records, action } = payload;
+    const freeTextKeys = payload.freeTextKeys || [];
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const props = PropertiesService.getScriptProperties();
@@ -164,6 +181,7 @@ function doPost(e) {
           const v = r[k];
           if (v === null || v === undefined) return '';
           if (typeof v === 'boolean') return v ? '✓' : '';
+          if (freeTextKeys.indexOf(k) !== -1) return translateFreeText(v);
           return String(v);
         })
       );
@@ -244,6 +262,8 @@ function doPost(e) {
             // Convert 0–1 fraction to percentage string
             return (parseFloat(v) * 100).toFixed(1) + '%';
           }
+          // Translate free-text fields (e.g. notes) to Hebrew
+          if (freeTextKeys.indexOf(k) !== -1) return translateFreeText(v);
           return String(v);
         })
       );

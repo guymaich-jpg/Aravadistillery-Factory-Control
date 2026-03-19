@@ -1088,6 +1088,11 @@ function t(key) {
   return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.en[key]) || key;
 }
 
+// Always return Hebrew translation (for Google Sheets sync)
+function tHe(key) {
+  return I18N.he[key] || I18N.en[key] || key;
+}
+
 function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('factory_lang', lang);
