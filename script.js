@@ -2550,7 +2550,7 @@ function renderBackoffice(container) {
           <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
             aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false">
         </div>
-        <select class="form-select bo-role-select" id="invite-role">
+        <select class="form-select bo-role-select" id="invite-role" aria-label="${t('role')}"
           <option value="worker">${t('role_worker')}</option>
           <option value="manager">${t('role_manager')}</option>
           <option value="admin">${t('role_admin')}</option>

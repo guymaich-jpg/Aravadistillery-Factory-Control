@@ -586,6 +586,12 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .nav-item.active { color: var(--accent); }
 
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
 /* Thin blue indicator bar at top of active item */
 .nav-item.active::before {
   content: '';
