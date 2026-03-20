@@ -155,16 +155,49 @@ function syncCrmStockLevels(bottleInv) {
   });
 }
 
-// Helper: write inventory directly to Firestore (shared by syncInventorySnapshot fallbacks)
-function _writeInventoryToFirestore(bottleInv, session, triggeredBy) {
-  fbSetDoc('factory_inventory', 'current', {
+// Helper: write inventory directly to Firestore (shared by syncInventorySnapshot fallbacks).
+// Retries each write up to 2 times on failure so CRM stock levels stay current.
+async function _writeInventoryToFirestore(bottleInv, session, triggeredBy) {
+  var doc = {
     bottles: { ...bottleInv },
     total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
     updatedAt: new Date().toISOString(),
     updatedBy: session?.username || 'system',
     trigger: triggeredBy || 'save',
-  });
-  syncCrmStockLevels(bottleInv);
+  };
+
+  var ok = await _retryFbSetDoc('factory_inventory', 'current', doc, 2);
+  if (!ok) {
+    console.error('[sync] Failed to write inventory to Firestore after retries');
+  }
+
+  await _retrySyncCrmStockLevels(bottleInv, 2);
+}
+
+// Retry fbSetDoc up to `retries` times with 1s delay between attempts.
+async function _retryFbSetDoc(collection, docId, data, retries) {
+  if (typeof fbSetDoc !== 'function') return false;
+  for (var i = 0; i <= retries; i++) {
+    try {
+      var result = await fbSetDoc(collection, docId, data);
+      if (result) return true;
+    } catch (e) { /* retry */ }
+    if (i < retries) await new Promise(function(r) { setTimeout(r, 1000); });
+  }
+  return false;
+}
+
+// Retry CRM stock-level sync up to `retries` times.
+async function _retrySyncCrmStockLevels(bottleInv, retries) {
+  if (typeof fbSetDoc !== 'function') return;
+  for (var i = 0; i <= retries; i++) {
+    try {
+      syncCrmStockLevels(bottleInv);
+      return; // syncCrmStockLevels is fire-and-forget per product, best we can do
+    } catch (e) { /* retry */ }
+    if (i < retries) await new Promise(function(r) { setTimeout(r, 1000); });
+  }
+  console.error('[sync] Failed to sync CRM stock levels after retries');
 }
 
 // Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
@@ -239,10 +272,12 @@ function syncInventorySnapshot(triggeredBy) {
     });
   }
 
-  // Push inventory to backend for CRM reads (backend writes to Firestore)
+  // Push inventory to backend for CRM reads (backend writes to Firestore).
+  // Always fall back to direct Firestore write when the backend is unavailable
+  // or returns an error so CRM stock levels stay in sync.
   if (typeof apiUpdateInventory === 'function') {
     apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
-      if (!result) {
+      if (!result || result.error) {
         _writeInventoryToFirestore(bottleInv, session, triggeredBy);
       }
     }).catch(function() {

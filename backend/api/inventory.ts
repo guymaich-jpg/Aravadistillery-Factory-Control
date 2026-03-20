@@ -107,11 +107,20 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
 
     await adminDb.collection('factory_inventory').doc('current').set(inventoryDoc);
 
-    // Sync to CRM stockLevels collection (real-time listener picks this up)
-    try {
-      await syncToCrmStockLevels(cleanBottles, callerEmail);
-    } catch {
-      // CRM sync is best-effort — don't fail the factory write
+    // Sync to CRM stockLevels collection (real-time listener picks this up).
+    // Retry up to 2 times so CRM always reflects the latest factory inventory.
+    let crmSynced = false;
+    for (let attempt = 0; attempt < 3 && !crmSynced; attempt++) {
+      try {
+        await syncToCrmStockLevels(cleanBottles, callerEmail);
+        crmSynced = true;
+      } catch (crmErr: any) {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        } else {
+          console.error('[inventory] CRM sync failed after 3 attempts:', crmErr?.message);
+        }
+      }
     }
 
     return res.status(200).json({ success: true, ...inventoryDoc });
