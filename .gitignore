@@ -2,3 +2,4 @@ node_modules/
 .DS_Store
 test-results/
 tests/e2e/report/
+.claude/settings.local.json

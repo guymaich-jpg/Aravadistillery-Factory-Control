@@ -163,7 +163,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  max-width: 600px;
+  max-width: 480px;
   margin: 0 auto;
   position: relative;
   overflow: hidden;
@@ -171,10 +171,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 .screen-content {
-  flex: 1;
+  flex: 1 1 0%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px 16px 110px;
+  padding: 16px 16px 24px;
+  min-height: 0;
 }
 
 /* ============================================================
@@ -415,15 +416,17 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .app-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding: 0 12px;
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
-  min-height: 52px;
-  position: sticky;
-  top: 0;
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  flex-shrink: 0;
+  position: relative;
   z-index: 100;
-  gap: 8px;
+  gap: 6px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -435,9 +438,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 0%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .header-back {
@@ -445,9 +449,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border: none;
   color: var(--accent);
   cursor: pointer;
-  padding: 10px;
-  min-width: 44px;
-  min-height: 44px;
+  padding: 8px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -455,27 +459,30 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   transition: background 0.2s;
   flex-shrink: 0;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .header-back:active { background: var(--accent-bg2); }
 
 .header-title {
-  font-size: 14px;
-  font-weight: 400;            /* Trirong regular — brand style */
-  letter-spacing: 1px;
-  flex: 2;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 40%;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 0%;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .lang-btn,
@@ -484,11 +491,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 8px 14px;
-  min-height: 44px;
-  min-width: 44px;
-  border-radius: 20px;
-  font-size: 12px;
+  padding: 6px 10px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 18px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -497,6 +504,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   gap: 4px;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  flex-shrink: 0;
 }
 
 .lang-btn:active,
@@ -506,21 +514,27 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .user-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11px;
   color: var(--text-secondary);
   background: var(--bg-surface);
-  padding: 5px 10px;
-  border-radius: 20px;
+  padding: 4px 8px;
+  height: 28px;
+  border-radius: 14px;
   border: 1px solid var(--separator);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .role-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--success);
+  flex-shrink: 0;
 }
 
 .role-dot.worker { background: var(--accent); }
@@ -532,10 +546,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   display: flex;
   background: var(--bg-card);
   border-top: 1px solid var(--separator);
-  padding: 6px 0;
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
-  position: sticky;
-  bottom: 0;
+  padding: 4px 0 0;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  position: relative;
+  flex-shrink: 0;
   z-index: 100;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -550,24 +564,33 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px 4px;
-  min-height: 52px;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 2px;
+  height: 52px;
   position: relative;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   cursor: pointer;
   transition: color 0.2s;
   border: none;
   background: none;
   font-family: 'Quattrocento Sans', 'Inter', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .nav-item.active { color: var(--accent); }
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
 
 /* Thin blue indicator bar at top of active item */
 .nav-item.active::before {
@@ -582,20 +605,20 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border-radius: 0 0 3px 3px;
 }
 
-.nav-item svg { width: 22px; height: 22px; }
+.nav-item svg { width: 20px; height: 20px; }
 
 /* ============================================================
    DASHBOARD
    ============================================================ */
 .welcome-card {
   background: #2C332F;
-  border-radius: 3px;          /* Sharp — Arava brand */
-  padding: 24px 20px;
-  margin-bottom: 20px;
+  border-radius: 3px;
+  padding: 20px 16px;
+  margin-bottom: 16px;
   color: #EFEFEC;
   position: relative;
   overflow: hidden;
-  border-left: 3px solid #3F5147;  /* subtle sage-green accent bar */
+  border-inline-start: 3px solid #3F5147;
 }
 
 /* Grain texture overlay — artisanal feel */
@@ -672,30 +695,32 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .module-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 28px;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .module-card {
   background: var(--bg-card);
-  border-radius: 3px;          /* Sharp — Arava brand */
-  padding: 20px 16px 18px;
+  border-radius: 3px;
+  padding: 16px 14px 14px;
   cursor: pointer;
   box-shadow: var(--shadow);
   transition: transform 0.12s, background 0.15s;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--separator);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .module-card:hover  { background: var(--bg-surface); }
 .module-card:active { transform: scale(0.96); }
 
-/* Colored left accent bar — craft/artisanal style */
+/* Colored accent bar — craft/artisanal style */
 .module-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; bottom: 0;
+  top: 0; inset-inline-start: 0; bottom: 0;
   width: 3px;
 }
 
@@ -804,15 +829,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 16px;
   min-width: 0;
 }
 
 .stat-card {
   background: var(--bg-card);
-  border-radius: 12px;
-  padding: 16px 12px;
+  border-radius: 6px;
+  padding: 12px 8px;
   text-align: center;
   border: 1px solid var(--separator);
   box-shadow: var(--shadow);
@@ -1309,9 +1334,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border-radius: var(--radius-sm);
   padding: 14px;
   box-shadow: var(--shadow);
-  border-left: 3px solid var(--separator);
+  border-inline-start: 3px solid var(--separator);
 }
-.inv-history-card.inv-history-latest { border-left-color: var(--success); }
+.inv-history-card.inv-history-latest { border-inline-start-color: var(--success); }
 .inv-history-header {
   display: flex;
   justify-content: space-between;
@@ -1354,7 +1379,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    ============================================================ */
 .toast {
   position: fixed;
-  bottom: 90px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: rgba(0, 0, 0, 0.82);
@@ -1474,42 +1499,18 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    RESPONSIVE — WIDER SCREENS
    ============================================================ */
 
-/* Lock the app to a phone-width column on all non-mobile screens */
+/* On wider screens, frame the app as a phone column */
 @media (min-width: 481px) {
-  #app {
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.4);
-    max-width: 480px;
-    margin: 0 auto;
-  }
-
   body {
     display: flex;
     align-items: flex-start;
     justify-content: center;
     overflow-x: hidden;
   }
-}
 
-/* Tablets and small desktops */
-@media (min-width: 768px) {
-  .module-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .stats-row {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .login-form {
-    max-width: 360px;
-  }
-
-  .form-actions {
-    max-width: 380px;
-    margin-left: auto;
-    margin-right: auto;
+  #app {
+    border-inline: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -1527,13 +1528,17 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   #app {
     height: 90vh;
     max-height: 900px;
-    border-radius: 24px;
+    border-radius: 20px;
     overflow: hidden;
     border: 1px solid var(--border);
   }
 
   .bottom-nav {
-    border-radius: 0 0 24px 24px;
+    border-radius: 0 0 20px 20px;
+  }
+
+  .app-header {
+    border-radius: 20px 20px 0 0;
   }
 }
 
@@ -1573,12 +1578,12 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
    FAB
    ============================================================ */
 .fab-add {
-  position: absolute;
-  bottom: 84px;
-  right: 18px;
-  width: 54px;
-  height: 54px;
-  border-radius: 8px;           /* sharp — brand aligned */
+  position: fixed;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 16px);
+  right: calc(50% - 240px + 16px); /* stay within max-width container */
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
   background: var(--accent);
   color: #EFEFEC;
   border: none;
@@ -1589,6 +1594,15 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   box-shadow: 0 4px 16px rgba(37, 37, 37, 0.22);
   z-index: 50;
   transition: transform 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* On mobile (<=480px), position from right edge of screen */
+@media (max-width: 480px) {
+  .fab-add {
+    right: 16px;
+  }
 }
 
 .fab-add:active {
@@ -1596,7 +1610,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   box-shadow: 0 2px 8px rgba(37, 37, 37, 0.18);
 }
 
-.fab-add svg { width: 24px; height: 24px; }
+.fab-add svg { width: 22px; height: 22px; }
 
 /* ============================================================
    TAB BAR
@@ -1965,7 +1979,35 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .export-row {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+}
+
+/* ============================================================
+   MOBILE TOUCH OPTIMIZATIONS
+   ============================================================ */
+
+/* Prevent text selection on interactive elements */
+.app-header,
+.bottom-nav,
+.btn,
+.fab-add,
+.module-card,
+.record-item,
+.tab-btn,
+.nav-item {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Smooth scroll for content area */
+.screen-content {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+/* Prevent pull-to-refresh in app area */
+#app {
+  overscroll-behavior: none;
 }
 
 /* ============================================================
@@ -2002,6 +2044,312 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+}
+
+/* ============================================================
+   INLINE STYLE REPLACEMENTS — utility classes
+   ============================================================ */
+
+/* Dashboard brand label inside welcome card */
+.welcome-brand-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(239, 239, 236, 0.45);
+  margin-bottom: 10px;
+  font-family: 'Quattrocento Sans', sans-serif;
+}
+
+/* Stat number color variants */
+.stat-num-warning { color: var(--warning, #f59e0b); }
+.stat-num-success { color: var(--success); }
+
+/* Stats row sub-info */
+.stat-sub-info {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* Section title with top margin */
+.section-title-mt { margin-top: 24px; }
+.section-title-mb { margin-bottom: 12px; }
+
+/* Export button (inline in module list) */
+.export-btn-wrap {
+  text-align: end;
+  margin-bottom: 12px;
+}
+
+.btn-export {
+  flex: none;
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+/* Hint below empty state */
+.empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Inline approve button in bottling records */
+.approve-inline-btn {
+  margin-inline-start: 6px;
+  padding: 2px 10px;
+  font-size: 11px;
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Icon sizing utilities for feather icons inline */
+.icon-sm { width: 14px; height: 14px; }
+.icon-md { width: 15px; height: 15px; }
+.icon-inline {
+  vertical-align: middle;
+  margin-inline-end: 4px;
+}
+
+/* Backoffice sections */
+.bo-section {
+  margin-top: 24px;
+}
+
+.bo-user-email {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bo-user-activity {
+  font-size: 10px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.bo-invite-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.bo-invite-field {
+  flex: 1;
+}
+
+.bo-invite-btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.bo-role-select {
+  width: auto;
+  min-width: 100px;
+  margin: 0;
+}
+
+.bo-feedback {
+  margin-top: 8px;
+}
+
+.bo-sheet-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  text-decoration: none;
+}
+
+.bo-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.bo-btn-flex { flex: 1; }
+
+/* Inventory import button spacing */
+.btn-import-base {
+  margin-inline-start: 8px;
+}
+
+/* Table alignment (replaces inline text-align:right) */
+.text-end { text-align: end; }
+.text-center { text-align: center; }
+
+/* Role pill inline spacing */
+.role-pill-inline {
+  margin-inline-start: 6px;
+}
+
+/* Invitation items */
+.inv-item-title {
+  font-size: 13px;
+}
+
+.inv-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inv-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.inv-item-role {
+  font-size: 9px;
+}
+
+.inv-item-date {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-inline-start: 8px;
+}
+
+/* Decision buttons (approval form field) */
+.decision-btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.decision-btn-row .btn { flex: 1; }
+
+/* Form group hidden (for conditional visibility) */
+.form-group-hidden { display: none; }
+
+/* Record list with top margin */
+.record-list-mt { margin-top: 16px; }
+
+/* Invite loading / error wraps */
+.invite-center-block {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.invite-info-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.invite-info-text-lg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+.invite-form-hidden { display: none; }
+
+/* Login switch margin override */
+.login-switch-mt { margin-top: 24px; }
+
+/* Empty state compact */
+.empty-state-compact {
+  padding: 16px 0;
+}
+
+.empty-state-compact p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Disabled input appearance */
+.input-disabled {
+  opacity: 0.7;
+}
+
+/* ============================================================
+   RESPONSIVE — NARROW SCREENS (320px)
+   ============================================================ */
+@media (max-width: 374px) {
+  /* Tighter header on very narrow screens */
+  .app-header {
+    gap: 4px;
+    padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .user-badge {
+    max-width: 80px;
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .lang-btn,
+  .logout-btn,
+  .theme-btn {
+    padding: 4px 8px;
+    height: 32px;
+    min-width: 32px;
+    font-size: 10px;
+  }
+
+  .header-title {
+    font-size: 13px;
+  }
+
+  /* Smaller nav items on narrow screens */
+  .nav-item {
+    font-size: 7px;
+    padding: 3px 1px;
+    height: 48px;
+  }
+
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Compact module grid */
+  .module-grid {
+    gap: 8px;
+  }
+
+  .module-card {
+    padding: 12px 10px 10px;
+  }
+
+  .module-card .mc-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 10px;
+  }
+
+  .module-card .mc-title {
+    font-size: 12px;
+  }
+
+  /* Stat cards on narrow screens */
+  .stats-row {
+    gap: 6px;
+  }
+
+  .stat-card {
+    padding: 10px 6px;
+  }
+
+  .stat-card .stat-num {
+    font-size: 22px;
+  }
+
+  /* Screen content tighter */
+  .screen-content {
+    padding: 12px 12px 20px;
+  }
 }
 
 /* ============================================================

@@ -247,7 +247,7 @@ test.describe('CSS Consistency', () => {
     const statRadius = await page.locator('.stat-card >> nth=0').evaluate(el =>
       getComputedStyle(el).borderRadius
     );
-    expect(statRadius).toBe('12px');
+    expect(statRadius).toBe('6px');
     const shadow = await page.locator('.stat-card >> nth=0').evaluate(el =>
       getComputedStyle(el).boxShadow
     );

@@ -1,0 +1,188 @@
+{
+  "summary": {
+    "pass": 12,
+    "info": 2,
+    "warn": 3,
+    "error": 0,
+    "total": 17
+  },
+  "findings": [
+    {
+      "category": "SMOKE",
+      "severity": "pass",
+      "message": "Page title: \"Arava Distillery · ייצור\""
+    },
+    {
+      "category": "SMOKE",
+      "severity": "pass",
+      "message": "Body text length: 64 chars"
+    },
+    {
+      "category": "SMOKE",
+      "severity": "warn",
+      "message": "Console errors on load: 6",
+      "details": [
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to fetch at 'https://aravadistillery-factory-control.vercel.app/api/health' from origin 'http://localhost:8099' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+      ]
+    },
+    {
+      "category": "LOGIN",
+      "severity": "info",
+      "message": "Provided creds failed (Firebase offline) — injecting admin session via localStorage"
+    },
+    {
+      "category": "LOGIN",
+      "severity": "pass",
+      "message": "Login succeeded via injected session"
+    },
+    {
+      "category": "HEADER",
+      "severity": "pass",
+      "message": "Header height consistent across all screens: 56px",
+      "details": {
+        "dashboard": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "receiving": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "production": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "spiritStock": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "bottling": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "inventory": {
+          "px": 56,
+          "computed": "56px"
+        },
+        "backoffice": {
+          "px": 56,
+          "computed": "56px"
+        }
+      }
+    },
+    {
+      "category": "BOTTOM-NAV",
+      "severity": "pass",
+      "message": "Bottom nav height consistent: 61px",
+      "details": {
+        "dashboard": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "receiving": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "production": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "spiritStock": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "bottling": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "inventory": {
+          "px": 61,
+          "computed": "61px"
+        },
+        "backoffice": {
+          "px": 61,
+          "computed": "61px"
+        }
+      }
+    },
+    {
+      "category": "RTL",
+      "severity": "pass",
+      "message": "html dir=\"rtl\""
+    },
+    {
+      "category": "RTL",
+      "severity": "pass",
+      "message": "html lang=\"he\""
+    },
+    {
+      "category": "RTL",
+      "severity": "pass",
+      "message": "body CSS direction: rtl"
+    },
+    {
+      "category": "RTL",
+      "severity": "pass",
+      "message": "Header left/right overflow check completed"
+    },
+    {
+      "category": "A11Y",
+      "severity": "pass",
+      "message": "All interactive elements have accessible labels"
+    },
+    {
+      "category": "A11Y",
+      "severity": "pass",
+      "message": "All images have alt text (or no images found)"
+    },
+    {
+      "category": "A11Y",
+      "severity": "info",
+      "message": "Focus indicator on nav button",
+      "details": {
+        "outlineStyle": "none",
+        "outlineWidth": "0px",
+        "outlineColor": "rgb(44, 51, 47)",
+        "boxShadow": "none"
+      }
+    },
+    {
+      "category": "A11Y",
+      "severity": "warn",
+      "message": "1 elements with low contrast ratio (<3.0)",
+      "details": [
+        {
+          "tag": "SPAN",
+          "class": "role-dot ",
+          "text": "",
+          "fg": "rgba(37, 37, 37, 0.65)",
+          "bg": "rgb(63, 81, 71)",
+          "ratio": "1.81"
+        }
+      ]
+    },
+    {
+      "category": "A11Y",
+      "severity": "warn",
+      "message": "Unlabeled inputs on \"backoffice\"",
+      "details": [
+        {
+          "screen": "backoffice",
+          "tag": "SELECT",
+          "type": "select-one",
+          "id": "invite-role",
+          "class": "form-select bo-role-select"
+        }
+      ]
+    },
+    {
+      "category": "OVERFLOW",
+      "severity": "pass",
+      "message": "No horizontal scroll detected at 375px viewport"
+    }
+  ]
+}
