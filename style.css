@@ -612,7 +612,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   color: #EFEFEC;
   position: relative;
   overflow: hidden;
-  border-left: 3px solid #3F5147;
+  border-inline-start: 3px solid #3F5147;
 }
 
 /* Grain texture overlay — artisanal feel */
@@ -710,11 +710,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .module-card:hover  { background: var(--bg-surface); }
 .module-card:active { transform: scale(0.96); }
 
-/* Colored left accent bar — craft/artisanal style */
+/* Colored accent bar — craft/artisanal style */
 .module-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; bottom: 0;
+  top: 0; inset-inline-start: 0; bottom: 0;
   width: 3px;
 }
 
@@ -1328,9 +1328,9 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border-radius: var(--radius-sm);
   padding: 14px;
   box-shadow: var(--shadow);
-  border-left: 3px solid var(--separator);
+  border-inline-start: 3px solid var(--separator);
 }
-.inv-history-card.inv-history-latest { border-left-color: var(--success); }
+.inv-history-card.inv-history-latest { border-inline-start-color: var(--success); }
 .inv-history-header {
   display: flex;
   justify-content: space-between;
@@ -1503,8 +1503,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   }
 
   #app {
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
+    border-inline: 1px solid var(--border);
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.15);
   }
 }
