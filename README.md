@@ -91,11 +91,7 @@ Every record save/approve/delete auto-appends a timestamped row. Separate tabs a
 
 ## Firebase Integration (Optional)
 
-Firestore cloud sync is disabled by default. To enable:
-
-1. Set `FIREBASE_ENABLED = true` in `firebase.js`
-2. Add your Firebase project config
-3. Data will sync bidirectionally between localStorage and Firestore
+Firestore cloud sync is always enabled (`FIREBASE_ENABLED = true` in `firebase.js`). Data syncs bidirectionally between localStorage and Firestore.
 
 ---
 

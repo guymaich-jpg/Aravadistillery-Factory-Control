@@ -43,7 +43,7 @@ cd backend && npm run dev    # vercel dev
 | `script.js` | Main controller: routing, form rendering, record CRUD, views (list/form/detail) |
 | `auth.js` | Login, signup, RBAC (Admin/Manager/Worker), session management (12h timeout) |
 | `data.js` | localStorage CRUD, dropdown data, CSV export |
-| `firebase.js` | Optional Firestore sync (disabled by default: `FIREBASE_ENABLED = false`) |
+| `firebase.js` | Firestore sync (always enabled: `FIREBASE_ENABLED = true`) |
 | `i18n.js` | Bilingual translations (English/Hebrew), `t('key')` lookup |
 | `api-client.js` | Backend API client for Vercel serverless |
 | `sync.js` | Google Sheets + CRM sync |
