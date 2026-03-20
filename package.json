@@ -1,6 +1,6 @@
 {
   "name": "factory-control-app",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Alcohol Production Documentation App - Bilingual (Hebrew/English) mobile-first web application for distillery production tracking",
   "main": "index.html",
   "scripts": {
