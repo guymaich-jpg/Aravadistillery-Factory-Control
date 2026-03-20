@@ -2042,6 +2042,312 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 /* ============================================================
+   INLINE STYLE REPLACEMENTS — utility classes
+   ============================================================ */
+
+/* Dashboard brand label inside welcome card */
+.welcome-brand-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(239, 239, 236, 0.45);
+  margin-bottom: 10px;
+  font-family: 'Quattrocento Sans', sans-serif;
+}
+
+/* Stat number color variants */
+.stat-num-warning { color: var(--warning, #f59e0b); }
+.stat-num-success { color: var(--success); }
+
+/* Stats row sub-info */
+.stat-sub-info {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* Section title with top margin */
+.section-title-mt { margin-top: 24px; }
+.section-title-mb { margin-bottom: 12px; }
+
+/* Export button (inline in module list) */
+.export-btn-wrap {
+  text-align: end;
+  margin-bottom: 12px;
+}
+
+.btn-export {
+  flex: none;
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+/* Hint below empty state */
+.empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Inline approve button in bottling records */
+.approve-inline-btn {
+  margin-inline-start: 6px;
+  padding: 2px 10px;
+  font-size: 11px;
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Icon sizing utilities for feather icons inline */
+.icon-sm { width: 14px; height: 14px; }
+.icon-md { width: 15px; height: 15px; }
+.icon-inline {
+  vertical-align: middle;
+  margin-inline-end: 4px;
+}
+
+/* Backoffice sections */
+.bo-section {
+  margin-top: 24px;
+}
+
+.bo-user-email {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bo-user-activity {
+  font-size: 10px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.bo-invite-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.bo-invite-field {
+  flex: 1;
+}
+
+.bo-invite-btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.bo-role-select {
+  width: auto;
+  min-width: 100px;
+  margin: 0;
+}
+
+.bo-feedback {
+  margin-top: 8px;
+}
+
+.bo-sheet-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  text-decoration: none;
+}
+
+.bo-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.bo-btn-flex { flex: 1; }
+
+/* Inventory import button spacing */
+.btn-import-base {
+  margin-inline-start: 8px;
+}
+
+/* Table alignment (replaces inline text-align:right) */
+.text-end { text-align: end; }
+.text-center { text-align: center; }
+
+/* Role pill inline spacing */
+.role-pill-inline {
+  margin-inline-start: 6px;
+}
+
+/* Invitation items */
+.inv-item-title {
+  font-size: 13px;
+}
+
+.inv-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inv-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.inv-item-role {
+  font-size: 9px;
+}
+
+.inv-item-date {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-inline-start: 8px;
+}
+
+/* Decision buttons (approval form field) */
+.decision-btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.decision-btn-row .btn { flex: 1; }
+
+/* Form group hidden (for conditional visibility) */
+.form-group-hidden { display: none; }
+
+/* Record list with top margin */
+.record-list-mt { margin-top: 16px; }
+
+/* Invite loading / error wraps */
+.invite-center-block {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.invite-info-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.invite-info-text-lg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+.invite-form-hidden { display: none; }
+
+/* Login switch margin override */
+.login-switch-mt { margin-top: 24px; }
+
+/* Empty state compact */
+.empty-state-compact {
+  padding: 16px 0;
+}
+
+.empty-state-compact p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Disabled input appearance */
+.input-disabled {
+  opacity: 0.7;
+}
+
+/* ============================================================
+   RESPONSIVE — NARROW SCREENS (320px)
+   ============================================================ */
+@media (max-width: 374px) {
+  /* Tighter header on very narrow screens */
+  .app-header {
+    gap: 4px;
+    padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .user-badge {
+    max-width: 80px;
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .lang-btn,
+  .logout-btn,
+  .theme-btn {
+    padding: 4px 8px;
+    height: 32px;
+    min-width: 32px;
+    font-size: 10px;
+  }
+
+  .header-title {
+    font-size: 13px;
+  }
+
+  /* Smaller nav items on narrow screens */
+  .nav-item {
+    font-size: 7px;
+    padding: 3px 1px;
+    height: 48px;
+  }
+
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Compact module grid */
+  .module-grid {
+    gap: 8px;
+  }
+
+  .module-card {
+    padding: 12px 10px 10px;
+  }
+
+  .module-card .mc-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 10px;
+  }
+
+  .module-card .mc-title {
+    font-size: 12px;
+  }
+
+  /* Stat cards on narrow screens */
+  .stats-row {
+    gap: 6px;
+  }
+
+  .stat-card {
+    padding: 10px 6px;
+  }
+
+  .stat-card .stat-num {
+    font-size: 22px;
+  }
+
+  /* Screen content tighter */
+  .screen-content {
+    padding: 12px 12px 20px;
+  }
+}
+
+/* ============================================================
    REDUCED MOTION — disable all animations for a11y
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {

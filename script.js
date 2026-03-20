@@ -345,8 +345,8 @@ function toggleTheme() {
   // Update icons without a full re-render
   const btn = document.querySelector('.theme-btn');
   if (btn) btn.innerHTML = next === 'dark'
-    ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
-    : '<i data-feather="moon" style="width:14px;height:14px"></i>';
+    ? '<i data-feather="sun" class="icon-sm"></i>'
+    : '<i data-feather="moon" class="icon-sm"></i>';
   if (typeof feather !== 'undefined') feather.replace();
 }
 
@@ -498,7 +498,7 @@ function showManagerPasswordModal(onSuccess) {
   modal.innerHTML = `
     <div class="manager-pwd-backdrop"></div>
     <div class="manager-pwd-dialog">
-      <div class="mpd-title"><i data-feather="lock" style="width:20px;height:20px;margin-inline-end:8px;"></i>${t('deleteConfirmTitle')}</div>
+      <div class="mpd-title"><i data-feather="lock" class="icon-md" style="margin-inline-end:8px;"></i>${t('deleteConfirmTitle')}</div>
       <p class="mpd-subtitle">${t('deleteConfirmSubtitle')}</p>
       <input type="password" class="form-input mpd-input" id="mpd-password" placeholder="${t('managerPasswordPlaceholder')}" aria-label="${t('managerPasswordPlaceholder')}" autocomplete="current-password">
       <div class="mpd-error" id="mpd-error"></div>
@@ -710,15 +710,15 @@ function renderInviteRegistration() {
         <div class="login-brand-rule"></div>
       </div>
 
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:280px;line-height:1.6">
+      <p class="invite-info-text-lg">
         ${t('inviteRegistrationSubtitle')}
       </p>
 
-      <div id="invite-loading" style="text-align:center;padding:24px 0;">
-        <p style="font-size:13px;color:var(--text-secondary)">${t('inviteLoading')}</p>
+      <div id="invite-loading" class="invite-center-block">
+        <p class="invite-info-text">${t('inviteLoading')}</p>
       </div>
 
-      <div id="invite-form-wrap" class="login-form" style="display:none;">
+      <div id="invite-form-wrap" class="login-form invite-form-hidden">
         <div class="field">
           <input type="email" id="inv-email" placeholder="${t('emailAddress')}" disabled
             aria-label="${t('emailAddress')}" class="invite-email-locked" autocomplete="email">
@@ -737,12 +737,12 @@ function renderInviteRegistration() {
         <div class="login-success" id="inv-success" role="status" aria-live="polite"></div>
       </div>
 
-      <div id="invite-error-wrap" style="display:none;text-align:center;padding:24px 0;">
-        <p class="login-error" id="inv-token-error" role="alert" aria-live="polite" style="display:block"></p>
-        <button class="login-btn" id="inv-retry-btn" style="margin-top:12px;display:none">${t('inviteRetry')}</button>
+      <div id="invite-error-wrap" class="invite-form-hidden invite-center-block">
+        <p class="login-error" id="inv-token-error" role="alert" aria-live="polite"></p>
+        <button class="login-btn invite-form-hidden" id="inv-retry-btn">${t('inviteRetry')}</button>
       </div>
 
-      <div class="login-switch" style="margin-top:24px;">
+      <div class="login-switch login-switch-mt">
         <a href="#" id="inv-go-login">${t('login')}</a>
       </div>
     </div>
@@ -1031,11 +1031,11 @@ function renderHeader() {
       <div class="header-right">
         <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
           ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
-            ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
-            : '<i data-feather="moon" style="width:14px;height:14px"></i>'}
+            ? '<i data-feather="sun" class="icon-sm"></i>'
+            : '<i data-feather="moon" class="icon-sm"></i>'}
         </button>
         <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
-        <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" style="width:14px;height:14px"></i></button>
+        <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" class="icon-sm"></i></button>
       </div>
     </header>
   `;
@@ -1174,12 +1174,12 @@ function renderDashboard(container) {
   container.innerHTML = `
     <h1 class="sr-only">${t('nav_dashboard')}</h1>
     <div class="welcome-card">
-      <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(239,239,236,0.45);margin-bottom:10px;font-family:'Quattrocento Sans',sans-serif">Arava Distillery · Production Control</div>
+      <div class="welcome-brand-label">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${esc(getUserDisplayName())}</h2>
       <p>${new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
 
-    <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+    <div class="stats-row">
       <div class="stat-card">
         <div class="stat-num">${todayTotal}</div>
         <div class="stat-label">${t('todayActivity')}</div>
@@ -1189,7 +1189,7 @@ function renderDashboard(container) {
         <div class="stat-label">${t('totalRecords')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num" style="color:var(--warning,#f59e0b)">${pendingApprovals}</div>
+        <div class="stat-num stat-num-warning">${pendingApprovals}</div>
         <div class="stat-label">${t('pendingApprovals')}</div>
       </div>
     </div>
@@ -1206,7 +1206,7 @@ function renderDashboard(container) {
     </div>
 
     ${topRecent.length ? `
-      <div class="section-title" style="margin-top:24px;">${t('recentActivity')}</div>
+      <div class="section-title section-title-mt">${t('recentActivity')}</div>
       ${topRecent.map(r => {
         const title = r.item || r.supplier || r.drinkType || r.type || r.batchNumber || getModuleTitle(r._module);
         const time = r.createdAt ? formatDate(r.createdAt) : '';
@@ -1290,9 +1290,9 @@ function renderModuleList(container) {
     ` : ''}
 
     ${hasPermission('canExportData') && records.length ? `
-      <div style="text-align:right;margin-bottom:12px;">
-        <button class="btn btn-secondary" id="export-btn" style="flex:none;padding:8px 16px;font-size:12px;">
-          <i data-feather="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>${t('exportCSV')}
+      <div class="export-btn-wrap">
+        <button class="btn btn-secondary btn-export" id="export-btn">
+          <i data-feather="download" class="icon-sm icon-inline"></i>${t('exportCSV')}
         </button>
       </div>
     ` : ''}
@@ -1303,7 +1303,7 @@ function renderModuleList(container) {
       <div class="empty-state">
         <i data-feather="inbox"></i>
         <p>${t('noData')}</p>
-        ${hasPermission('canAddRecords') ? `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">${t('tapPlusToAdd')}</p>` : ''}
+        ${hasPermission('canAddRecords') ? `<p class="empty-hint">${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
@@ -1404,7 +1404,7 @@ function renderRecordItem(r) {
         ? `<span class="ri-badge approved">${t('approved')}</span>`
         : r.decision === 'notApproved'
           ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
-          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn" data-id="${esc(r.id)}" style="margin-inline-start:6px;padding:2px 10px;font-size:11px;background:#22c55e;color:#fff;border:none;border-radius:6px;cursor:pointer;">${t('bt_approve')}</button>` : ''}`;
+          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn approve-inline-btn" data-id="${esc(r.id)}">${t('bt_approve')}</button>` : ''}`;
       break;
   }
 
@@ -1634,9 +1634,8 @@ function renderFormField(f, val) {
         </div>`;
 
     case 'text':
-      const display = f.hidden ? 'display:none' : '';
       return `
-        <div class="form-group" style="${display}">
+        <div class="form-group${f.hidden ? ' form-group-hidden' : ''}">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
           <input type="text" class="form-input" id="field-${f.key}" value="${esc(val)}" placeholder="${f.placeholder || ''}">
         </div>`;
@@ -1660,7 +1659,7 @@ function renderFormField(f, val) {
             ${!skipAddNew ? `<option value="__ADD_NEW__">${t('addNewOption')}</option>` : ''}
           </select>
           ${!skipAddNew ? `
-          <div class="custom-option-form" id="custom-form-${f.key}" style="display:none;">
+          <div class="custom-option-form invite-form-hidden" id="custom-form-${f.key}">
             <input type="text" class="form-input custom-option-input" id="custom-input-${f.key}" placeholder="${t('newOptionPlaceholder')}">
             <div class="custom-option-actions">
               <button class="btn btn-secondary custom-opt-cancel" data-fkey="${f.key}">${t('cancel')}</button>
@@ -1709,9 +1708,9 @@ function renderFormField(f, val) {
       return `
         <div class="form-group">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
-          <div style="display:flex;gap:8px;">
-            <button class="btn ${val === 'approved' ? 'btn-success' : 'btn-secondary'}" data-decision="approved" id="field-${f.key}-approved" style="flex:1">${t('approved')}</button>
-            <button class="btn ${val === 'notApproved' ? 'btn-danger' : 'btn-secondary'}" data-decision="notApproved" id="field-${f.key}-notApproved" style="flex:1">${t('notApproved')}</button>
+          <div class="decision-btn-row">
+            <button class="btn ${val === 'approved' ? 'btn-success' : 'btn-secondary'}" data-decision="approved" id="field-${f.key}-approved">${t('approved')}</button>
+            <button class="btn ${val === 'notApproved' ? 'btn-danger' : 'btn-secondary'}" data-decision="notApproved" id="field-${f.key}-notApproved">${t('notApproved')}</button>
           </div>
           <input type="hidden" id="field-${f.key}" value="${esc(val || '')}">
         </div>`;
@@ -2023,7 +2022,7 @@ function renderInventory(container) {
     <h1 class="sr-only">${t('mod_inventory')}</h1>
     ${totalPending > 0 ? `
     <div class="inv-pending-banner">
-      <i data-feather="clock" style="width:14px;height:14px;margin-inline-end:6px;"></i>
+      <i data-feather="clock" class="icon-sm" style="margin-inline-end:6px;"></i>
       ${t('pendingChanges').replace('{n}', totalPending)}
     </div>` : ''}
 
@@ -2035,33 +2034,33 @@ function renderInventory(container) {
 
     <div id="inv-bottles">
       <div class="inv-section">
-        <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+        <div class="stats-row">
           <div class="stat-card">
-            <div class="stat-num" style="color:var(--success)">${availableDates.toFixed(0)}</div>
+            <div class="stat-num stat-num-success">${availableDates.toFixed(0)}</div>
             <div class="stat-label">${t('inv_dates')}</div>
-            <div style="font-size:10px;opacity:0.6;margin-top:2px;">+${totalDatesReceived.toFixed(0)} / -${totalDatesInFerm.toFixed(0)}</div>
+            <div class="stat-sub-info">+${totalDatesReceived.toFixed(0)} / -${totalDatesInFerm.toFixed(0)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-num">${activeFerm}</div>
             <div class="stat-label">${t('mod_fermentation')}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num" style="color:var(--warning,#f59e0b)">${totalDatesInFerm.toFixed(0)}</div>
+            <div class="stat-num stat-num-warning">${totalDatesInFerm.toFixed(0)}</div>
             <div class="stat-label">${t('inv_datesUsed')}</div>
           </div>
         </div>
 
         <h3>${t('mod_bottleInventory')}</h3>
-        ${lastSignedInfo ? `<p class="inv-last-signed"><i data-feather="check-circle" style="width:13px;height:13px;vertical-align:middle;margin-inline-end:4px;"></i>${lastSignedInfo}</p>` : ''}
+        ${lastSignedInfo ? `<p class="inv-last-signed"><i data-feather="check-circle" class="icon-sm icon-inline"></i>${lastSignedInfo}</p>` : ''}
 
         <div class="inv-table-wrap">
           <table class="inv-table inv-table-4col">
             <thead>
               <tr>
                 <th>${t('inv_drinkType')}</th>
-                <th style="text-align:right">${t('inv_factoryCreated')}</th>
-                <th style="text-align:right">${t('inv_realCount')}</th>
-                <th style="text-align:right">${t('inv_gap')}</th>
+                <th class="text-end">${t('inv_factoryCreated')}</th>
+                <th class="text-end">${t('inv_realCount')}</th>
+                <th class="text-end">${t('inv_gap')}</th>
               </tr>
             </thead>
             <tbody>
@@ -2075,9 +2074,9 @@ function renderInventory(container) {
     const gapDisplay = gap !== null ? (gap > 0 ? '+' + gap : gap) : '—';
     return `<tr>
       <td>${t(dt)}</td>
-      <td style="text-align:right" class="${createdCls}">${created}</td>
-      <td style="text-align:right" class="${realCls}">${real !== null ? real : '—'}</td>
-      <td style="text-align:right" class="${gapCls}">${gapDisplay}</td>
+      <td class="text-end ${createdCls}">${created}</td>
+      <td class="text-end ${realCls}">${real !== null ? real : '—'}</td>
+      <td class="text-end ${gapCls}">${gapDisplay}</td>
     </tr>`;
   }).join('')}
             </tbody>
@@ -2086,25 +2085,25 @@ function renderInventory(container) {
 
         <div class="inv-actions">
           <button class="btn btn-primary" id="btn-sign-inventory">
-            <i data-feather="edit-3" style="width:15px;height:15px;vertical-align:middle;margin-inline-end:4px;"></i>${t('inv_signInventory')}
+            <i data-feather="edit-3" class="icon-md icon-inline"></i>${t('inv_signInventory')}
           </button>
-          <button class="btn btn-secondary" id="btn-import-base" style="margin-inline-start:8px;">
-            <i data-feather="upload" style="width:15px;height:15px;vertical-align:middle;margin-inline-end:4px;"></i>${t('inv_importBase')}
+          <button class="btn btn-secondary btn-import-base" id="btn-import-base">
+            <i data-feather="upload" class="icon-md icon-inline"></i>${t('inv_importBase')}
           </button>
         </div>
       </div>
     </div>
 
-    <div id="inv-raw" style="display:none;">
+    <div id="inv-raw" style="display:none">
       <div class="inv-section">
         <h3>${t('mod_rawInventory')}</h3>
         <table class="inv-table">
-          <thead><tr><th>${t('inv_item')}</th><th style="text-align:right">${t('inv_stock')}</th></tr></thead>
+          <thead><tr><th>${t('inv_item')}</th><th class="text-end">${t('inv_stock')}</th></tr></thead>
           <tbody>
-            ${Object.entries(rawInv).length === 0 ? `<tr><td colspan="2" style="text-align:center">${t('noData')}</td></tr>` :
+            ${Object.entries(rawInv).length === 0 ? `<tr><td colspan="2" class="text-center">${t('noData')}</td></tr>` :
       Object.entries(rawInv).map(([item, qty]) => {
         const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-        return `<tr><td>${esc(item)}</td><td style="text-align:right" class="${cls}">${esc(qty)}</td></tr>`;
+        return `<tr><td>${esc(item)}</td><td class="text-end ${cls}">${esc(qty)}</td></tr>`;
       }).join('')
     }
           </tbody>
@@ -2112,11 +2111,11 @@ function renderInventory(container) {
       </div>
     </div>
 
-    <div id="inv-history" style="display:none;">
+    <div id="inv-history" style="display:none">
       <div class="inv-section">
         <h3>${t('inv_countHistory')}</h3>
         ${countRecords.length === 0 ? `
-          <div class="empty-state" style="padding:24px 0;">
+          <div class="empty-state empty-state-compact">
             <i data-feather="clipboard"></i>
             <p>${t('inv_noSignings')}</p>
           </div>
@@ -2207,7 +2206,7 @@ function showSignInventoryModal(bottleInv, baseInv) {
       <div class="inv-sign-actions">
         <button class="btn btn-secondary inv-sign-cancel">${t('cancel')}</button>
         <button class="btn btn-primary inv-sign-confirm">
-          <i data-feather="check" style="width:15px;height:15px;vertical-align:middle;margin-inline-end:4px;"></i>${t('inv_signConfirm')}
+          <i data-feather="check" class="icon-md icon-inline"></i>${t('inv_signConfirm')}
         </button>
       </div>
     </div>
@@ -2278,7 +2277,7 @@ function showImportBaseInventoryModal() {
       <div class="inv-sign-actions">
         <button class="btn btn-secondary inv-sign-cancel">${t('cancel')}</button>
         <button class="btn btn-primary inv-import-confirm">
-          <i data-feather="download" style="width:15px;height:15px;vertical-align:middle;margin-inline-end:4px;"></i>${t('inv_importConfirm')}
+          <i data-feather="download" class="icon-md icon-inline"></i>${t('inv_importConfirm')}
         </button>
       </div>
     </div>
@@ -2521,22 +2520,22 @@ function renderBackoffice(container) {
     <div class="section-title">${t('userManagement')}</div>
     <p class="backoffice-subtitle">${t('backofficeSubtitle')}</p>
 
-    <div class="record-list" style="margin-top:16px;">
+    <div class="record-list record-list-mt">
       ${users.map(u => `
         <div class="record-item user-item" data-username="${esc(u.username)}">
           <div class="ri-top">
             <span class="ri-title">
               ${esc(u.username)}
-              <span class="role-pill role-pill-${esc(u.role)}" style="margin-inline-start:6px;">${t('role_' + u.role)}</span>
+              <span class="role-pill role-pill-${esc(u.role)} role-pill-inline">${t('role_' + u.role)}</span>
             </span>
             <span class="ri-badge ${u.status === 'inactive' ? 'not-approved' : 'approved'}">
               ${u.status === 'inactive' ? t('inactive') : t('active')}
             </span>
           </div>
           <div class="ri-details">
-            ${u.email ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(u.email)}</div>` : ''}
+            ${u.email ? `<div class="bo-user-email">${esc(u.email)}</div>` : ''}
             ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : (u.name || '-'))}
-            <div style="font-size:10px; margin-top:4px; color:var(--text-muted);">
+            <div class="bo-user-activity">
               ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
             </div>
           </div>
@@ -2544,49 +2543,48 @@ function renderBackoffice(container) {
       `).join('')}
     </div>
 
-    <div class="invite-section" style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('inviteUser')}</div>
-      <div style="display:flex;gap:8px;align-items:flex-end;">
-        <div style="flex:1;">
+    <div class="invite-section bo-section">
+      <div class="section-title section-title-mb">${t('inviteUser')}</div>
+      <div class="bo-invite-row">
+        <div class="bo-invite-field">
           <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
-            aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin:0;">
+            aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false">
         </div>
-        <select class="form-select" id="invite-role" style="width:auto;min-width:100px;margin:0;">
+        <select class="form-select bo-role-select" id="invite-role">
           <option value="worker">${t('role_worker')}</option>
           <option value="manager">${t('role_manager')}</option>
           <option value="admin">${t('role_admin')}</option>
         </select>
       </div>
-      <button class="btn btn-primary" id="btn-send-invite" style="margin-top:10px;width:100%;">
+      <button class="btn btn-primary bo-invite-btn" id="btn-send-invite">
         <i data-feather="send"></i> ${t('sendInvitation')}
       </button>
-      <div class="login-error" id="invite-error" role="alert" aria-live="polite" style="margin-top:8px;"></div>
-      <div class="login-success" id="invite-success" role="status" aria-live="polite" style="margin-top:8px;"></div>
+      <div class="login-error bo-feedback" id="invite-error" role="alert" aria-live="polite"></div>
+      <div class="login-success bo-feedback" id="invite-success" role="status" aria-live="polite"></div>
     </div>
 
-    <div style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('invitationsTitle')}</div>
+    <div class="bo-section">
+      <div class="section-title section-title-mb">${t('invitationsTitle')}</div>
       <div id="invitations-list" class="record-list">
-        <div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>
+        <div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>
       </div>
     </div>
 
-    <div style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('sheetsIntegration')}</div>
+    <div class="bo-section">
+      <div class="section-title section-title-mb">${t('sheetsIntegration')}</div>
       <a href="${INVENTORY_SHEET_URL}" target="_blank" rel="noopener noreferrer"
-         id="inventory-sheet-link" class="btn btn-secondary"
-         style="display:flex;align-items:center;gap:8px;margin-bottom:12px;text-decoration:none;">
+         id="inventory-sheet-link" class="btn btn-secondary bo-sheet-link">
         <i data-feather="external-link"></i> ${t('viewInventorySheet')}
       </a>
-      <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary" id="btn-sync-all-sheets" style="flex:1;">
+      <div class="bo-btn-row">
+        <button class="btn btn-secondary bo-btn-flex" id="btn-sync-all-sheets">
           <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
         </button>
       </div>
     </div>
 
-    <div style="margin-top:16px; display:flex; gap:10px;">
-      <button class="btn btn-secondary" id="btn-export-all" style="flex:1;">
+    <div class="bo-btn-row">
+      <button class="btn btn-secondary bo-btn-flex" id="btn-export-all">
         <i data-feather="download"></i> ${t('exportAllData')}
       </button>
     </div>
@@ -2797,27 +2795,27 @@ function fetchInvitationsFromGAS(listEl) {
 
 function renderInvitationItems(listEl, invites) {
   if (!invites || invites.length === 0) {
-    listEl.innerHTML = `<div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>`;
+    listEl.innerHTML = `<div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>`;
     return;
   }
 
   listEl.innerHTML = invites.map(inv => `
     <div class="record-item">
       <div class="ri-top">
-        <span class="ri-title" style="font-size:13px;">
+        <span class="ri-title inv-item-title">
           ${inv.username ? esc(inv.username) : esc(inv.email)}
         </span>
-        <span style="display:flex;align-items:center;gap:6px;">
-          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-muted);"><i data-feather="x-circle" style="width:16px;height:16px;"></i></button>` : ''}
+        <span class="inv-item-actions">
+          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}"><i data-feather="x-circle" class="icon-sm"></i></button>` : ''}
           <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
             ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
           </span>
         </span>
       </div>
       <div class="ri-details">
-        ${inv.username ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(inv.email)}</div>` : ''}
-        <span class="role-pill role-pill-${esc(inv.role || 'worker')}" style="font-size:9px;">${t('role_' + (inv.role || 'worker'))}</span>
-        <span style="font-size:10px;color:var(--text-muted);margin-inline-start:8px;">
+        ${inv.username ? `<div class="bo-user-email">${esc(inv.email)}</div>` : ''}
+        <span class="role-pill role-pill-${esc(inv.role || 'worker')} inv-item-role">${t('role_' + (inv.role || 'worker'))}</span>
+        <span class="inv-item-date">
           ${inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : ''}
         </span>
       </div>
@@ -2869,7 +2867,7 @@ function renderUserForm(container) {
       
       <div class="form-group">
         <label class="form-label">${t('username')} <span class="req">*</span></label>
-        <input type="text" class="form-input" id="bo-username" value="${esc(u.username || '')}" ${isEdit ? 'disabled style="opacity:0.7"' : ''}>
+        <input type="text" class="form-input${isEdit ? ' input-disabled' : ''}" id="bo-username" value="${esc(u.username || '')}" ${isEdit ? 'disabled' : ''}>
       </div>
 
       ${!isEdit ? `
