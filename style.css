@@ -1146,11 +1146,19 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .ri-badge.approved    { background: var(--success-bg); color: var(--success); }
 .ri-badge.not-approved{ background: var(--danger-bg);  color: var(--danger); }
 .ri-badge.pending     { background: var(--warning-bg); color: var(--warning); }
+.ri-badge.deleted     { background: var(--danger-bg);  color: var(--danger); }
+
+.record-item.record-deleted {
+  opacity: 0.5;
+  text-decoration: line-through;
+  pointer-events: none;
+}
 
 /* Dark mode: boost badge text contrast to meet WCAG AA */
 [data-theme="dark"] .ri-badge.approved     { color: #8FD4A0; }
 [data-theme="dark"] .ri-badge.not-approved { color: #E08A8A; }
 [data-theme="dark"] .ri-badge.pending      { color: #D4B856; }
+[data-theme="dark"] .ri-badge.deleted      { color: #E08A8A; }
 
 /* ============================================================
    INVENTORY

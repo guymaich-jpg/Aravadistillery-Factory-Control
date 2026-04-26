@@ -81,7 +81,7 @@ function addRecord(key, record) {
   setData(key, data);
 
   // Async sync to Firebase (fire-and-forget)
-  if (typeof fbAdd === 'function') {
+  if (typeof fbAdd === 'function' && !_syncInProgress) {
     fbAdd(key, record).catch(() => {});
   }
 
@@ -95,7 +95,7 @@ function updateRecord(key, id, updates) {
     data[idx] = { ...data[idx], ...updates, updatedAt: new Date().toISOString() };
     setData(key, data);
 
-    if (typeof fbUpdate === 'function') {
+    if (typeof fbUpdate === 'function' && !_syncInProgress) {
       fbUpdate(key, id, updates).catch(() => {});
     }
 
@@ -109,7 +109,7 @@ function deleteRecord(key, id) {
   const filtered = data.filter(r => r.id !== id);
   setData(key, filtered);
 
-  if (typeof fbDelete === 'function') {
+  if (typeof fbDelete === 'function' && !_syncInProgress) {
     fbDelete(key, id).catch(() => {});
   }
 }
