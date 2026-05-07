@@ -547,6 +547,9 @@ function showManagerPasswordModal(onSuccess) {
 
 // ---------- Main Render ----------
 function renderApp() {
+  if (typeof _renderInProgress !== 'undefined' && _renderInProgress) return;
+  _renderInProgress = true;
+
   const app = $('#app');
   const session = getSession();
 
@@ -559,8 +562,11 @@ function renderApp() {
     app.innerHTML = renderLogin();
     if (typeof feather !== 'undefined') feather.replace();
     bindLogin();
+    _renderInProgress = false;
     return;
   }
+
+  if (typeof onModuleChange === 'function') onModuleChange(currentModule);
 
   // Persist current navigation state for refresh recovery
   _persistNavState();
@@ -602,6 +608,7 @@ function renderApp() {
   if (_scrollPositions[scrollKey]) {
     content.scrollTop = _scrollPositions[scrollKey];
   }
+  _renderInProgress = false;
 }
 
 function checkSecurity() {
@@ -1408,13 +1415,16 @@ function renderRecordItem(r) {
       break;
   }
 
+  var deletedClass = r._deleted ? ' record-deleted' : '';
+  var deletedBadge = r._deleted ? '<span class="ri-badge deleted">' + t('deleted') + '</span>' : '';
+
   return `
-    <div class="record-item" data-id="${esc(r.id)}">
+    <div class="record-item${deletedClass}" data-id="${esc(r.id)}">
       <div class="ri-top">
         <span class="ri-title">${title}</span>
         <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
       </div>
-      <div class="ri-details">${details} ${badge}</div>
+      <div class="ri-details">${details} ${badge} ${deletedBadge}</div>
     </div>
   `;
 }
@@ -3031,6 +3041,7 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
+  if (typeof initFirestoreSync === 'function') initFirestoreSync();
   // Check backend availability (non-blocking)
   if (typeof apiHealthCheck === 'function') {
     apiHealthCheck();
