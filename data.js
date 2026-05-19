@@ -10,6 +10,8 @@ const STORE_KEYS = {
   distillation2: 'factory_distillation2',
   bottling: 'factory_bottling',
   inventoryVersions: 'factory_inventoryVersions',
+  inventoryCounts: 'factory_inventoryCounts',
+  inventoryBase: 'factory_inventoryBase',
   customSuppliers: 'factory_customSuppliers',
   users: 'factory_users',
 };
@@ -19,7 +21,6 @@ function getData(key) {
   try {
     return JSON.parse(localStorage.getItem(key) || '[]');
   } catch (e) {
-    console.error('[data] Corrupted localStorage key:', key, e.message);
     // Backup corrupted data before removing
     const raw = localStorage.getItem(key);
     if (raw) {
@@ -37,7 +38,6 @@ function setData(key, data) {
     if (e.name === 'QuotaExceededError' || e.code === 22) {
       alert('Storage is full. Please export and clear old data.');
     }
-    console.error('[data] localStorage.setItem failed:', key, e);
     return;
   }
   const session = JSON.parse(localStorage.getItem('factory_session') || 'null');
@@ -61,7 +61,6 @@ function addRecord(key, record) {
   const dangerousKeys = ['__proto__', 'constructor'];
   for (const k of Object.keys(record)) {
     if (dangerousKeys.includes(k)) {
-      console.error('[data] Rejected record with dangerous key:', k);
       return null;
     }
   }
@@ -69,7 +68,6 @@ function addRecord(key, record) {
   // Validate: limit record size to 100KB
   const recordJSON = JSON.stringify(record);
   if (recordJSON.length > 100 * 1024) {
-    console.error('[data] Rejected record exceeding 100KB limit:', recordJSON.length, 'bytes');
     return null;
   }
 
@@ -83,8 +81,8 @@ function addRecord(key, record) {
   setData(key, data);
 
   // Async sync to Firebase (fire-and-forget)
-  if (typeof fbAdd === 'function') {
-    fbAdd(key, record).catch(e => console.warn('[data] Firebase sync failed:', e.message));
+  if (typeof fbAdd === 'function' && !_syncInProgress) {
+    fbAdd(key, record).catch(() => {});
   }
 
   return record;
@@ -97,8 +95,8 @@ function updateRecord(key, id, updates) {
     data[idx] = { ...data[idx], ...updates, updatedAt: new Date().toISOString() };
     setData(key, data);
 
-    if (typeof fbUpdate === 'function') {
-      fbUpdate(key, id, updates).catch(e => console.warn('[data] Firebase sync failed:', e.message));
+    if (typeof fbUpdate === 'function' && !_syncInProgress) {
+      fbUpdate(key, id, updates).catch(() => {});
     }
 
     return data[idx];
@@ -111,8 +109,8 @@ function deleteRecord(key, id) {
   const filtered = data.filter(r => r.id !== id);
   setData(key, filtered);
 
-  if (typeof fbDelete === 'function') {
-    fbDelete(key, id).catch(e => console.warn('[data] Firebase sync failed:', e.message));
+  if (typeof fbDelete === 'function' && !_syncInProgress) {
+    fbDelete(key, id).catch(() => {});
   }
 }
 
@@ -144,20 +142,6 @@ async function addCustomOption(fieldKey, value) {
     await fbAddCustomOption(fieldKey, value).catch(() => {});
   }
   return value;
-}
-
-// Legacy: keep getCustomSuppliers for backward compat
-function getCustomSuppliers() {
-  return getCustomOptions('supplier');
-}
-
-function addCustomSupplier(name) {
-  const suppliers = getCustomOptions('supplier');
-  if (!suppliers.includes(name)) {
-    suppliers.push(name);
-    localStorage.setItem('factory_customOptions_supplier', JSON.stringify(suppliers));
-  }
-  return name;
 }
 
 // ---- Inventory Versioning ----
@@ -307,7 +291,8 @@ function exportAllData() {
   const keys = [
     'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
     'factory_distillation1', 'factory_distillation2', 'factory_bottling',
-    'factory_inventoryVersions', 'factory_customSuppliers'
+    'factory_inventoryVersions', 'factory_inventoryCounts', 'factory_inventoryBase',
+    'factory_customSuppliers'
   ];
   const today = new Date().toISOString().slice(0, 10);
   keys.forEach(key => {

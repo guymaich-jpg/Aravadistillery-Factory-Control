@@ -1,164 +1,289 @@
 // ============================================================
-// sync.js — Cross-Device Real-Time Sync via Firestore
+// sync.js — Google Sheets sync & CRM sync
 // ============================================================
 
-const _SYNC_COLLECTIONS = [
-  'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
-  'factory_distillation1', 'factory_distillation2', 'factory_bottling',
-  'factory_inventoryVersions', 'factory_customSuppliers'
-];
+const SHEETS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz4IIUXvDoo7qJH1Ytn7hEWZ85Ek7hViA9riSezMZCXQbjKQG3VwfppQlq0kuTwOHT3/exec';
+const INVENTORY_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
 
-let _syncActive = false;
-let _unsubscribers = [];
-let _syncRefreshTimer = null;
-let _pendingSyncRefresh = false;
+// Sync state for the visual indicator
+let _syncQueue = 0;
 
-function startSync() {
-  if (_syncActive) return;
+// ── Sync infrastructure ──────────────────────────────────────
 
-  if (typeof isFirebaseReady !== 'function' || !isFirebaseReady()) {
-    _retrySyncStart(0);
-    return;
-  }
+// Sends a POST to GAS. Always fire-and-forget (no-cors), with 1 retry and console logging.
+async function postToSheets(payload) {
+  const url = SHEETS_SYNC_URL;
+  if (!url) return;
 
-  _activateListeners();
-}
+  _syncQueue++;
+  updateSyncIndicator('syncing');
 
-function _retrySyncStart(attempt) {
-  if (attempt >= 5) {
-    console.warn('[sync] Firebase not ready after 5 retries — running offline');
-    return;
-  }
-  setTimeout(() => {
-    if (typeof isFirebaseReady === 'function' && isFirebaseReady()) {
-      _activateListeners();
-    } else {
-      _retrySyncStart(attempt + 1);
-    }
-  }, 2000);
-}
-
-function _activateListeners() {
-  if (_syncActive) return;
-  _syncActive = true;
-
-  _SYNC_COLLECTIONS.forEach(key => {
-    if (typeof fbSubscribe !== 'function') return;
-    const unsub = fbSubscribe(key, records => {
-      mergeFirestoreIntoLocal(key, records);
-    });
-    _unsubscribers.push(unsub);
-  });
-
-  _syncCustomOptions();
-  console.log('[sync] Real-time listeners active for', _SYNC_COLLECTIONS.length, 'collections');
-}
-
-function stopSync() {
-  _syncActive = false;
-  _unsubscribers.forEach(fn => { try { fn(); } catch (_) {} });
-  _unsubscribers = [];
-  if (_syncRefreshTimer) {
-    clearTimeout(_syncRefreshTimer);
-    _syncRefreshTimer = null;
-  }
-  _pendingSyncRefresh = false;
-  console.log('[sync] Listeners stopped');
-}
-
-function mergeFirestoreIntoLocal(key, firestoreRecords) {
-  const localData = getData(key);
-  const localMap = new Map();
-  localData.forEach(r => { if (r.id) localMap.set(r.id, r); });
-
-  const fbMap = new Map();
-  firestoreRecords.forEach(r => { if (r.id) fbMap.set(r.id, r); });
-
-  let changed = false;
-  const merged = [];
-
-  // Process all records from both sources by id
-  const allIds = new Set([...localMap.keys(), ...fbMap.keys()]);
-
-  allIds.forEach(id => {
-    const local = localMap.get(id);
-    const fb = fbMap.get(id);
-
-    if (fb && !local) {
-      const clean = _stripFbId(fb);
-      merged.push(clean);
-      changed = true;
-    } else if (local && !fb) {
-      merged.push(local);
-      if (typeof fbAdd === 'function') {
-        fbAdd(key, local).catch(e => console.warn('[sync] Push local record failed:', e.message));
-      }
-    } else {
-      const fbTime = fb.updatedAt || fb.createdAt || '';
-      const localTime = local.updatedAt || local.createdAt || '';
-      if (fbTime > localTime) {
-        const clean = _stripFbId(fb);
-        merged.push(clean);
-        changed = true;
-      } else {
-        merged.push(local);
-      }
-    }
-  });
-
-  if (changed) {
-    merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    localStorage.setItem(key, JSON.stringify(merged));
-    scheduleSyncRefresh();
-  }
-}
-
-function _stripFbId(record) {
-  const clean = { ...record };
-  delete clean._fbId;
-  return clean;
-}
-
-function scheduleSyncRefresh() {
-  if (_syncRefreshTimer) clearTimeout(_syncRefreshTimer);
-  _syncRefreshTimer = setTimeout(() => {
-    _syncRefreshTimer = null;
-    if (typeof currentView !== 'undefined' && currentView === 'form') {
-      _pendingSyncRefresh = true;
-      return;
-    }
-    if (typeof renderApp === 'function') renderApp();
-  }, 500);
-}
-
-function _syncCustomOptions() {
-  if (typeof _db === 'undefined' || !_db) return;
-  _db.collection('factory_customOptions').get().then(snap => {
-    const groups = {};
-    snap.docs.forEach(d => {
-      const data = d.data();
-      if (!data.fieldKey || !data.value) return;
-      if (!groups[data.fieldKey]) groups[data.fieldKey] = [];
-      groups[data.fieldKey].push(data.value);
-    });
-    Object.keys(groups).forEach(fieldKey => {
-      const localKey = 'factory_customOptions_' + fieldKey;
-      const local = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const union = [...new Set([...local, ...groups[fieldKey]])];
-      if (union.length !== local.length) {
-        localStorage.setItem(localKey, JSON.stringify(union));
-      }
-      local.forEach(val => {
-        if (!groups[fieldKey].includes(val) && typeof fbAddCustomOption === 'function') {
-          fbAddCustomOption(fieldKey, val).catch(() => {});
-        }
+  const attempt = async (n) => {
+    try {
+      await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        mode: 'no-cors',
       });
-    });
-  }).catch(e => console.warn('[sync] Custom options sync failed:', e.message));
+      return true;
+    } catch (err) {
+      if (n < 1) {
+        await new Promise(r => setTimeout(r, 2000));
+        return attempt(n + 1);
+      }
+      return false;
+    }
+  };
+
+  const sent = await attempt(0);
+  _syncQueue--;
+
+  if (!sent) {
+    updateSyncIndicator(_syncQueue > 0 ? 'syncing' : 'error');
+    showToast(t('syncFailed'));
+    return;
+  }
+
+  updateSyncIndicator(_syncQueue > 0 ? 'syncing' : 'success');
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && _syncActive) {
-    scheduleSyncRefresh();
+// Verifies sync via GET request (GAS doGet supports CORS — we can read the response)
+async function verifySyncStatus(sheetName) {
+  const url = SHEETS_SYNC_URL;
+  if (!url) return { verified: false, error: 'no-url' };
+  try {
+    const resp = await fetch(`${url}?action=syncStatus&sheet=${encodeURIComponent(sheetName)}`);
+    if (!resp.ok) return { verified: false, error: 'http-' + resp.status };
+    const data = await resp.json();
+    return { verified: true, ...data };
+  } catch (err) {
+    return { verified: false, error: err.message };
   }
-});
+}
+
+// Shows a small persistent pill in the corner: Syncing / Synced / Sync failed
+function updateSyncIndicator(state) {
+  let indicator = document.querySelector('.sync-indicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.className = 'sync-indicator';
+    document.body.appendChild(indicator);
+  }
+
+  indicator.className = 'sync-indicator sync-' + state;
+
+  switch (state) {
+    case 'syncing':
+      indicator.innerHTML = '<span class="sync-dot pulse"></span>' + t('syncInProgress');
+      break;
+    case 'success':
+      indicator.innerHTML = '<span class="sync-dot green"></span>' + t('syncSuccess');
+      setTimeout(() => { if (indicator.classList.contains('sync-success')) indicator.classList.add('sync-fade'); }, 4000);
+      break;
+    case 'error':
+      indicator.innerHTML = '<span class="sync-dot red"></span>' + t('syncFailed');
+      break;
+    default:
+      indicator.classList.add('sync-fade');
+  }
+}
+
+// ── Module sync ───────────────────────────────────────────────
+
+function syncModuleToSheets(module) {
+  const url = SHEETS_SYNC_URL;
+  if (!url) return;
+
+  const storeKey = STORE_KEYS[module];
+  if (!storeKey) return;
+
+  const records = getData(storeKey);
+
+  const fields = ALL_MODULE_SYNC_FIELDS[module];
+  if (!fields) return;
+
+  const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
+  const labels = [...fields.map(f => tHe(f.labelKey)), tHe('notes'), 'Created At'];
+
+  const dropdowns = SYNC_DROPDOWN_FIELDS[module] || {};
+
+  // Format dropdown values as "key (Hebrew label)" for the sheet
+  const formattedRecords = records.map(r => {
+    const copy = { ...r };
+    Object.keys(dropdowns).forEach(fieldKey => {
+      const val = copy[fieldKey];
+      if (val && typeof val === 'string' && I18N.he[val]) {
+        copy[fieldKey] = val + ' (' + tHe(val) + ')';
+      }
+    });
+    return copy;
+  });
+
+  postToSheets({
+    sheetName: tHe('mod_' + module),
+    keys,
+    labels,
+    records: formattedRecords,
+    freeTextKeys: ['notes'],
+  });
+}
+
+// Sync bottle counts to the CRM stockLevels Firestore collection.
+// Called as fallback when the backend API is unavailable.
+// CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
+function syncCrmStockLevels(bottleInv) {
+  if (typeof fbSetDoc !== 'function') return;
+  var DRINK_TO_CRM = {
+    drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
+    drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
+  };
+  var aggregated = {};
+  Object.keys(bottleInv).forEach(function(dt) {
+    var pid = DRINK_TO_CRM[dt];
+    if (!pid) return;
+    aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
+  });
+  var now = new Date().toISOString();
+  Object.keys(aggregated).forEach(function(productId) {
+    fbSetDoc('stockLevels', productId, {
+      productId: productId,
+      currentStock: aggregated[productId],
+      unit: 'בקבוק',
+      lastUpdated: now,
+      factoryLastSync: now,
+    });
+  });
+}
+
+// Helper: write inventory directly to Firestore (shared by syncInventorySnapshot fallbacks).
+// Retries each write up to 2 times on failure so CRM stock levels stay current.
+async function _writeInventoryToFirestore(bottleInv, session, triggeredBy) {
+  var doc = {
+    bottles: { ...bottleInv },
+    total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+    updatedAt: new Date().toISOString(),
+    updatedBy: session?.username || 'system',
+    trigger: triggeredBy || 'save',
+  };
+
+  var ok = await _retryFbSetDoc('factory_inventory', 'current', doc, 2);
+  if (!ok) {
+    console.error('[sync] Failed to write inventory to Firestore after retries');
+  }
+
+  await _retrySyncCrmStockLevels(bottleInv, 2);
+}
+
+// Retry fbSetDoc up to `retries` times with 1s delay between attempts.
+async function _retryFbSetDoc(collection, docId, data, retries) {
+  if (typeof fbSetDoc !== 'function') return false;
+  for (var i = 0; i <= retries; i++) {
+    try {
+      var result = await fbSetDoc(collection, docId, data);
+      if (result) return true;
+    } catch (e) { /* retry */ }
+    if (i < retries) await new Promise(function(r) { setTimeout(r, 1000); });
+  }
+  return false;
+}
+
+// Retry CRM stock-level sync up to `retries` times.
+async function _retrySyncCrmStockLevels(bottleInv, retries) {
+  if (typeof fbSetDoc !== 'function') return;
+  for (var i = 0; i <= retries; i++) {
+    try {
+      syncCrmStockLevels(bottleInv);
+      return; // syncCrmStockLevels is fire-and-forget per product, best we can do
+    } catch (e) { /* retry */ }
+    if (i < retries) await new Promise(function(r) { setTimeout(r, 1000); });
+  }
+  console.error('[sync] Failed to sync CRM stock levels after retries');
+}
+
+// Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
+// Called automatically after any record is saved, updated, or deleted.
+function syncInventorySnapshot(triggeredBy) {
+  const bottlingRecords = getData(STORE_KEYS.bottling);
+  const rawRecords = getData(STORE_KEYS.rawMaterials);
+  const dateRecords = getData(STORE_KEYS.dateReceiving);
+  const fermRecords = getData(STORE_KEYS.fermentation);
+  const d1Records = getData(STORE_KEYS.distillation1);
+  const d2Records = getData(STORE_KEYS.distillation2);
+
+  const bottleInv = {};
+  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
+  bottlingRecords.forEach(r => {
+    if (r.drinkType && r.decision === 'approved') {
+      bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+    }
+  });
+
+  // Include base inventory in totals
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  if (baseRecords.length > 0) {
+    const latestBase = baseRecords[0];
+    DRINK_TYPES.forEach(dt => {
+      bottleInv[dt] = (bottleInv[dt] || 0) + (parseInt(latestBase[dt]) || 0);
+    });
+  }
+
+  const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
+  const totalDatesInFerm = fermRecords.reduce((sum, r) => {
+    if (r.datesCrates !== undefined && r.datesCrates !== '') return sum + (parseFloat(r.datesCrates) || 0) * 20;
+    return sum + (parseFloat(r.datesKg) || 0);
+  }, 0);
+
+  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
+  const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
+  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
+
+  const session = getSession();
+  const record = {
+    timestamp: new Date().toISOString(),
+    user: session?.username || 'unknown',
+    triggeredBy: triggeredBy || 'save',
+    dates_available: Math.max(0, totalDatesReceived - totalDatesInFerm),
+    dates_received: totalDatesReceived,
+    dates_in_ferm: totalDatesInFerm,
+    d1_produced: d1Produced,
+    d1_available: Math.max(0, d1Produced - d1Consumed),
+    d2_produced: d2Produced,
+    d2_available: Math.max(0, d2Produced - d2Consumed),
+    ...DRINK_TYPES.reduce((acc, dt) => ({ ...acc, [dt]: bottleInv[dt] || 0 }), {}),
+  };
+
+  const keys = Object.keys(record);
+  const labels = [
+    'Timestamp', 'User', 'Triggered By',
+    tHe('inv_dates'), 'Dates Received (kg)', tHe('inv_datesUsed'),
+    'D1 Produced (L)', 'D1 Available (L)',
+    'D2 Produced (L)', 'D2 Available (L)',
+    ...DRINK_TYPES.map(dt => tHe(dt)),
+  ];
+
+  if (SHEETS_SYNC_URL) {
+    postToSheets({
+      sheetName: tHe('mod_inventory'),
+      action: 'append',
+      keys,
+      labels,
+      records: [record],
+    });
+  }
+
+  // Push inventory to backend for CRM reads (backend writes to Firestore).
+  // Always fall back to direct Firestore write when the backend is unavailable
+  // or returns an error so CRM stock levels stay in sync.
+  if (typeof apiUpdateInventory === 'function') {
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
+      if (!result || result.error) {
+        _writeInventoryToFirestore(bottleInv, session, triggeredBy);
+      }
+    }).catch(function() {
+      _writeInventoryToFirestore(bottleInv, session, triggeredBy);
+    });
+  } else {
+    _writeInventoryToFirestore(bottleInv, session, triggeredBy);
+  }
+}

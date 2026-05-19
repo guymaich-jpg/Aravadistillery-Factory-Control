@@ -66,12 +66,11 @@ function initFirebase() {
       _db = firebase.firestore();
       _auth = firebase.auth();
       _firebaseReady = true;
-      console.log('[Firebase] Firestore + Auth connected');
     } catch (e) {
-      console.warn('[Firebase] Init failed, using localStorage fallback:', e.message);
+      // Init failed — localStorage fallback
     }
-  }).catch(e => {
-    console.warn('[Firebase] SDK load failed, using localStorage fallback:', e.message);
+  }).catch(() => {
+    // SDK load failed — localStorage fallback
   });
 }
 
@@ -90,7 +89,6 @@ async function fbGetAll(collectionName) {
       .get();
     return snap.docs.map(d => ({ ...d.data(), _fbId: d.id }));
   } catch (e) {
-    console.warn('[Firebase] fbGetAll error:', e.message);
     return null;
   }
 }
@@ -104,7 +102,6 @@ async function fbAdd(collectionName, record) {
     const docRef = await _db.collection(collectionName).add(record);
     return { ...record, _fbId: docRef.id };
   } catch (e) {
-    console.warn('[Firebase] fbAdd error:', e.message);
     return null;
   }
 }
@@ -122,7 +119,6 @@ async function fbUpdate(collectionName, localId, updates) {
     await snap.docs[0].ref.update({ ...updates, updatedAt: new Date().toISOString() });
     return true;
   } catch (e) {
-    console.warn('[Firebase] fbUpdate error:', e.message);
     return null;
   }
 }
@@ -139,7 +135,6 @@ async function fbDelete(collectionName, localId) {
     await snap.docs[0].ref.delete();
     return true;
   } catch (e) {
-    console.warn('[Firebase] fbDelete error:', e.message);
     return null;
   }
 }
@@ -157,12 +152,9 @@ function fbSubscribe(collectionName, callback) {
       .onSnapshot(snap => {
         const records = snap.docs.map(d => ({ ...d.data(), _fbId: d.id }));
         callback(records);
-      }, err => {
-        console.warn('[Firebase] onSnapshot error:', err.message);
-      });
+      }, () => {});
     return unsub;
   } catch (e) {
-    console.warn('[Firebase] fbSubscribe error:', e.message);
     return () => {};
   }
 }
@@ -206,7 +198,7 @@ async function fbAddCustomOption(fieldKey, value) {
       });
     }
   } catch (e) {
-    console.warn('[Firebase] fbAddCustomOption error:', e.message);
+    // skip — localStorage backup already saved
   }
 }
 
@@ -239,7 +231,6 @@ async function fbSaveUser(user) {
     }
     return true;
   } catch (e) {
-    console.warn('[Firebase] fbSaveUser error:', e.message);
     return null;
   }
 }
@@ -255,7 +246,6 @@ async function fbDeleteUser(username) {
     }
     return null;
   } catch (e) {
-    console.warn('[Firebase] fbDeleteUser error:', e.message);
     return null;
   }
 }
@@ -275,29 +265,93 @@ async function fbAuthSignIn(email, password) {
   if (!_firebaseReady || !_auth) return null;
   try {
     const result = await _auth.signInWithEmailAndPassword(email, password);
-    console.log('[Firebase] Auth signed in:', email);
     return result.user;
   } catch (e) {
-    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-      // User exists locally but not in Firebase Auth — auto-create (lazy migration)
+    // Newer Firebase SDK returns 'auth/invalid-login-credentials' instead of
+    // separate user-not-found / wrong-password codes. Handle all variants.
+    const notFound = [
+      'auth/user-not-found',
+      'auth/invalid-credential',
+      'auth/invalid-login-credentials',
+      'auth/wrong-password',
+    ];
+    if (notFound.includes(e.code)) {
+      // Try auto-create (lazy migration). If the user already exists in
+      // Firebase Auth with a different password, createUser will fail with
+      // email-already-in-use and we return null (wrong password).
       try {
         const result = await _auth.createUserWithEmailAndPassword(email, password);
-        console.log('[Firebase] Auth user auto-created:', email);
         return result.user;
       } catch (createErr) {
-        if (createErr.code === 'auth/email-already-in-use') {
-          console.warn('[Firebase] Auth password out of sync for', email);
-        } else {
-          console.warn('[Firebase] Auth create error:', createErr.message);
-        }
         return null;
       }
     }
-    if (e.code === 'auth/wrong-password') {
-      console.warn('[Firebase] Auth password out of sync for', email);
-      return null;
+    return null;
+  }
+}
+
+/**
+ * Create a new Firebase Auth account for an invited/new user.
+ * Returns the Firebase user on success, null on failure.
+ */
+async function fbAuthCreateUser(email, password) {
+  if (!_firebaseReady || !_auth) return null;
+  try {
+    const result = await _auth.createUserWithEmailAndPassword(email, password);
+    return result.user;
+  } catch (e) {
+    if (e.code === 'auth/email-already-in-use') return 'exists';
+    return null;
+  }
+}
+
+/**
+ * Update password in Firebase Auth for an existing user.
+ * Requires the user to be currently signed in, or we sign in first.
+ */
+async function fbAuthUpdatePassword(email, oldPassword, newPassword) {
+  if (!_firebaseReady || !_auth) return false;
+  try {
+    // Sign in as the user first to get a fresh credential
+    const cred = firebase.auth.EmailAuthProvider.credential(email, oldPassword);
+    const currentUser = _auth.currentUser;
+    if (currentUser && currentUser.email === email) {
+      await currentUser.reauthenticateWithCredential(cred);
+      await currentUser.updatePassword(newPassword);
+      return true;
     }
-    console.warn('[Firebase] Auth sign-in error:', e.code, e.message);
+    // If not currently signed in as this user, sign in then update
+    const result = await _auth.signInWithEmailAndPassword(email, oldPassword);
+    await result.user.updatePassword(newPassword);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Get the current user's Firebase ID token for backend API calls.
+ * Returns null if no user is signed in or Firebase is unavailable.
+ */
+async function fbGetIdToken() {
+  if (!_firebaseReady || !_auth || !_auth.currentUser) return null;
+  try {
+    return await _auth.currentUser.getIdToken();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Write (or overwrite) a specific document by ID in a Firestore collection.
+ * Used for singleton documents like inventory snapshots.
+ */
+async function fbSetDoc(collectionName, docId, data) {
+  if (!isFirebaseReady()) return null;
+  try {
+    await _db.collection(collectionName).doc(docId).set(data);
+    return true;
+  } catch (e) {
     return null;
   }
 }
@@ -307,33 +361,7 @@ async function fbAuthSignOut() {
   try {
     await _auth.signOut();
   } catch (e) {
-    console.warn('[Firebase] Auth sign-out error:', e.message);
+    // sign-out failed — ignore
   }
 }
 
-// ============================================================
-// Sync: push all localStorage data to Firestore (one-time migration)
-// ============================================================
-async function migrateLocalStorageToFirebase() {
-  if (!isFirebaseReady()) return;
-  const keys = [
-    'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
-    'factory_distillation1', 'factory_distillation2', 'factory_bottling',
-    'factory_inventoryVersions'
-  ];
-  for (const key of keys) {
-    const local = JSON.parse(localStorage.getItem(key) || '[]');
-    for (const record of local) {
-      try {
-        const existing = await _db.collection(key)
-          .where('id', '==', record.id).get();
-        if (existing.empty) {
-          await _db.collection(key).add(record);
-        }
-      } catch (e) {
-        // skip
-      }
-    }
-  }
-  console.log('[Firebase] Migration complete');
-}

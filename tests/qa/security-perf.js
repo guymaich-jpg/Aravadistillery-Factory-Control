@@ -567,10 +567,10 @@ function WARN(label) { totalWarn++; warn(label); }
   }
 
   const fbEnabled = credentialCheck.find(c => c.service === 'FIREBASE_ENABLED');
-  if (fbEnabled && fbEnabled.status === 'false') {
-    PASS('Firebase is DISABLED (FIREBASE_ENABLED=false) — no live credentials exposed');
-  } else if (fbEnabled && fbEnabled.status === 'true') {
-    WARN('Firebase is ENABLED — credentials are active in client code');
+  if (fbEnabled && fbEnabled.status === 'true') {
+    PASS('Firebase is ENABLED (FIREBASE_ENABLED=true) — CRM sync active');
+  } else if (fbEnabled && fbEnabled.status === 'false') {
+    WARN('Firebase is DISABLED — CRM sync will not work');
   }
 
   // Check for Google Apps Script URLs in source

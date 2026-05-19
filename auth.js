@@ -80,6 +80,7 @@ const PERMISSIONS = {
     canApproveBottling: true,
     canViewAllModules: true,
     canAccessBackoffice: true,
+    canImportInventory: true,
   },
   manager: {
     canViewDashboard: true,
@@ -93,6 +94,7 @@ const PERMISSIONS = {
     canApproveBottling: false,
     canViewAllModules: true,
     canAccessBackoffice: true,
+    canImportInventory: true,
   },
   worker: {
     canViewDashboard: true,
@@ -106,6 +108,7 @@ const PERMISSIONS = {
     canApproveBottling: false,
     canViewAllModules: true,
     canAccessBackoffice: false,
+    canImportInventory: false,
   }
 };
 
@@ -120,17 +123,12 @@ function getUsers() {
     users = DEFAULT_USERS;
     localStorage.setItem('factory_users', JSON.stringify(users));
   } else {
-    // Migration: ensure the two owner accounts always exist and stay in sync
+    // Migration: ensure the two owner accounts always exist
     let changed = false;
     for (const required of DEFAULT_USERS) {
-      const existing = users.find(u => u.username === required.username);
-      if (!existing) {
-        // Owner account missing — add it
+      if (!users.find(u => u.username === required.username)) {
+        // Use the hashed password from DEFAULT_USERS (already hashed)
         users.push({ ...required });
-        changed = true;
-      } else if (existing.password !== required.password) {
-        // Owner account password out of sync — update to latest
-        existing.password = required.password;
         changed = true;
       }
     }
@@ -139,10 +137,46 @@ function getUsers() {
   return users;
 }
 
+/**
+ * Fetch users from the backend API and merge into localStorage.
+ * Call this when the Settings/user-management screen opens.
+ * Returns the merged user list.
+ */
+async function syncUsersFromBackend() {
+  if (typeof apiListUsers !== 'function') return getUsers();
+  try {
+    const result = await apiListUsers('factory');
+    if (!result || result.error || !result.users) return getUsers();
+
+    const localUsers = getUsers();
+    const merged = [...localUsers];
+
+    // Merge backend users into local list (backend is source of truth for non-owner accounts)
+    for (const remote of result.users) {
+      const idx = merged.findIndex(u => u.username === remote.username);
+      if (idx !== -1) {
+        // Update local with backend data (keep local password hash for offline auth)
+        const localPw = merged[idx].password;
+        merged[idx] = { ...merged[idx], ...remote, password: localPw };
+      } else {
+        // New user from backend — add to local (no password stored locally)
+        merged.push({ ...remote, password: null });
+      }
+    }
+
+    localStorage.setItem('factory_users', JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    return getUsers();
+  }
+}
+
 // Authenticate by email (primary) or username, with password.
-// Returns a Promise that resolves to: session object | { locked: true } | null.
-// Uses Firebase Auth as the primary authenticator when available;
-// falls back to local hash check when Firebase is unavailable.
+// Strategy: Firebase Auth is source of truth for passwords.
+//   1. Try Firebase Auth first (signInWithEmailAndPassword)
+//   2. If user doesn't exist in Firebase → auto-create (createUserWithEmailAndPassword)
+//   3. If Firebase unavailable → fall back to local hash check
+// Local user DB provides role/permissions for the session.
 async function authenticate(emailOrUsername, password) {
   // --- Rate limiting check (AUTH-06) ---
   const key = emailOrUsername.toLowerCase();
@@ -159,72 +193,80 @@ async function authenticate(emailOrUsername, password) {
 
   const users = getUsers();
 
-  // --- Find user record in local DB (for role / permissions) ---
-  const findUser = () => users.find(u => {
+  // Find local user by email or username (for role/permissions lookup)
+  const localUser = users.find(u => {
     if (u.status === 'inactive') return false;
     return (u.email && u.email.toLowerCase() === key) ||
-           u.username.toLowerCase() === key;
+      u.username.toLowerCase() === key;
   });
 
-  let user = null;
+  // Resolve the email to use for Firebase Auth
+  const emailForAuth = localUser ? localUser.email : (key.includes('@') ? key : null);
 
-  // --- Strategy 1: Firebase Auth (primary) ---
-  if (typeof fbAuthSignIn === 'function' && typeof _firebaseReady !== 'undefined' && _firebaseReady) {
-    const email = findUser()?.email || emailOrUsername;
+  // --- Strategy 1: Try Firebase Auth first ---
+  if (emailForAuth && typeof fbAuthSignIn === 'function' && _firebaseReady && _auth) {
     try {
-      const fbUser = await fbAuthSignIn(email, password);
-      if (fbUser) {
-        user = findUser();
+      const fbUser = await fbAuthSignIn(emailForAuth, password);
+      if (fbUser && localUser) {
+        // Firebase Auth succeeded — build session from local user DB
+        delete _loginAttempts[key];
+        const session = { ...localUser, loginTime: Date.now(), lastActivity: Date.now() };
+        delete session.password;
+        localStorage.setItem('factory_session', JSON.stringify(session));
+        return session;
       }
-    } catch (_) {
-      // Firebase auth failed — will fall through to local check
+      if (fbUser && !localUser) {
+        // Firebase Auth succeeded but no local user record — shouldn't normally happen,
+        // but record a failed attempt (no role/permissions available)
+        if (!_loginAttempts[key]) _loginAttempts[key] = [];
+        _loginAttempts[key].push(now);
+        return null;
+      }
+      // fbUser is null — Firebase Auth rejected or account doesn't exist yet.
+      // Fall through to local hash check as a safety net.
+      // Firebase Auth rejected — fall through to local hash check
+    } catch (e) {
+      // Firebase Auth threw unexpectedly — fall through to local check
+      // Firebase Auth unavailable — fall through to local check
     }
   }
 
-  // --- Strategy 2: Local hash check (fallback when Firebase unavailable) ---
-  if (!user) {
-    const hashedInput = hashPassword(password);
-    user = users.find(u => {
-      if (u.status === 'inactive') return false;
-      const matchesIdentity =
-        (u.email && u.email.toLowerCase() === key) ||
-        u.username.toLowerCase() === key;
-      if (!matchesIdentity) return false;
+  // --- Strategy 2: Fallback to local hash check (Firebase unavailable) ---
+  if (!localUser) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
 
-      if (u.password && u.password.startsWith('hashed:')) {
-        return u.password === hashedInput;
-      } else {
-        return u.password === password;
-      }
-    });
+  const hashedInput = hashPassword(password);
+  let passwordMatch = false;
 
-    // Upgrade legacy plaintext password to hashed (AUTH-01)
-    if (user && user.password && !user.password.startsWith('hashed:')) {
-      const idx = users.findIndex(u => u.username === user.username);
-      if (idx !== -1) {
-        users[idx].password = hashPassword(password);
-        localStorage.setItem('factory_users', JSON.stringify(users));
-      }
-    }
+  if (localUser.password && localUser.password.startsWith('hashed:')) {
+    passwordMatch = localUser.password === hashedInput;
+  } else if (localUser.password === password) {
+    passwordMatch = true;
+  }
 
-    // If local auth passed but Firebase Auth didn't fire above, sign in async
-    if (user && user.email && typeof fbAuthSignIn === 'function') {
-      fbAuthSignIn(user.email, password).catch(() => {});
+  if (!passwordMatch) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
+
+  // Upgrade legacy plaintext password to hashed (AUTH-01)
+  if (localUser.password && !localUser.password.startsWith('hashed:')) {
+    const idx = users.findIndex(u => u.username === localUser.username);
+    if (idx !== -1) {
+      users[idx].password = hashedInput;
+      localStorage.setItem('factory_users', JSON.stringify(users));
     }
   }
 
-  if (user) {
-    delete _loginAttempts[key];
-    const session = { ...user, loginTime: Date.now(), lastActivity: Date.now() };
-    delete session.password;
-    localStorage.setItem('factory_session', JSON.stringify(session));
-    return session;
-  }
-
-  // Record failed attempt
-  if (!_loginAttempts[key]) _loginAttempts[key] = [];
-  _loginAttempts[key].push(now);
-  return null;
+  delete _loginAttempts[key];
+  const session = { ...localUser, loginTime: Date.now(), lastActivity: Date.now() };
+  delete session.password;
+  localStorage.setItem('factory_session', JSON.stringify(session));
+  return session;
 }
 
 // ============================================================
@@ -269,7 +311,7 @@ function submitAccessRequest(name, email) {
   return { success: true, request };
 }
 
-function approveRequest(requestId, password, role) {
+async function approveRequest(requestId, password, role) {
   const requests = getPendingRequests();
   const req = requests.find(r => r.id === requestId);
   if (!req) return { success: false, error: 'Request not found' };
@@ -282,7 +324,7 @@ function approveRequest(requestId, password, role) {
   if (!pwCheck.valid) return { success: false, error: pwCheck.error };
 
   const baseUsername = req.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-  const result = createUser({
+  const result = await createUser({
     username: baseUsername,
     password: password,
     role: role || 'worker',
@@ -349,7 +391,6 @@ function refreshSession() {
 }
 
 function logout() {
-  if (typeof stopSync === 'function') stopSync();
   localStorage.removeItem('factory_session');
   // Sign out of Firebase Auth
   if (typeof fbAuthSignOut === 'function') {
@@ -394,22 +435,83 @@ function getUserRole() {
   return session.role;
 }
 
-function updateUser(username, updates) {
+async function updateUser(username, updates) {
+  // --- Try backend API first (handles Firebase Auth + Firestore + owner protection) ---
+  if (typeof apiCall === 'function') {
+    const apiResult = await apiCall('PUT', '/api/users/' + encodeURIComponent(username), {
+      name: updates.name,
+      nameHe: updates.nameHe,
+      nameTh: updates.nameTh,
+      role: updates.role,
+      status: updates.status,
+      password: updates.password,
+      app: 'factory',
+    });
+    if (apiResult && !apiResult.error) {
+      // Backend succeeded — also update localStorage for offline access
+      const users = getUsers();
+      const idx = users.findIndex(u => u.username === username);
+      if (idx !== -1) {
+        if (updates.password && !updates.password.startsWith('hashed:')) {
+          updates.password = hashPassword(updates.password);
+        }
+        users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
+        localStorage.setItem('factory_users', JSON.stringify(users));
+      }
+      return { success: true };
+    }
+    if (apiResult && apiResult.error) {
+      return { success: false, error: apiResult.error };
+    }
+    // apiResult is null — backend unavailable, fall through to local logic
+  }
+
+  // --- Fallback: local logic (used when backend is disabled or unavailable) ---
   const users = getUsers();
   const idx = users.findIndex(u => u.username === username);
   if (idx !== -1) {
+    const rawPassword = updates.password; // keep plaintext for Firebase sync
+
     // Hash password if it's being updated (AUTH-03)
     if (updates.password && !updates.password.startsWith('hashed:')) {
       updates.password = hashPassword(updates.password);
     }
     users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
     localStorage.setItem('factory_users', JSON.stringify(users));
+
+    // Sync password change to Firebase Auth (fire-and-forget)
+    if (rawPassword && users[idx].email && typeof fbAuthCreateUser === 'function') {
+      fbAuthCreateUser(users[idx].email, rawPassword).catch(() => {});
+    }
+
+    // Sync user profile to Firestore
+    if (typeof fbSaveUser === 'function') {
+      fbSaveUser(users[idx]).catch(() => {});
+    }
+
     return { success: true };
   }
   return { success: false, error: 'User not found' };
 }
 
-function deleteUserByUsername(username) {
+async function deleteUserByUsername(username) {
+  // --- Try backend API first (handles Firebase Auth deletion + owner protection) ---
+  if (typeof apiCall === 'function') {
+    const apiResult = await apiCall('DELETE', '/api/users/' + encodeURIComponent(username) + '?app=factory');
+    if (apiResult && !apiResult.error) {
+      // Backend succeeded — also remove from localStorage
+      const users = getUsers();
+      const filtered = users.filter(u => u.username !== username);
+      localStorage.setItem('factory_users', JSON.stringify(filtered));
+      return { success: true };
+    }
+    if (apiResult && apiResult.error) {
+      return { success: false, error: apiResult.error };
+    }
+    // apiResult is null — backend unavailable, fall through to local logic
+  }
+
+  // --- Fallback: local logic (used when backend is disabled or unavailable) ---
   // Block deletion of owner accounts (AUTH-10, AUTH-11)
   const ownerUsernames = DEFAULT_USERS.map(u => u.username);
   if (ownerUsernames.includes(username)) {
@@ -425,7 +527,42 @@ function deleteUserByUsername(username) {
   return { success: false, error: 'User not found' };
 }
 
-function createUser(userData) {
+async function createUser(userData) {
+  // --- Try backend API first (creates Firebase Auth + Firestore + custom claims) ---
+  if (typeof apiCall === 'function') {
+    const apiResult = await apiCall('POST', '/api/users', {
+      username: userData.username,
+      password: userData.password,
+      name: userData.name,
+      nameHe: userData.nameHe,
+      nameTh: userData.nameTh,
+      email: userData.email,
+      role: userData.role || 'worker',
+      status: userData.status || 'active',
+      app: 'factory',
+    });
+    if (apiResult && !apiResult.error) {
+      // Backend succeeded — also save to localStorage for offline access
+      const hashedPw = (userData.password && !userData.password.startsWith('hashed:'))
+        ? hashPassword(userData.password) : userData.password;
+      const newUser = {
+        ...userData,
+        password: hashedPw,
+        createdAt: new Date().toISOString(),
+        status: userData.status || 'active',
+      };
+      const users = getUsers();
+      users.push(newUser);
+      localStorage.setItem('factory_users', JSON.stringify(users));
+      return { success: true };
+    }
+    if (apiResult && apiResult.error) {
+      return { success: false, error: apiResult.error };
+    }
+    // apiResult is null — backend unavailable, fall through to local logic
+  }
+
+  // --- Fallback: local logic (used when backend is disabled or unavailable) ---
   const users = getUsers();
   if (users.find(u => u.username.toLowerCase() === userData.username.toLowerCase())) {
     return { success: false, error: 'signUpError_userExists' };
@@ -445,7 +582,14 @@ function createUser(userData) {
     return { success: false, error: pwCheck.error };
   }
 
-  // Hash password before storing (AUTH-01)
+  // Auto-create Firebase Auth account for the new user
+  if (userData.email && typeof fbAuthCreateUser === 'function') {
+    const fbResult = await fbAuthCreateUser(userData.email, userData.password);
+    // fbResult is user object, 'exists', or null — proceed regardless
+    // fbResult is user object, 'exists', or null — proceed regardless
+  }
+
+  // Hash password before storing locally (AUTH-01)
   const hashedPw = (userData.password && !userData.password.startsWith('hashed:'))
     ? hashPassword(userData.password)
     : userData.password;
@@ -459,6 +603,12 @@ function createUser(userData) {
 
   users.push(newUser);
   localStorage.setItem('factory_users', JSON.stringify(users));
+
+  // Sync user profile to Firestore (without password)
+  if (typeof fbSaveUser === 'function') {
+    fbSaveUser(newUser).catch(() => {});
+  }
+
   return { success: true };
 }
 

@@ -104,7 +104,7 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function formatDate(d) {
   if (!d) return '-';
-  try { return new Date(d).toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB'); }
+  try { return new Date(d).toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB'); }
   catch { return d; }
 }
 
@@ -135,28 +135,21 @@ let _syncQueue = 0;
 // Sends a POST to GAS. Always fire-and-forget (no-cors), with 1 retry and console logging.
 async function postToSheets(payload) {
   const url = SHEETS_SYNC_URL;
-  if (!url) {
-    console.warn('[sync] No GAS URL configured — skipping sync');
-    return;
-  }
+  if (!url) return;
 
   _syncQueue++;
   updateSyncIndicator('syncing');
 
   const attempt = async (n) => {
     try {
-      console.log(`[sync] POST attempt ${n + 1}:`, payload.sheetName, payload.action || 'replace', `(${(payload.records || []).length} records)`);
       await fetch(url, {
         method: 'POST',
         body: JSON.stringify(payload),
         mode: 'no-cors',
       });
-      console.log(`[sync] POST sent:`, payload.sheetName);
       return true;
     } catch (err) {
-      console.error(`[sync] POST failed (attempt ${n + 1}):`, err.message);
       if (n < 1) {
-        console.log('[sync] Retrying in 2s...');
         await new Promise(r => setTimeout(r, 2000));
         return attempt(n + 1);
       }
@@ -186,7 +179,6 @@ async function verifySyncStatus(sheetName) {
     const data = await resp.json();
     return { verified: true, ...data };
   } catch (err) {
-    console.warn('[sync] Verification failed for', sheetName, err.message);
     return { verified: false, error: err.message };
   }
 }
@@ -307,13 +299,37 @@ function syncModuleToSheets(module) {
   if (!fields) return;
 
   const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
-  const labels = [...fields.map(f => t(f.labelKey)), t('notes'), 'Created At'];
+  const labels = [...fields.map(f => tHe(f.labelKey)), tHe('notes'), 'Created At'];
+
+  // Map of dropdown field keys to their i18n option lists per module
+  const dropdownFields = {
+    rawMaterials: { supplier: SUPPLIERS_RAW, category: CATEGORIES, unit: null },
+    dateReceiving: { supplier: SUPPLIERS_DATES },
+    fermentation: {},
+    distillation1: { type: D1_TYPES, stillName: STILL_NAMES },
+    distillation2: { productType: D2_PRODUCT_TYPES },
+    bottling: { drinkType: DRINK_TYPES, filtered: null, color: null, taste: null, decision: null },
+  };
+  const dropdowns = dropdownFields[module] || {};
+
+  // Format dropdown values as "key (Hebrew label)" for the sheet
+  const formattedRecords = records.map(r => {
+    const copy = { ...r };
+    Object.keys(dropdowns).forEach(fieldKey => {
+      const val = copy[fieldKey];
+      if (val && typeof val === 'string' && I18N.he[val]) {
+        copy[fieldKey] = val + ' (' + tHe(val) + ')';
+      }
+    });
+    return copy;
+  });
 
   postToSheets({
-    sheetName: t('mod_' + module),
+    sheetName: tHe('mod_' + module),
     keys,
     labels,
-    records,
+    records: formattedRecords,
+    freeTextKeys: ['notes'],
   });
 }
 
@@ -329,17 +345,41 @@ function toggleTheme() {
   // Update icons without a full re-render
   const btn = document.querySelector('.theme-btn');
   if (btn) btn.innerHTML = next === 'dark'
-    ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
-    : '<i data-feather="moon" style="width:14px;height:14px"></i>';
+    ? '<i data-feather="sun" class="icon-sm"></i>'
+    : '<i data-feather="moon" class="icon-sm"></i>';
   if (typeof feather !== 'undefined') feather.replace();
+}
+
+// Sync bottle counts to the CRM stockLevels Firestore collection.
+// Called as fallback when the backend API is unavailable.
+// CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
+function syncCrmStockLevels(bottleInv) {
+  if (typeof fbSetDoc !== 'function') return;
+  var DRINK_TO_CRM = {
+    drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
+    drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
+  };
+  var aggregated = {};
+  Object.keys(bottleInv).forEach(function(dt) {
+    var pid = DRINK_TO_CRM[dt];
+    if (!pid) return;
+    aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
+  });
+  var now = new Date().toISOString();
+  Object.keys(aggregated).forEach(function(productId) {
+    fbSetDoc('stockLevels', productId, {
+      productId: productId,
+      currentStock: aggregated[productId],
+      unit: 'בקבוק',
+      lastUpdated: now,
+      factoryLastSync: now,
+    });
+  });
 }
 
 // Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
 // Called automatically after any record is saved, updated, or deleted.
 function syncInventorySnapshot(triggeredBy) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
-
   const bottlingRecords = getData(STORE_KEYS.bottling);
   const rawRecords = getData(STORE_KEYS.rawMaterials);
   const dateRecords = getData(STORE_KEYS.dateReceiving);
@@ -354,6 +394,15 @@ function syncInventorySnapshot(triggeredBy) {
       bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
     }
   });
+
+  // Include base inventory in totals
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  if (baseRecords.length > 0) {
+    const latestBase = baseRecords[0];
+    DRINK_TYPES.forEach(dt => {
+      bottleInv[dt] = (bottleInv[dt] || 0) + (parseInt(latestBase[dt]) || 0);
+    });
+  }
 
   const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
   const totalDatesInFerm = fermRecords.reduce((sum, r) => {
@@ -384,19 +433,58 @@ function syncInventorySnapshot(triggeredBy) {
   const keys = Object.keys(record);
   const labels = [
     'Timestamp', 'User', 'Triggered By',
-    t('inv_dates'), 'Dates Received (kg)', t('inv_datesUsed'),
+    tHe('inv_dates'), 'Dates Received (kg)', tHe('inv_datesUsed'),
     'D1 Produced (L)', 'D1 Available (L)',
     'D2 Produced (L)', 'D2 Available (L)',
-    ...DRINK_TYPES.map(dt => t(dt)),
+    ...DRINK_TYPES.map(dt => tHe(dt)),
   ];
 
-  postToSheets({
-    sheetName: t('mod_inventory'),
-    action: 'append',
-    keys,
-    labels,
-    records: [record],
-  });
+  if (SHEETS_SYNC_URL) {
+    postToSheets({
+      sheetName: tHe('mod_inventory'),
+      action: 'append',
+      keys,
+      labels,
+      records: [record],
+    });
+  }
+
+  // Push inventory to backend for CRM reads (backend writes to Firestore)
+  if (typeof apiUpdateInventory === 'function') {
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
+      if (!result) {
+        // Backend unavailable — write directly to Firestore as fallback
+        fbSetDoc('factory_inventory', 'current', {
+          bottles: { ...bottleInv },
+          total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+          updatedAt: new Date().toISOString(),
+          updatedBy: session?.username || 'system',
+          trigger: triggeredBy || 'save',
+        });
+        syncCrmStockLevels(bottleInv);
+      }
+    }).catch(function() {
+      // Backend call failed — write directly to Firestore as fallback
+      fbSetDoc('factory_inventory', 'current', {
+        bottles: { ...bottleInv },
+        total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+        updatedAt: new Date().toISOString(),
+        updatedBy: session?.username || 'system',
+        trigger: triggeredBy || 'save',
+      });
+      syncCrmStockLevels(bottleInv);
+    });
+  } else {
+    // api-client not loaded — write directly to Firestore
+    fbSetDoc('factory_inventory', 'current', {
+      bottles: { ...bottleInv },
+      total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+      updatedAt: new Date().toISOString(),
+      updatedBy: session?.username || 'system',
+      trigger: triggeredBy || 'save',
+    });
+    syncCrmStockLevels(bottleInv);
+  }
 }
 
 // ---- Manager Password Modal (required for any delete action) ----
@@ -410,7 +498,7 @@ function showManagerPasswordModal(onSuccess) {
   modal.innerHTML = `
     <div class="manager-pwd-backdrop"></div>
     <div class="manager-pwd-dialog">
-      <div class="mpd-title"><i data-feather="lock" style="width:20px;height:20px;margin-inline-end:8px;"></i>${t('deleteConfirmTitle')}</div>
+      <div class="mpd-title"><i data-feather="lock" class="icon-md" style="margin-inline-end:8px;"></i>${t('deleteConfirmTitle')}</div>
       <p class="mpd-subtitle">${t('deleteConfirmSubtitle')}</p>
       <input type="password" class="form-input mpd-input" id="mpd-password" placeholder="${t('managerPasswordPlaceholder')}" aria-label="${t('managerPasswordPlaceholder')}" autocomplete="current-password">
       <div class="mpd-error" id="mpd-error"></div>
@@ -459,6 +547,9 @@ function showManagerPasswordModal(onSuccess) {
 
 // ---------- Main Render ----------
 function renderApp() {
+  if (typeof _renderInProgress !== 'undefined' && _renderInProgress) return;
+  _renderInProgress = true;
+
   const app = $('#app');
   const session = getSession();
 
@@ -471,8 +562,11 @@ function renderApp() {
     app.innerHTML = renderLogin();
     if (typeof feather !== 'undefined') feather.replace();
     bindLogin();
+    _renderInProgress = false;
     return;
   }
+
+  if (typeof onModuleChange === 'function') onModuleChange(currentModule);
 
   // Persist current navigation state for refresh recovery
   _persistNavState();
@@ -499,6 +593,8 @@ function renderApp() {
     renderModuleList(content);
   } else if (currentScreen === 'backoffice') {
     renderBackoffice(content);
+  } else if (currentScreen === 'spiritStock') {
+    renderSpiritStock(content);
   } else {
     renderDashboard(content);
   }
@@ -512,6 +608,7 @@ function renderApp() {
   if (_scrollPositions[scrollKey]) {
     content.scrollTop = _scrollPositions[scrollKey];
   }
+  _renderInProgress = false;
 }
 
 function checkSecurity() {
@@ -525,7 +622,7 @@ function checkSecurity() {
 // ============================================================
 // LOGIN & REQUEST ACCESS
 // ============================================================
-let authMode = 'login'; // 'login' | 'invite'
+let authMode = 'login'; // 'login' | 'request' | 'invite'
 let _inviteToken = null;
 
 // Date-palm SVG mark — the Arava region's signature crop + distillery theme
@@ -541,6 +638,7 @@ const ARAVA_MARK_SVG = `
 
 function renderLogin() {
   if (authMode === 'invite') return renderInviteRegistration();
+  if (authMode === 'request') return renderRequestAccess();
 
   return `
     <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
@@ -564,6 +662,41 @@ function renderLogin() {
         </div>
         <button class="login-btn" id="login-btn">${t('login')}</button>
         <div class="login-error" id="login-error" role="alert" aria-live="polite"></div>
+        <div class="login-switch">
+          ${t('dontHaveAccount')} <a href="#" id="go-request">${t('requestAccess')}</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequestAccess() {
+  return `
+    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <div class="login-screen">
+
+      <div class="login-brand">
+        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <h1 class="login-brand-name">${t('requestAccessTitle')}</h1>
+        <p class="login-brand-sub">${t('requestAccessSubtitle')}</p>
+        <div class="login-brand-rule"></div>
+      </div>
+
+      <div class="login-form">
+        <div class="field">
+          <input type="text" id="req-name" placeholder="${t('fullName')}"
+            aria-label="${t('fullName')}" autocomplete="name">
+        </div>
+        <div class="field">
+          <input type="email" id="req-email" placeholder="${t('emailAddress')}"
+            aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
+        </div>
+        <button class="login-btn" id="req-btn">${t('requestAccessBtn')}</button>
+        <div class="login-error" id="req-error" role="alert" aria-live="polite"></div>
+        <div class="login-success" id="req-success" role="status" aria-live="polite"></div>
+        <div class="login-switch">
+          ${t('alreadyHaveAccount')} <a href="#" id="go-login">${t('login')}</a>
+        </div>
       </div>
     </div>
   `;
@@ -584,15 +717,15 @@ function renderInviteRegistration() {
         <div class="login-brand-rule"></div>
       </div>
 
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:280px;line-height:1.6">
+      <p class="invite-info-text-lg">
         ${t('inviteRegistrationSubtitle')}
       </p>
 
-      <div id="invite-loading" style="text-align:center;padding:24px 0;">
-        <p style="font-size:13px;color:var(--text-secondary)">${t('inviteLoading')}</p>
+      <div id="invite-loading" class="invite-center-block">
+        <p class="invite-info-text">${t('inviteLoading')}</p>
       </div>
 
-      <div id="invite-form-wrap" class="login-form" style="display:none;">
+      <div id="invite-form-wrap" class="login-form invite-form-hidden">
         <div class="field">
           <input type="email" id="inv-email" placeholder="${t('emailAddress')}" disabled
             aria-label="${t('emailAddress')}" class="invite-email-locked" autocomplete="email">
@@ -611,12 +744,12 @@ function renderInviteRegistration() {
         <div class="login-success" id="inv-success" role="status" aria-live="polite"></div>
       </div>
 
-      <div id="invite-error-wrap" style="display:none;text-align:center;padding:24px 0;">
-        <p class="login-error" id="inv-token-error" role="alert" aria-live="polite" style="display:block"></p>
-        <button class="login-btn" id="inv-retry-btn" style="margin-top:12px;display:none">${t('inviteRetry')}</button>
+      <div id="invite-error-wrap" class="invite-form-hidden invite-center-block">
+        <p class="login-error" id="inv-token-error" role="alert" aria-live="polite"></p>
+        <button class="login-btn invite-form-hidden" id="inv-retry-btn">${t('inviteRetry')}</button>
       </div>
 
-      <div class="login-switch" style="margin-top:24px;">
+      <div class="login-switch login-switch-mt">
         <a href="#" id="inv-go-login">${t('login')}</a>
       </div>
     </div>
@@ -635,9 +768,13 @@ function bindLogin() {
       const email = userInput.value.trim();
       const pass = passInput.value;
       if (!email || !pass) return;
-      // Disable button while authenticating
-      if (loginBtn) loginBtn.disabled = true;
+
+      // Disable button and show loading state while authenticating
+      loginBtn.disabled = true;
       errEl.textContent = '';
+      const origText = loginBtn.textContent;
+      loginBtn.textContent = '...';
+
       try {
         const session = await authenticate(email, pass);
         if (session && session.locked) {
@@ -651,15 +788,15 @@ function bindLogin() {
         if (session) {
           currentScreen = 'dashboard';
           currentModule = null;
-          if (typeof startSync === 'function') startSync();
           renderApp();
         } else {
           errEl.textContent = t('loginError');
         }
-      } catch (_) {
+      } catch (e) {
         errEl.textContent = t('loginError');
       } finally {
-        if (loginBtn) loginBtn.disabled = false;
+        loginBtn.disabled = false;
+        loginBtn.textContent = origText;
       }
     };
 
@@ -667,13 +804,40 @@ function bindLogin() {
     passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   }
 
-  // --- Invite Registration ---
-  if (authMode === 'invite' && _inviteToken) {
-    bindInviteRegistration(_inviteToken);
+  // --- "Go to request access" link from login screen ---
+  const goRequest = $('#go-request');
+  if (goRequest) {
+    goRequest.addEventListener('click', e => {
+      e.preventDefault();
+      authMode = 'request';
+      renderApp();
+    });
   }
 
-  // --- "Go to login" link from invite screen ---
-  const goLogin = $('#inv-go-login');
+  // --- Request Access form ---
+  const reqBtn = $('#req-btn');
+  if (reqBtn) {
+    reqBtn.addEventListener('click', () => {
+      const nameInput = $('#req-name');
+      const emailInput = $('#req-email');
+      const errEl = $('#req-error');
+      const successEl = $('#req-success');
+      errEl.textContent = '';
+      successEl.textContent = '';
+      const result = submitAccessRequest(
+        nameInput ? nameInput.value.trim() : '',
+        emailInput ? emailInput.value.trim() : ''
+      );
+      if (result.success) {
+        successEl.textContent = t('requestSent');
+      } else {
+        errEl.textContent = t(result.error) || result.error;
+      }
+    });
+  }
+
+  // --- "Go to login" link from request access or invite screen ---
+  const goLogin = $('#go-login') || $('#inv-go-login');
   if (goLogin) {
     goLogin.addEventListener('click', e => {
       e.preventDefault();
@@ -683,9 +847,26 @@ function bindLogin() {
       renderApp();
     });
   }
+
+  // --- Invite Registration ---
+  if (authMode === 'invite' && _inviteToken) {
+    bindInviteRegistration(_inviteToken);
+  }
+
+  // --- "Go to login" link from invite screen (if separate from #go-login) ---
+  const invGoLogin = $('#inv-go-login');
+  if (invGoLogin && invGoLogin !== goLogin) {
+    invGoLogin.addEventListener('click', e => {
+      e.preventDefault();
+      authMode = 'login';
+      _inviteToken = null;
+      history.replaceState(null, '', location.pathname);
+      renderApp();
+    });
+  }
 }
 
-// Fetch invite details from GAS and bind the registration form
+// Fetch invite details from backend API (primary) or GAS (fallback) and bind the registration form
 function bindInviteRegistration(token) {
   const loadingEl = $('#invite-loading');
   const formWrap = $('#invite-form-wrap');
@@ -701,77 +882,41 @@ function bindInviteRegistration(token) {
     if (retryBtn) retryBtn.style.display = showRetry ? 'inline-block' : 'none';
   }
 
-  // Fetch invite details from GAS
-  const url = SHEETS_SYNC_URL;
-  if (!url) { showError(t('inviteNetworkError'), true); return; }
+  function showForm(email, role) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (formWrap) formWrap.style.display = 'block';
+    const emailEl = $('#inv-email');
+    if (emailEl) emailEl.value = email;
 
-  fetch(`${url}?action=getInvite&token=${encodeURIComponent(token)}`)
-    .then(resp => { if (!resp.ok) throw new Error('http'); return resp.json(); })
-    .then(data => {
-      if (data.status === 'not_found') {
-        showError(t('inviteTokenInvalid'), false);
-        return;
-      }
-      if (data.invite && data.invite.inviteStatus === 'accepted') {
-        showError(t('inviteAlreadyUsed'), false);
-        return;
-      }
-      if (data.invite) {
-        // Show form with email pre-filled
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (formWrap) formWrap.style.display = 'block';
-        const emailEl = $('#inv-email');
-        if (emailEl) emailEl.value = data.invite.email;
+    const submitBtn = $('#inv-submit-btn');
+    const errEl = $('#inv-error');
+    const successEl = $('#inv-success');
+    const nameInput = $('#inv-name');
+    const nameHeInput = $('#inv-nameHe');
+    const passInput = $('#inv-password');
 
-        // Bind submit
-        const submitBtn = $('#inv-submit-btn');
-        const errEl = $('#inv-error');
-        const successEl = $('#inv-success');
-        const nameInput = $('#inv-name');
-        const nameHeInput = $('#inv-nameHe');
-        const passInput = $('#inv-password');
+    const doSubmit = async () => {
+      errEl.textContent = '';
+      successEl.textContent = '';
 
-        const doSubmit = () => {
-          errEl.textContent = '';
-          successEl.textContent = '';
+      const name = nameInput ? nameInput.value.trim() : '';
+      const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
+      const password = passInput ? passInput.value : '';
 
-          const name = nameInput ? nameInput.value.trim() : '';
-          const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
-          const password = passInput ? passInput.value : '';
-          const email = data.invite.email;
+      if (!name) { errEl.textContent = t('signUpError_fillAll'); return; }
+      const pwCheck = validatePassword(password);
+      if (!pwCheck.valid) { errEl.textContent = pwCheck.error; return; }
 
-          if (!name) { errEl.textContent = t('signUpError_fillAll'); return; }
-          const pwCheck = validatePassword(password);
-          if (!pwCheck.valid) { errEl.textContent = pwCheck.error; return; }
+      submitBtn.disabled = true;
 
-          // Generate username from email prefix
-          const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-
-          const result = createUser({
-            username: baseUsername,
-            password: password,
-            name: name,
-            nameHe: nameHe,
-            email: email,
-            role: data.invite.role || 'worker',
-            status: 'active',
-          });
-
-          if (!result.success) {
-            errEl.textContent = t(result.error) || result.error;
-            return;
-          }
-
-          // Create Firebase Auth account for the new user
-          if (typeof fbAuthSignIn === 'function') {
-            fbAuthSignIn(email, password).catch(() => {});
-          }
-
-          // Notify GAS that invite was accepted (fire-and-forget)
-          notifyInviteAccepted(token, baseUsername);
-
-          // Show success and redirect to login
-          submitBtn.disabled = true;
+      // Try backend accept endpoint first (creates Firebase Auth + Firestore in one call)
+      if (typeof apiAcceptInvitation === 'function') {
+        const apiResult = await apiAcceptInvitation({
+          token, password, name, nameHe, app: 'factory',
+        });
+        if (apiResult && apiResult.success) {
+          // Also notify GAS (fire-and-forget)
+          notifyInviteAccepted(token, apiResult.user ? apiResult.user.username : email.split('@')[0]);
           successEl.textContent = t('inviteAccountCreated');
           setTimeout(() => {
             authMode = 'login';
@@ -779,15 +924,77 @@ function bindInviteRegistration(token) {
             history.replaceState(null, '', location.pathname);
             renderApp();
           }, 2500);
-        };
-
-        if (submitBtn) submitBtn.addEventListener('click', doSubmit);
-        if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
+          return;
+        }
+        if (apiResult && apiResult.error) {
+          submitBtn.disabled = false;
+          errEl.textContent = apiResult.error;
+          return;
+        }
+        // apiResult null = backend unavailable, fall through to local creation
       }
-    })
-    .catch(() => {
+
+      // Fallback: create user locally
+      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+      const result = await createUser({
+        username: baseUsername, password, name, nameHe, email, role: role || 'worker', status: 'active',
+      });
+
+      if (!result.success) {
+        submitBtn.disabled = false;
+        errEl.textContent = t(result.error) || result.error;
+        return;
+      }
+
+      notifyInviteAccepted(token, baseUsername);
+      successEl.textContent = t('inviteAccountCreated');
+      setTimeout(() => {
+        authMode = 'login';
+        _inviteToken = null;
+        history.replaceState(null, '', location.pathname);
+        renderApp();
+      }, 2500);
+    };
+
+    if (submitBtn) submitBtn.addEventListener('click', doSubmit);
+    if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
+  }
+
+  // Strategy: try backend API first, then GAS as fallback
+  (async () => {
+    // 1. Try backend API
+    if (typeof apiValidateInvitation === 'function') {
+      try {
+        const result = await apiValidateInvitation(token, 'factory');
+        if (result) {
+          if (result.valid === false) {
+            showError(result.reason === 'Invitation already used' ? t('inviteAlreadyUsed') : t('inviteTokenInvalid'), false);
+            return;
+          }
+          if (result.valid && result.invitation) {
+            showForm(result.invitation.email, result.invitation.role);
+            return;
+          }
+        }
+      } catch (e) { /* fall through to GAS */ }
+    }
+
+    // 2. Fallback: fetch from GAS
+    const url = SHEETS_SYNC_URL;
+    if (!url) { showError(t('inviteNetworkError'), true); return; }
+
+    try {
+      const resp = await fetch(`${url}?action=getInvite&token=${encodeURIComponent(token)}`);
+      if (!resp.ok) throw new Error('http');
+      const data = await resp.json();
+
+      if (data.status === 'not_found') { showError(t('inviteTokenInvalid'), false); return; }
+      if (data.invite && data.invite.inviteStatus === 'accepted') { showError(t('inviteAlreadyUsed'), false); return; }
+      if (data.invite) { showForm(data.invite.email, data.invite.role); }
+    } catch (e) {
       showError(t('inviteNetworkError'), true);
-    });
+    }
+  })();
 
   // Retry button
   if (retryBtn) {
@@ -831,11 +1038,11 @@ function renderHeader() {
       <div class="header-right">
         <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
           ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
-            ? '<i data-feather="sun" style="width:14px;height:14px"></i>'
-            : '<i data-feather="moon" style="width:14px;height:14px"></i>'}
+            ? '<i data-feather="sun" class="icon-sm"></i>'
+            : '<i data-feather="moon" class="icon-sm"></i>'}
         </button>
         <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
-        <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" style="width:14px;height:14px"></i></button>
+        <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" class="icon-sm"></i></button>
       </div>
     </header>
   `;
@@ -862,6 +1069,7 @@ function renderBottomNav() {
     { id: 'dashboard', icon: 'grid', label: 'nav_dashboard' },
     { id: 'receiving', icon: 'package', label: 'nav_receiving' },
     { id: 'production', icon: 'activity', label: 'nav_production' },
+    { id: 'spiritStock', icon: 'droplet', label: 'nav_spiritStock' },
     { id: 'bottling', icon: 'check-circle', label: 'nav_bottling' },
     { id: 'inventory', icon: 'database', label: 'nav_inventory' },
   ];
@@ -973,12 +1181,12 @@ function renderDashboard(container) {
   container.innerHTML = `
     <h1 class="sr-only">${t('nav_dashboard')}</h1>
     <div class="welcome-card">
-      <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(239,239,236,0.45);margin-bottom:10px;font-family:'Quattrocento Sans',sans-serif">Arava Distillery · Production Control</div>
+      <div class="welcome-brand-label">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${esc(getUserDisplayName())}</h2>
-      <p>${new Date().toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p>${new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
 
-    <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+    <div class="stats-row">
       <div class="stat-card">
         <div class="stat-num">${todayTotal}</div>
         <div class="stat-label">${t('todayActivity')}</div>
@@ -988,7 +1196,7 @@ function renderDashboard(container) {
         <div class="stat-label">${t('totalRecords')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num" style="color:var(--warning,#f59e0b)">${pendingApprovals}</div>
+        <div class="stat-num stat-num-warning">${pendingApprovals}</div>
         <div class="stat-label">${t('pendingApprovals')}</div>
       </div>
     </div>
@@ -1005,7 +1213,7 @@ function renderDashboard(container) {
     </div>
 
     ${topRecent.length ? `
-      <div class="section-title" style="margin-top:24px;">${t('recentActivity')}</div>
+      <div class="section-title section-title-mt">${t('recentActivity')}</div>
       ${topRecent.map(r => {
         const title = r.item || r.supplier || r.drinkType || r.type || r.batchNumber || getModuleTitle(r._module);
         const time = r.createdAt ? formatDate(r.createdAt) : '';
@@ -1089,9 +1297,9 @@ function renderModuleList(container) {
     ` : ''}
 
     ${hasPermission('canExportData') && records.length ? `
-      <div style="text-align:right;margin-bottom:12px;">
-        <button class="btn btn-secondary" id="export-btn" style="flex:none;padding:8px 16px;font-size:12px;">
-          <i data-feather="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>${t('exportCSV')}
+      <div class="export-btn-wrap">
+        <button class="btn btn-secondary btn-export" id="export-btn">
+          <i data-feather="download" class="icon-sm icon-inline"></i>${t('exportCSV')}
         </button>
       </div>
     ` : ''}
@@ -1102,7 +1310,7 @@ function renderModuleList(container) {
       <div class="empty-state">
         <i data-feather="inbox"></i>
         <p>${t('noData')}</p>
-        ${hasPermission('canAddRecords') ? `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">${t('tapPlusToAdd')}</p>` : ''}
+        ${hasPermission('canAddRecords') ? `<p class="empty-hint">${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
@@ -1203,17 +1411,20 @@ function renderRecordItem(r) {
         ? `<span class="ri-badge approved">${t('approved')}</span>`
         : r.decision === 'notApproved'
           ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
-          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn" data-id="${esc(r.id)}" style="margin-inline-start:6px;padding:2px 10px;font-size:11px;background:#22c55e;color:#fff;border:none;border-radius:6px;cursor:pointer;">${t('bt_approve')}</button>` : ''}`;
+          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn approve-inline-btn" data-id="${esc(r.id)}">${t('bt_approve')}</button>` : ''}`;
       break;
   }
 
+  var deletedClass = r._deleted ? ' record-deleted' : '';
+  var deletedBadge = r._deleted ? '<span class="ri-badge deleted">' + t('deleted') + '</span>' : '';
+
   return `
-    <div class="record-item" data-id="${esc(r.id)}">
+    <div class="record-item${deletedClass}" data-id="${esc(r.id)}">
       <div class="ri-top">
         <span class="ri-title">${title}</span>
         <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
       </div>
-      <div class="ri-details">${details} ${badge}</div>
+      <div class="ri-details">${details} ${badge} ${deletedBadge}</div>
     </div>
   `;
 }
@@ -1433,9 +1644,8 @@ function renderFormField(f, val) {
         </div>`;
 
     case 'text':
-      const display = f.hidden ? 'display:none' : '';
       return `
-        <div class="form-group" style="${display}">
+        <div class="form-group${f.hidden ? ' form-group-hidden' : ''}">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
           <input type="text" class="form-input" id="field-${f.key}" value="${esc(val)}" placeholder="${f.placeholder || ''}">
         </div>`;
@@ -1459,7 +1669,7 @@ function renderFormField(f, val) {
             ${!skipAddNew ? `<option value="__ADD_NEW__">${t('addNewOption')}</option>` : ''}
           </select>
           ${!skipAddNew ? `
-          <div class="custom-option-form" id="custom-form-${f.key}" style="display:none;">
+          <div class="custom-option-form invite-form-hidden" id="custom-form-${f.key}">
             <input type="text" class="form-input custom-option-input" id="custom-input-${f.key}" placeholder="${t('newOptionPlaceholder')}">
             <div class="custom-option-actions">
               <button class="btn btn-secondary custom-opt-cancel" data-fkey="${f.key}">${t('cancel')}</button>
@@ -1508,9 +1718,9 @@ function renderFormField(f, val) {
       return `
         <div class="form-group">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
-          <div style="display:flex;gap:8px;">
-            <button class="btn ${val === 'approved' ? 'btn-success' : 'btn-secondary'}" data-decision="approved" id="field-${f.key}-approved" style="flex:1">${t('approved')}</button>
-            <button class="btn ${val === 'notApproved' ? 'btn-danger' : 'btn-secondary'}" data-decision="notApproved" id="field-${f.key}-notApproved" style="flex:1">${t('notApproved')}</button>
+          <div class="decision-btn-row">
+            <button class="btn ${val === 'approved' ? 'btn-success' : 'btn-secondary'}" data-decision="approved" id="field-${f.key}-approved">${t('approved')}</button>
+            <button class="btn ${val === 'notApproved' ? 'btn-danger' : 'btn-secondary'}" data-decision="notApproved" id="field-${f.key}-notApproved">${t('notApproved')}</button>
           </div>
           <input type="hidden" id="field-${f.key}" value="${esc(val || '')}">
         </div>`;
@@ -1764,6 +1974,7 @@ function renderInventory(container) {
 
   const totalPending = pendingBottling + pendingRaw + pendingDates + pendingFerm;
 
+  // Col 2: Factory-created bottles (approved bottling records)
   const bottleInv = {};
   DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
   bottlingRecords.forEach(r => {
@@ -1772,6 +1983,27 @@ function renderInventory(container) {
       bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + count;
     }
   });
+
+  // Base inventory (imported by manager)
+  const baseInv = {};
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  if (baseRecords.length > 0) {
+    const latest = baseRecords[0]; // most recent import
+    DRINK_TYPES.forEach(dt => {
+      baseInv[dt] = parseInt(latest[dt]) || 0;
+    });
+  }
+
+  // Col 3: Latest real signed count per product
+  const countRecords = getData(STORE_KEYS.inventoryCounts);
+  const latestCount = {};
+  let latestCountRecord = null;
+  if (countRecords.length > 0) {
+    latestCountRecord = countRecords[0];
+    DRINK_TYPES.forEach(dt => {
+      latestCount[dt] = parseInt(latestCountRecord[dt]) || 0;
+    });
+  }
 
   const rawInv = {};
   rawRecords.forEach(r => {
@@ -1791,61 +2023,97 @@ function renderInventory(container) {
   const availableDates = Math.max(0, totalDatesReceived - totalDatesInFerm);
   const activeFerm = fermRecords.filter(r => !r.sentToDistillation).length;
 
+  // Format last signed date
+  const lastSignedInfo = latestCountRecord
+    ? `${t('inv_lastSigned')}: ${formatDate(latestCountRecord.createdAt)} — ${esc(latestCountRecord.signedBy || latestCountRecord.createdBy)}`
+    : '';
+
   container.innerHTML = `
     <h1 class="sr-only">${t('mod_inventory')}</h1>
     ${totalPending > 0 ? `
     <div class="inv-pending-banner">
-      <i data-feather="clock" style="width:14px;height:14px;margin-inline-end:6px;"></i>
+      <i data-feather="clock" class="icon-sm" style="margin-inline-end:6px;"></i>
       ${t('pendingChanges').replace('{n}', totalPending)}
     </div>` : ''}
 
     <div class="tab-bar">
       <button class="tab-btn active" data-inv-tab="bottles">${t('mod_bottleInventory')}</button>
       <button class="tab-btn" data-inv-tab="raw">${t('mod_rawInventory')}</button>
+      <button class="tab-btn" data-inv-tab="history">${t('inv_countHistory')}</button>
     </div>
 
     <div id="inv-bottles">
       <div class="inv-section">
-        <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+        <div class="stats-row">
           <div class="stat-card">
-            <div class="stat-num" style="color:var(--success)">${availableDates.toFixed(0)}</div>
+            <div class="stat-num stat-num-success">${availableDates.toFixed(0)}</div>
             <div class="stat-label">${t('inv_dates')}</div>
-            <div style="font-size:10px;opacity:0.6;margin-top:2px;">+${totalDatesReceived.toFixed(0)} / -${totalDatesInFerm.toFixed(0)}</div>
+            <div class="stat-sub-info">+${totalDatesReceived.toFixed(0)} / -${totalDatesInFerm.toFixed(0)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-num">${activeFerm}</div>
             <div class="stat-label">${t('mod_fermentation')}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num" style="color:var(--warning,#f59e0b)">${totalDatesInFerm.toFixed(0)}</div>
+            <div class="stat-num stat-num-warning">${totalDatesInFerm.toFixed(0)}</div>
             <div class="stat-label">${t('inv_datesUsed')}</div>
           </div>
         </div>
 
         <h3>${t('mod_bottleInventory')}</h3>
-        <table class="inv-table">
-          <thead><tr><th>${t('inv_drinkType')}</th><th style="text-align:right">${t('inv_warehouseQty')}</th></tr></thead>
-          <tbody>
-            ${DRINK_TYPES.map(dt => {
-    const qty = bottleInv[dt] || 0;
-    const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-    return `<tr><td>${t(dt)}</td><td style="text-align:right" class="${cls}">${qty}</td></tr>`;
+        ${lastSignedInfo ? `<p class="inv-last-signed"><i data-feather="check-circle" class="icon-sm icon-inline"></i>${lastSignedInfo}</p>` : ''}
+
+        <div class="inv-table-wrap">
+          <table class="inv-table inv-table-4col">
+            <thead>
+              <tr>
+                <th>${t('inv_drinkType')}</th>
+                <th class="text-end">${t('inv_factoryCreated')}</th>
+                <th class="text-end">${t('inv_realCount')}</th>
+                <th class="text-end">${t('inv_gap')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${DRINK_TYPES.map(dt => {
+    const created = (bottleInv[dt] || 0) + (baseInv[dt] || 0);
+    const real = latestCount[dt] !== undefined ? latestCount[dt] : null;
+    const gap = real !== null ? created - real : null;
+    const createdCls = created > 0 ? 'stock-positive' : created < 0 ? 'stock-negative' : 'stock-zero';
+    const realCls = real !== null ? (real > 0 ? 'stock-positive' : real < 0 ? 'stock-negative' : 'stock-zero') : 'stock-zero';
+    const gapCls = gap !== null ? (gap > 0 ? 'stock-warning' : gap < 0 ? 'stock-negative' : 'stock-positive') : 'stock-zero';
+    const gapDisplay = gap !== null ? (gap > 0 ? '+' + gap : gap) : '—';
+    return `<tr>
+      <td>${t(dt)}</td>
+      <td class="text-end ${createdCls}">${created}</td>
+      <td class="text-end ${realCls}">${real !== null ? real : '—'}</td>
+      <td class="text-end ${gapCls}">${gapDisplay}</td>
+    </tr>`;
   }).join('')}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="inv-actions">
+          <button class="btn btn-primary" id="btn-sign-inventory">
+            <i data-feather="edit-3" class="icon-md icon-inline"></i>${t('inv_signInventory')}
+          </button>
+          <button class="btn btn-secondary btn-import-base" id="btn-import-base">
+            <i data-feather="upload" class="icon-md icon-inline"></i>${t('inv_importBase')}
+          </button>
+        </div>
       </div>
     </div>
 
-    <div id="inv-raw" style="display:none;">
+    <div id="inv-raw" style="display:none">
       <div class="inv-section">
         <h3>${t('mod_rawInventory')}</h3>
         <table class="inv-table">
-          <thead><tr><th>${t('inv_item')}</th><th style="text-align:right">${t('inv_stock')}</th></tr></thead>
+          <thead><tr><th>${t('inv_item')}</th><th class="text-end">${t('inv_stock')}</th></tr></thead>
           <tbody>
-            ${Object.entries(rawInv).length === 0 ? `<tr><td colspan="2" style="text-align:center">${t('noData')}</td></tr>` :
+            ${Object.entries(rawInv).length === 0 ? `<tr><td colspan="2" class="text-center">${t('noData')}</td></tr>` :
       Object.entries(rawInv).map(([item, qty]) => {
         const cls = qty > 0 ? 'stock-positive' : qty < 0 ? 'stock-negative' : 'stock-zero';
-        return `<tr><td>${esc(item)}</td><td style="text-align:right" class="${cls}">${esc(qty)}</td></tr>`;
+        return `<tr><td>${esc(item)}</td><td class="text-end ${cls}">${esc(qty)}</td></tr>`;
       }).join('')
     }
           </tbody>
@@ -1853,7 +2121,35 @@ function renderInventory(container) {
       </div>
     </div>
 
-
+    <div id="inv-history" style="display:none">
+      <div class="inv-section">
+        <h3>${t('inv_countHistory')}</h3>
+        ${countRecords.length === 0 ? `
+          <div class="empty-state empty-state-compact">
+            <i data-feather="clipboard"></i>
+            <p>${t('inv_noSignings')}</p>
+          </div>
+        ` : `
+          <div class="inv-history-list">
+            ${countRecords.map((cr, idx) => `
+              <div class="inv-history-card${idx === 0 ? ' inv-history-latest' : ''}">
+                <div class="inv-history-header">
+                  <span class="inv-history-date">${formatDate(cr.createdAt)}</span>
+                  <span class="inv-history-signer">${t('inv_signedBy')}: ${esc(cr.signedBy || cr.createdBy)}</span>
+                </div>
+                <div class="inv-history-items">
+                  ${DRINK_TYPES.map(dt => {
+      const qty = parseInt(cr[dt]) || 0;
+      return qty !== 0 ? `<span class="inv-history-chip">${t(dt)}: <strong>${qty}</strong></span>` : '';
+    }).join('')}
+                </div>
+                ${cr.note ? `<div class="inv-history-note">${esc(cr.note)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    </div>
   `;
 
   // Bind tabs
@@ -1864,18 +2160,212 @@ function renderInventory(container) {
       const tab = btn.dataset.invTab;
       container.querySelector('#inv-bottles').style.display = tab === 'bottles' ? '' : 'none';
       container.querySelector('#inv-raw').style.display = tab === 'raw' ? '' : 'none';
+      container.querySelector('#inv-history').style.display = tab === 'history' ? '' : 'none';
     });
   });
 
-  // Version Detail View — removed: dead code referencing undefined 'versions' variable (BUG-012)
+  // Bind sign inventory button
+  const signBtn = container.querySelector('#btn-sign-inventory');
+  if (signBtn) {
+    signBtn.addEventListener('click', () => showSignInventoryModal(bottleInv, baseInv));
+  }
+
+  // Bind import base inventory button (manager-only, behind password gate)
+  const importBtn = container.querySelector('#btn-import-base');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      showManagerPasswordModal(() => {
+        showImportBaseInventoryModal();
+      });
+    });
+  }
 
   // Schedule auto-refresh when pending records become visible
   scheduleInventoryRefresh(container);
 }
 
 // ============================================================
+// SIGN WEEKLY INVENTORY MODAL
+// ============================================================
+function showSignInventoryModal(bottleInv, baseInv) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-content inv-sign-modal">
+      <div class="modal-header">
+        <h3>${t('inv_signTitle')}</h3>
+        <button class="modal-close" aria-label="${t('cancel')}">&times;</button>
+      </div>
+      <p class="inv-sign-subtitle">${t('inv_signSubtitle')}</p>
+      <div class="inv-sign-form">
+        ${DRINK_TYPES.map(dt => {
+    const expected = (bottleInv[dt] || 0) + (baseInv[dt] || 0);
+    return `
+          <div class="inv-sign-row">
+            <label class="inv-sign-label">${t(dt)}</label>
+            <div class="inv-sign-expected">${t('inv_factoryCreated')}: ${expected}</div>
+            <input type="number" class="form-input inv-sign-input" data-drink="${dt}" min="0" step="1" placeholder="0" value="">
+          </div>`;
+  }).join('')}
+        <div class="inv-sign-row inv-sign-signature-row">
+          <label class="inv-sign-label">${t('inv_signature')}</label>
+          <input type="text" class="form-input" id="inv-sign-name" placeholder="${t('inv_signature')}" value="${esc(getUserDisplayName())}" required>
+        </div>
+      </div>
+      <div class="inv-sign-error" id="inv-sign-error" role="alert"></div>
+      <div class="inv-sign-actions">
+        <button class="btn btn-secondary inv-sign-cancel">${t('cancel')}</button>
+        <button class="btn btn-primary inv-sign-confirm">
+          <i data-feather="check" class="icon-md icon-inline"></i>${t('inv_signConfirm')}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (typeof feather !== 'undefined') feather.replace();
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.modal-close').addEventListener('click', close);
+  overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('.inv-sign-confirm').addEventListener('click', () => {
+    const signedBy = overlay.querySelector('#inv-sign-name').value.trim();
+    if (!signedBy) {
+      overlay.querySelector('#inv-sign-error').textContent = t('inv_signature') + ' — required';
+      return;
+    }
+
+    const record = {};
+    let hasAnyValue = false;
+    DRINK_TYPES.forEach(dt => {
+      const input = overlay.querySelector(`[data-drink="${dt}"]`);
+      const val = parseInt(input.value) || 0;
+      record[dt] = val;
+      if (val > 0) hasAnyValue = true;
+    });
+
+    if (!hasAnyValue) {
+      overlay.querySelector('#inv-sign-error').textContent = 'Enter at least one product count';
+      return;
+    }
+
+    record.signedBy = signedBy;
+    addRecord(STORE_KEYS.inventoryCounts, record);
+    syncInventorySnapshot('inventory-sign');
+    close();
+    showToast(t('inv_signConfirm') + ' ✓');
+    renderApp();
+  });
+}
+
+// ============================================================
+// IMPORT BASE INVENTORY MODAL (manager-only, hidden from workers)
+// ============================================================
+function showImportBaseInventoryModal() {
+  const existing = getData(STORE_KEYS.inventoryBase);
+  const current = existing.length > 0 ? existing[0] : {};
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-content inv-sign-modal">
+      <div class="modal-header">
+        <h3>${t('inv_importTitle')}</h3>
+        <button class="modal-close" aria-label="${t('cancel')}">&times;</button>
+      </div>
+      <p class="inv-sign-subtitle">${t('inv_importSubtitle')}</p>
+      <div class="inv-sign-form">
+        ${DRINK_TYPES.map(dt => `
+          <div class="inv-sign-row">
+            <label class="inv-sign-label">${t(dt)}</label>
+            <input type="number" class="form-input inv-sign-input" data-drink="${dt}" min="0" step="1" placeholder="0" value="${parseInt(current[dt]) || ''}">
+          </div>
+        `).join('')}
+      </div>
+      <div class="inv-sign-error" id="inv-import-error" role="alert"></div>
+      <div class="inv-sign-actions">
+        <button class="btn btn-secondary inv-sign-cancel">${t('cancel')}</button>
+        <button class="btn btn-primary inv-import-confirm">
+          <i data-feather="download" class="icon-md icon-inline"></i>${t('inv_importConfirm')}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (typeof feather !== 'undefined') feather.replace();
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.modal-close').addEventListener('click', close);
+  overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('.inv-import-confirm').addEventListener('click', () => {
+    const record = {};
+    DRINK_TYPES.forEach(dt => {
+      const input = overlay.querySelector(`[data-drink="${dt}"]`);
+      record[dt] = parseInt(input.value) || 0;
+    });
+
+    // Store as the latest base (overwrite previous)
+    const data = getData(STORE_KEYS.inventoryBase);
+    record.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    record.createdAt = new Date().toISOString();
+    record.createdBy = getSession()?.username || 'unknown';
+    data.unshift(record);
+    setData(STORE_KEYS.inventoryBase, data);
+    if (typeof fbAdd === 'function') {
+      fbAdd(STORE_KEYS.inventoryBase, record).catch(() => {});
+    }
+
+    syncInventorySnapshot('base-import');
+    close();
+    showToast(t('inv_baseImported') + ' ✓');
+    renderApp();
+  });
+}
+
+// ============================================================
 // SPIRIT PIPELINE SCREEN
 // ============================================================
+function renderSpiritStock(container) {
+  const d1Records = getData('distillation1');
+  const d2Records = getData('distillation2');
+
+  if (!d1Records.length && !d2Records.length) {
+    container.innerHTML = `
+      <div class="screen-header"><h2>${t('mod_spiritStock')}</h2></div>
+      <div class="empty-state">
+        <p>${t('spirit_noData')}</p>
+      </div>`;
+    return;
+  }
+
+  // Calculate D1 produced and D2 consumed/produced
+  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
+  const d2Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
+  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+  const d1Available = d1Produced - d2Consumed;
+
+  container.innerHTML = `
+    <div class="screen-header"><h2>${t('mod_spiritStock')}</h2></div>
+    <div class="spirit-pipeline">
+      <div class="spirit-card">
+        <h3>${t('spirit_d1Label')}</h3>
+        <p>${t('spirit_produced')}: ${d1Produced.toFixed(1)}</p>
+        <p>${t('spirit_consumed')}: ${d2Consumed.toFixed(1)}</p>
+        <p><strong>${t('spirit_available')}: ${d1Available.toFixed(1)}</strong></p>
+      </div>
+      <div class="spirit-card">
+        <h3>${t('spirit_d2Label')}</h3>
+        <p>${t('spirit_produced')}: ${d2Produced.toFixed(1)}</p>
+        ${d1Available > 0 ? `<p class="spirit-ready">${t('spirit_readyToBottle')}</p>` : ''}
+      </div>
+    </div>`;
+}
+
 // ============================================================
 // MODULE FIELD DEFINITIONS
 // ============================================================
@@ -2019,6 +2509,16 @@ function renderBackoffice(container) {
     return;
   }
 
+  // Sync users from backend in background (updates localStorage, then re-renders)
+  if (typeof syncUsersFromBackend === 'function' && !container._syncStarted) {
+    container._syncStarted = true;
+    syncUsersFromBackend().then(synced => {
+      if (synced && synced.length !== getUsers().length) {
+        renderBackoffice(container); // re-render with merged data
+      }
+    }).catch(() => {});
+  }
+
   const users = getUsers();
 
   if (currentView === 'form') {
@@ -2030,22 +2530,22 @@ function renderBackoffice(container) {
     <div class="section-title">${t('userManagement')}</div>
     <p class="backoffice-subtitle">${t('backofficeSubtitle')}</p>
 
-    <div class="record-list" style="margin-top:16px;">
+    <div class="record-list record-list-mt">
       ${users.map(u => `
         <div class="record-item user-item" data-username="${esc(u.username)}">
           <div class="ri-top">
             <span class="ri-title">
               ${esc(u.username)}
-              <span class="role-pill role-pill-${esc(u.role)}" style="margin-inline-start:6px;">${t('role_' + u.role)}</span>
+              <span class="role-pill role-pill-${esc(u.role)} role-pill-inline">${t('role_' + u.role)}</span>
             </span>
             <span class="ri-badge ${u.status === 'inactive' ? 'not-approved' : 'approved'}">
               ${u.status === 'inactive' ? t('inactive') : t('active')}
             </span>
           </div>
           <div class="ri-details">
-            ${u.email ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(u.email)}</div>` : ''}
-            ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : currentLang === 'th' ? (u.nameTh || u.name || '-') : (u.name || '-'))}
-            <div style="font-size:10px; margin-top:4px; color:var(--text-muted);">
+            ${u.email ? `<div class="bo-user-email">${esc(u.email)}</div>` : ''}
+            ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : (u.name || '-'))}
+            <div class="bo-user-activity">
               ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
             </div>
           </div>
@@ -2053,49 +2553,48 @@ function renderBackoffice(container) {
       `).join('')}
     </div>
 
-    <div class="invite-section" style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('inviteUser')}</div>
-      <div style="display:flex;gap:8px;align-items:flex-end;">
-        <div style="flex:1;">
+    <div class="invite-section bo-section">
+      <div class="section-title section-title-mb">${t('inviteUser')}</div>
+      <div class="bo-invite-row">
+        <div class="bo-invite-field">
           <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
-            aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin:0;">
+            aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false">
         </div>
-        <select class="form-select" id="invite-role" style="width:auto;min-width:100px;margin:0;">
+        <select class="form-select bo-role-select" id="invite-role" aria-label="${t('role')}"
           <option value="worker">${t('role_worker')}</option>
           <option value="manager">${t('role_manager')}</option>
           <option value="admin">${t('role_admin')}</option>
         </select>
       </div>
-      <button class="btn btn-primary" id="btn-send-invite" style="margin-top:10px;width:100%;">
+      <button class="btn btn-primary bo-invite-btn" id="btn-send-invite">
         <i data-feather="send"></i> ${t('sendInvitation')}
       </button>
-      <div class="login-error" id="invite-error" role="alert" aria-live="polite" style="margin-top:8px;"></div>
-      <div class="login-success" id="invite-success" role="status" aria-live="polite" style="margin-top:8px;"></div>
+      <div class="login-error bo-feedback" id="invite-error" role="alert" aria-live="polite"></div>
+      <div class="login-success bo-feedback" id="invite-success" role="status" aria-live="polite"></div>
     </div>
 
-    <div style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('invitationsTitle')}</div>
+    <div class="bo-section">
+      <div class="section-title section-title-mb">${t('invitationsTitle')}</div>
       <div id="invitations-list" class="record-list">
-        <div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>
+        <div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>
       </div>
     </div>
 
-    <div style="margin-top:24px;">
-      <div class="section-title" style="margin-bottom:12px;">${t('sheetsIntegration')}</div>
+    <div class="bo-section">
+      <div class="section-title section-title-mb">${t('sheetsIntegration')}</div>
       <a href="${INVENTORY_SHEET_URL}" target="_blank" rel="noopener noreferrer"
-         id="inventory-sheet-link" class="btn btn-secondary"
-         style="display:flex;align-items:center;gap:8px;margin-bottom:12px;text-decoration:none;">
+         id="inventory-sheet-link" class="btn btn-secondary bo-sheet-link">
         <i data-feather="external-link"></i> ${t('viewInventorySheet')}
       </a>
-      <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary" id="btn-sync-all-sheets" style="flex:1;">
+      <div class="bo-btn-row">
+        <button class="btn btn-secondary bo-btn-flex" id="btn-sync-all-sheets">
           <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
         </button>
       </div>
     </div>
 
-    <div style="margin-top:16px; display:flex; gap:10px;">
-      <button class="btn btn-secondary" id="btn-export-all" style="flex:1;">
+    <div class="bo-btn-row">
+      <button class="btn btn-secondary bo-btn-flex" id="btn-export-all">
         <i data-feather="download"></i> ${t('exportAllData')}
       </button>
     </div>
@@ -2127,7 +2626,6 @@ function renderBackoffice(container) {
       // Wait for GAS to process, then verify via GET
       await new Promise(r => setTimeout(r, 4000));
       const check = await verifySyncStatus(t('mod_bottling'));
-      console.log('[sync] Sync All verification:', check);
 
       syncAllBtn.disabled = false;
       syncAllBtn.innerHTML = origHtml;
@@ -2199,6 +2697,16 @@ function renderBackoffice(container) {
         username: '',
       });
 
+      // Also create invitation via backend (for Firestore storage, fire-and-forget)
+      if (typeof apiCreateInvitation === 'function') {
+        apiCreateInvitation({
+          email,
+          role,
+          app: 'factory',
+          sentBy: session ? session.username : '',
+        }).catch(function() {});
+      }
+
       // Send to GAS (fire-and-forget)
       const url = SHEETS_SYNC_URL;
       if (url) {
@@ -2245,7 +2753,7 @@ function renderBackoffice(container) {
   loadInvitationsList(container);
 }
 
-// Fetch invitations from GAS and render them in the backoffice
+// Fetch invitations from backend API (primary) or GAS (fallback) and render
 function loadInvitationsList(container) {
   const listEl = container.querySelector('#invitations-list');
   if (!listEl) return;
@@ -2254,7 +2762,33 @@ function loadInvitationsList(container) {
   const localInvites = getInvitations();
   renderInvitationItems(listEl, localInvites);
 
-  // Then fetch from GAS for latest status
+  // Try backend API first
+  if (typeof apiListInvitations === 'function') {
+    apiListInvitations('factory').then(result => {
+      if (result && result.invitations) {
+        // Map backend format to local format
+        const mapped = result.invitations.map(inv => ({
+          token: inv.token || inv._fbId,
+          email: inv.email,
+          role: inv.role,
+          status: inv.status,
+          sentAt: inv.createdAt || inv.sentAt,
+          sentBy: inv.createdBy || inv.sentBy || '',
+          username: inv.username || '',
+        }));
+        saveInvitations(mapped);
+        renderInvitationItems(listEl, mapped);
+        return; // backend succeeded, skip GAS
+      }
+      // Backend returned null (unavailable) — fallback to GAS
+      fetchInvitationsFromGAS(listEl);
+    }).catch(() => fetchInvitationsFromGAS(listEl));
+  } else {
+    fetchInvitationsFromGAS(listEl);
+  }
+}
+
+function fetchInvitationsFromGAS(listEl) {
   const url = SHEETS_SYNC_URL;
   if (!url) return;
 
@@ -2262,39 +2796,36 @@ function loadInvitationsList(container) {
     .then(resp => { if (!resp.ok) throw new Error('http'); return resp.json(); })
     .then(data => {
       if (data.status === 'ok' && Array.isArray(data.invites)) {
-        // Update local cache with GAS data
         saveInvitations(data.invites);
         renderInvitationItems(listEl, data.invites);
       }
     })
-    .catch(() => {
-      // Keep showing local data on network failure
-    });
+    .catch(() => {});
 }
 
 function renderInvitationItems(listEl, invites) {
   if (!invites || invites.length === 0) {
-    listEl.innerHTML = `<div class="empty-state" style="padding:16px 0;"><p style="font-size:13px;color:var(--text-muted)">${t('invitationsEmpty')}</p></div>`;
+    listEl.innerHTML = `<div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>`;
     return;
   }
 
   listEl.innerHTML = invites.map(inv => `
     <div class="record-item">
       <div class="ri-top">
-        <span class="ri-title" style="font-size:13px;">
+        <span class="ri-title inv-item-title">
           ${inv.username ? esc(inv.username) : esc(inv.email)}
         </span>
-        <span style="display:flex;align-items:center;gap:6px;">
-          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-muted);"><i data-feather="x-circle" style="width:16px;height:16px;"></i></button>` : ''}
+        <span class="inv-item-actions">
+          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}"><i data-feather="x-circle" class="icon-sm"></i></button>` : ''}
           <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
             ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
           </span>
         </span>
       </div>
       <div class="ri-details">
-        ${inv.username ? `<div style="font-size:11px;color:var(--text-secondary)">${esc(inv.email)}</div>` : ''}
-        <span class="role-pill role-pill-${esc(inv.role || 'worker')}" style="font-size:9px;">${t('role_' + (inv.role || 'worker'))}</span>
-        <span style="font-size:10px;color:var(--text-muted);margin-inline-start:8px;">
+        ${inv.username ? `<div class="bo-user-email">${esc(inv.email)}</div>` : ''}
+        <span class="role-pill role-pill-${esc(inv.role || 'worker')} inv-item-role">${t('role_' + (inv.role || 'worker'))}</span>
+        <span class="inv-item-date">
           ${inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : ''}
         </span>
       </div>
@@ -2320,6 +2851,11 @@ function deleteInvitation(token, listEl) {
   saveInvitations(invites);
   renderInvitationItems(listEl, invites);
 
+  // Remove from backend API (fire-and-forget)
+  if (typeof apiDeleteInvitation === 'function') {
+    apiDeleteInvitation(token).catch(() => {});
+  }
+
   // Remove from GAS (fire-and-forget)
   const url = SHEETS_SYNC_URL;
   if (url) {
@@ -2341,7 +2877,7 @@ function renderUserForm(container) {
       
       <div class="form-group">
         <label class="form-label">${t('username')} <span class="req">*</span></label>
-        <input type="text" class="form-input" id="bo-username" value="${esc(u.username || '')}" ${isEdit ? 'disabled style="opacity:0.7"' : ''}>
+        <input type="text" class="form-input${isEdit ? ' input-disabled' : ''}" id="bo-username" value="${esc(u.username || '')}" ${isEdit ? 'disabled' : ''}>
       </div>
 
       ${!isEdit ? `
@@ -2366,10 +2902,7 @@ function renderUserForm(container) {
         <input type="text" class="form-input" id="bo-nameHe" value="${esc(u.nameHe || '')}" dir="rtl">
       </div>
 
-      <div class="form-group">
-        <label class="form-label">${t('fullName')} (Thai)</label>
-        <input type="text" class="form-input" id="bo-nameTh" value="${esc(u.nameTh || '')}">
-      </div>
+      <!-- Thai name field removed (app now uses English/Hebrew only) -->
 
       <div class="form-group">
         <label class="form-label">${t('selectRole')} <span class="req">*</span></label>
@@ -2417,8 +2950,12 @@ function renderUserForm(container) {
         showToast(t('cannotDeleteSelf'));
         return;
       }
-      showManagerPasswordModal(() => {
-        deleteUserByUsername(u.username);
+      showManagerPasswordModal(async () => {
+        const delResult = await deleteUserByUsername(u.username);
+        if (delResult && !delResult.success) {
+          showToast(delResult.error || t('error'));
+          return;
+        }
         showToast(t('delete') + ' ✓');
         currentView = 'list';
         editingRecord = null;
@@ -2428,7 +2965,7 @@ function renderUserForm(container) {
   }
 
   const saveBtn = container.querySelector('#bo-save');
-  if (saveBtn) saveBtn.addEventListener('click', () => {
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
     const errorEl = container.querySelector('#bo-error');
     errorEl.textContent = '';
 
@@ -2436,7 +2973,6 @@ function renderUserForm(container) {
     const passwordInput = container.querySelector('#bo-password');
     const nameInput = container.querySelector('#bo-name');
     const nameHeInput = container.querySelector('#bo-nameHe');
-    const nameThInput = container.querySelector('#bo-nameTh');
     const roleInput = container.querySelector('#bo-role');
     const statusInput = container.querySelector('#bo-status');
 
@@ -2444,7 +2980,6 @@ function renderUserForm(container) {
     const password = passwordInput ? passwordInput.value : '';
     const name = nameInput ? nameInput.value.trim() : '';
     const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
-    const nameTh = nameThInput ? nameThInput.value.trim() : '';
     const role = roleInput ? roleInput.value : '';
     const status = statusInput ? statusInput.value : 'active';
 
@@ -2453,29 +2988,33 @@ function renderUserForm(container) {
       return;
     }
 
+    saveBtn.disabled = true;
+
     if (isEdit) {
       // Update
-      const updates = { name, nameHe, nameTh, role, status };
+      const updates = { name, nameHe, role, status };
       if (password) updates.password = password;
 
-      const res = updateUser(username, updates);
+      const res = await updateUser(username, updates);
       if (res.success) {
         showToast(t('saved'));
         currentView = 'list';
         editingRecord = null;
         renderApp();
       } else {
+        saveBtn.disabled = false;
         errorEl.textContent = res.error;
       }
     } else {
-      // Create
-      const res = createUser({ username, password, name, nameHe, nameTh, role, status });
+      // Create (async — may create Firebase Auth account)
+      const res = await createUser({ username, password, name, nameHe, role, status });
       if (res.success) {
         showToast(t('signUpSuccess'));
         currentView = 'list';
         editingRecord = null;
         renderApp();
       } else {
+        saveBtn.disabled = false;
         errorEl.textContent = t(res.error) || res.error;
       }
     }
@@ -2502,6 +3041,11 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initFirebase === 'function') initFirebase();
+  if (typeof initFirestoreSync === 'function') initFirestoreSync();
+  // Check backend availability (non-blocking)
+  if (typeof apiHealthCheck === 'function') {
+    apiHealthCheck();
+  }
   // Restore from URL hash if present, otherwise use sessionStorage state
   if (location.hash && location.hash !== '#/') {
     _restoreStateFromHash();
@@ -2511,6 +3055,5 @@ document.addEventListener('DOMContentLoaded', () => {
     currentView = 'list';
   }
   renderApp();
-  if (getSession() && typeof startSync === 'function') startSync();
   scheduleHardRefresh();
 });
