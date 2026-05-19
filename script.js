@@ -651,6 +651,7 @@ function bindLogin() {
         if (session) {
           currentScreen = 'dashboard';
           currentModule = null;
+          if (typeof startSync === 'function') startSync();
           renderApp();
         } else {
           errEl.textContent = t('loginError');
@@ -2510,5 +2511,6 @@ document.addEventListener('DOMContentLoaded', () => {
     currentView = 'list';
   }
   renderApp();
+  if (getSession() && typeof startSync === 'function') startSync();
   scheduleHardRefresh();
 });

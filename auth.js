@@ -349,6 +349,7 @@ function refreshSession() {
 }
 
 function logout() {
+  if (typeof stopSync === 'function') stopSync();
   localStorage.removeItem('factory_session');
   // Sign out of Firebase Auth
   if (typeof fbAuthSignOut === 'function') {
