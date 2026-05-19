@@ -294,6 +294,7 @@ test.describe('Security: Input sanitization', () => {
     await page.fill('#login-user', TEST_MANAGER.email);
     await page.fill('#login-pass', TEST_MANAGER.password);
     await page.click('#login-btn');
+    await expect(page.locator('.app-header')).toBeVisible({ timeout: 5000 });
 
     const session = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('factory_session') || 'null')
