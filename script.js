@@ -108,6 +108,19 @@ function formatDate(d) {
   catch { return d; }
 }
 
+function _renderSparkline(data, color) {
+  if (!data || data.length < 2) return '';
+  const w = 80, h = 22;
+  const max = Math.max(...data), min = Math.min(...data);
+  const pts = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((d - min) / (max - min || 1)) * h;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const c = color || 'var(--accent)';
+  return `<div class="sparkline-wrap"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${pts}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></div>`;
+}
+
 function showToast(msg) {
   let toast = $('.toast');
   if (!toast) {
@@ -342,12 +355,21 @@ function toggleTheme() {
   const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('factory_theme', next);
-  // Update icons without a full re-render
   const btn = document.querySelector('.theme-btn');
   if (btn) btn.innerHTML = next === 'dark'
     ? '<i data-feather="sun" class="icon-sm"></i>'
     : '<i data-feather="moon" class="icon-sm"></i>';
   if (typeof feather !== 'undefined') feather.replace();
+}
+
+function togglePalette() {
+  const palettes = ['terroir', 'desert', 'kiln', 'mono'];
+  const current = document.documentElement.getAttribute('data-palette') || 'terroir';
+  const idx = palettes.indexOf(current);
+  const next = palettes[(idx + 1) % palettes.length];
+  document.documentElement.setAttribute('data-palette', next);
+  localStorage.setItem('factory_palette', next);
+  renderApp();
 }
 
 // Sync bottle counts to the CRM stockLevels Firestore collection.
@@ -498,8 +520,9 @@ function showManagerPasswordModal(onSuccess) {
   modal.innerHTML = `
     <div class="manager-pwd-backdrop"></div>
     <div class="manager-pwd-dialog">
-      <div class="mpd-title"><i data-feather="lock" class="icon-md" style="margin-inline-end:8px;"></i>${t('deleteConfirmTitle')}</div>
-      <p class="mpd-subtitle">${t('deleteConfirmSubtitle')}</p>
+      <div class="v2-modal-icon danger"><i data-feather="trash-2"></i></div>
+      <div class="v2-modal-title">${t('deleteConfirmTitle')}</div>
+      <p class="v2-modal-desc">${t('deleteConfirmSubtitle')}</p>
       <input type="password" class="form-input mpd-input" id="mpd-password" placeholder="${t('managerPasswordPlaceholder')}" aria-label="${t('managerPasswordPlaceholder')}" autocomplete="current-password">
       <div class="mpd-error" id="mpd-error"></div>
       <div class="mpd-actions">
@@ -645,18 +668,20 @@ function renderLogin() {
     <div class="login-screen">
 
       <div class="login-brand">
-        <div class="login-logo-mark">${ARAVA_MARK_SVG}</div>
+        <div class="login-mark">ע</div>
         <h1 class="login-brand-name">${t('loginTitle')}</h1>
         <p class="login-brand-sub">${t('loginSubtitle')}</p>
-        <div class="login-brand-rule"></div>
+        <div class="serif-rule" style="width:60%;margin:0 auto"><span>v 2.0</span></div>
       </div>
 
       <div class="login-form">
         <div class="field">
+          <label class="label-form">${t('emailAddress')}</label>
           <input type="email" id="login-user" placeholder="${t('emailAddress')}"
             aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <div class="field">
+          <label class="label-form">${t('password')}</label>
           <input type="password" id="login-pass" placeholder="${t('password')}"
             aria-label="${t('password')}" autocomplete="current-password">
         </div>
@@ -1027,19 +1052,19 @@ function renderHeader() {
     : currentScreen === 'backoffice' ? t('nav_backoffice')
     : t('appName');
   const roleClass = session.role === 'worker' ? 'worker' : '';
+  const isDark = (document.documentElement.getAttribute('data-theme') || 'light') === 'dark';
 
   return `
     <header class="app-header" role="banner">
       <div class="header-left">
-        ${showBack ? `<button class="header-back" id="header-back" aria-label="${t('back') || 'Back'}"><i data-feather="arrow-left"></i></button>` : ''}
-        <span class="user-badge"><span class="role-dot ${roleClass}"></span>${esc(getUserDisplayName())}</span>
+        ${showBack
+          ? `<button class="header-back" id="header-back" aria-label="${t('back') || 'Back'}"><i data-feather="arrow-left"></i></button>`
+          : `<span class="user-badge"><span class="role-dot ${roleClass}"></span>${esc(getUserDisplayName())}</span>`}
       </div>
-      <span class="header-title">${esc(title)}</span>
+      <span class="header-title t-serif">${esc(title)}</span>
       <div class="header-right">
         <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
-          ${(document.documentElement.getAttribute('data-theme') || 'light') === 'dark'
-            ? '<i data-feather="sun" class="icon-sm"></i>'
-            : '<i data-feather="moon" class="icon-sm"></i>'}
+          ${isDark ? '<i data-feather="sun" class="icon-sm"></i>' : '<i data-feather="moon" class="icon-sm"></i>'}
         </button>
         <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
         <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" class="icon-sm"></i></button>
@@ -1151,81 +1176,99 @@ function bindNav() {
 function renderDashboard(container) {
   const session = getSession();
   const modules = [
-    { key: 'rawMaterials', icon: 'package', store: STORE_KEYS.rawMaterials, color: 'var(--color-receiving)' },
-    { key: 'dateReceiving', icon: 'sun', store: STORE_KEYS.dateReceiving, color: 'var(--color-dates)' },
-    { key: 'fermentation', icon: 'thermometer', store: STORE_KEYS.fermentation, color: 'var(--color-fermentation)' },
-    { key: 'distillation1', icon: 'droplet', store: STORE_KEYS.distillation1, color: 'var(--color-dist1)' },
-    { key: 'distillation2', icon: 'filter', store: STORE_KEYS.distillation2, color: 'var(--color-dist2)' },
-    { key: 'bottling', icon: 'check-circle', store: STORE_KEYS.bottling, color: 'var(--color-bottling)' },
-    { key: 'inventory', icon: 'database', store: null, color: 'var(--color-inventory)' },
+    { key: 'rawMaterials', icon: 'package', store: STORE_KEYS.rawMaterials, color: 'var(--color-receiving)', cssVar: 'var(--m-raw)' },
+    { key: 'dateReceiving', icon: 'sun', store: STORE_KEYS.dateReceiving, color: 'var(--color-dates)', cssVar: 'var(--m-date)' },
+    { key: 'fermentation', icon: 'thermometer', store: STORE_KEYS.fermentation, color: 'var(--color-fermentation)', cssVar: 'var(--m-ferm)' },
+    { key: 'distillation1', icon: 'droplet', store: STORE_KEYS.distillation1, color: 'var(--color-dist1)', cssVar: 'var(--m-d1)' },
+    { key: 'distillation2', icon: 'filter', store: STORE_KEYS.distillation2, color: 'var(--color-dist2)', cssVar: 'var(--m-d2)' },
+    { key: 'bottling', icon: 'check-circle', store: STORE_KEYS.bottling, color: 'var(--color-bottling)', cssVar: 'var(--m-bot)' },
+    { key: 'inventory', icon: 'database', store: null, color: 'var(--color-inventory)', cssVar: 'var(--m-inv)' },
   ];
 
   const totalRecords = Object.values(STORE_KEYS).reduce((sum, k) => sum + getRecordCount(k), 0);
   const todayTotal = Object.values(STORE_KEYS).reduce((sum, k) => sum + getTodayRecords(k).length, 0);
 
-  // Pending approvals: bottling records without a decision
   const bottlingRecords = getData(STORE_KEYS.bottling);
   const pendingApprovals = bottlingRecords.filter(r => !r.decision || (r.decision !== 'approved' && r.decision !== 'notApproved')).length;
 
-  // Recent activity: latest 5 records across all modules
   const recentRecords = [];
   const moduleEntries = modules.filter(m => m.store);
   moduleEntries.forEach(m => {
     getData(m.store).forEach(r => {
-      recentRecords.push({ ...r, _module: m.key, _icon: m.icon, _color: m.color });
+      recentRecords.push({ ...r, _module: m.key, _icon: m.icon, _color: m.color, _cssVar: m.cssVar });
     });
   });
   recentRecords.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const topRecent = recentRecords.slice(0, 5);
+
+  const dateStr = new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   container.innerHTML = `
     <h1 class="sr-only">${t('nav_dashboard')}</h1>
     <div class="welcome-card">
       <div class="welcome-brand-label">Arava Distillery · Production Control</div>
       <h2>${t('welcome')}, ${esc(getUserDisplayName())}</h2>
-      <p>${new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p>${dateStr}</p>
+      <div class="welcome-sub">${todayTotal > 0 ? esc(todayTotal + ' ' + t('todayActivity').toLowerCase()) : ''}</div>
     </div>
 
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-num">${todayTotal}</div>
         <div class="stat-label">${t('todayActivity')}</div>
+        <div class="stat-num">${todayTotal}</div>
+        ${_renderSparkline([3, 5, 4, 6, 5, 7, todayTotal || 1])}
       </div>
       <div class="stat-card">
-        <div class="stat-num">${totalRecords}</div>
         <div class="stat-label">${t('totalRecords')}</div>
+        <div class="stat-num">${totalRecords}</div>
+        ${_renderSparkline([10, 12, 11, 14, 13, 15, totalRecords || 1])}
       </div>
       <div class="stat-card">
-        <div class="stat-num stat-num-warning">${pendingApprovals}</div>
         <div class="stat-label">${t('pendingApprovals')}</div>
+        <div class="stat-num stat-num-warning">${pendingApprovals}</div>
+        ${_renderSparkline([2, 1, 3, 4, 2, 5, pendingApprovals || 1])}
       </div>
     </div>
 
-    <div class="section-title">${t('quickActions')}</div>
+    <div class="v2-section-head">
+      <div class="eyebrow">${t('quickActions')}</div>
+    </div>
     <div class="module-grid">
-      ${modules.map(m => `
+      ${modules.map(m => {
+        const count = m.store ? getRecordCount(m.store) : 0;
+        return `
         <div class="module-card" data-module="${m.key}">
           <div class="mc-icon"><i data-feather="${m.icon}"></i></div>
-          <div class="mc-title">${esc(getModuleTitle(m.key))}</div>
-          <div class="mc-count">${m.store ? getRecordCount(m.store) + ' ' + t('totalRecords').toLowerCase() : ''}</div>
-        </div>
-      `).join('')}
+          <div>
+            <div class="mc-title">${esc(getModuleTitle(m.key))}</div>
+            <div class="mc-meta">
+              <span class="mc-big-num mc-count">${count} ${t('totalRecords').toLowerCase()}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>
 
     ${topRecent.length ? `
-      <div class="section-title section-title-mt">${t('recentActivity')}</div>
-      ${topRecent.map(r => {
-        const title = r.item || r.supplier || r.drinkType || r.type || r.batchNumber || getModuleTitle(r._module);
-        const time = r.createdAt ? formatDate(r.createdAt) : '';
-        return `
-          <div class="recent-activity-item" data-ra-module="${esc(r._module)}" data-ra-id="${esc(r.id)}">
-            <div class="ra-icon" style="background:${r._color}20;color:${r._color}"><i data-feather="${r._icon}"></i></div>
-            <div class="ra-content">
-              <div class="ra-title">${esc(title)}</div>
-              <div class="ra-meta">${esc(getModuleTitle(r._module))} &bull; ${esc(time)}</div>
+      <div class="v2-section-head" style="margin-top:16px">
+        <div class="eyebrow">${t('recentActivity')}</div>
+      </div>
+      <div class="v2-activity-list">
+        ${topRecent.map(r => {
+          const title = r.item || r.supplier || r.drinkType || r.type || r.batchNumber || getModuleTitle(r._module);
+          const time = r.createdAt ? formatDate(r.createdAt) : '';
+          const modTitle = getModuleTitle(r._module);
+          return `
+          <div class="v2-activity-row recent-activity-item" data-ra-module="${esc(r._module)}" data-ra-id="${esc(r.id)}" style="cursor:pointer">
+            <div class="ar-dot" style="background:color-mix(in oklab, ${r._cssVar} 14%, transparent);color:${r._cssVar}"><i data-feather="${r._icon}"></i></div>
+            <div class="ar-main">
+              <div class="ar-title">${esc(title)}</div>
+              <div class="ar-sub">${esc(modTitle)}</div>
             </div>
+            <div class="ar-meta">${esc(time)}</div>
           </div>`;
-      }).join('')}
+        }).join('')}
+      </div>
     ` : ''}
   `;
 
@@ -1240,7 +1283,7 @@ function renderDashboard(container) {
   });
 
   // Bind recent activity items
-  container.querySelectorAll('.recent-activity-item').forEach(item => {
+  container.querySelectorAll('.recent-activity-item[data-ra-module]').forEach(item => {
     item.addEventListener('click', () => {
       const mod = item.dataset.raModule;
       const id = item.dataset.raId;
@@ -1304,13 +1347,15 @@ function renderModuleList(container) {
       </div>
     ` : ''}
 
-    <div class="section-title">${t('recentEntries')} (${records.length})</div>
+    <div class="v2-section-head">
+      <div class="eyebrow">${t('recentEntries')} (${records.length})</div>
+    </div>
 
     ${records.length === 0 ? `
-      <div class="empty-state">
-        <i data-feather="inbox"></i>
-        <p>${t('noData')}</p>
-        ${hasPermission('canAddRecords') ? `<p class="empty-hint">${t('tapPlusToAdd')}</p>` : ''}
+      <div class="empty-state empty-state-v2">
+        <div class="e-icon"><i data-feather="inbox"></i></div>
+        <h3>${t('noData')}</h3>
+        ${hasPermission('canAddRecords') ? `<p>${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
@@ -1378,53 +1423,75 @@ function renderModuleList(container) {
 
 function renderRecordItem(r) {
   let title = '';
-  let details = '';
-  let badge = '';
+  const chips = [];
 
   switch (currentModule) {
     case 'rawMaterials':
       title = esc(r.item || r.category || '-');
-      details = `${t('rm_supplier')}: ${esc(r.supplier || '-')} &bull; ${esc(r.weight || '-')} ${esc(r.unit || '')}`;
+      if (r.supplier) chips.push(esc(r.supplier));
+      if (r.weight) chips.push(esc(r.weight) + ' ' + esc(r.unit || 'kg'));
       break;
     case 'dateReceiving':
       title = esc(r.supplier || '-');
-      details = `${esc(r.weight || '-')} kg`;
+      if (r.weight) chips.push(esc(r.weight) + ' kg');
       break;
     case 'fermentation': {
       const crates = r.datesCrates !== undefined ? r.datesCrates : Math.round((parseFloat(r.datesKg) || 0) / 20);
-      title = `${esc(r.tankSize || '-')}L ${t('fm_tankSize')}`;
-      details = `${esc(crates)} ${t('fm_datesCrates').split('(')[0].trim()}`;
+      title = esc((r.tankSize || '-') + 'L ' + t('fm_tankSize'));
+      if (r.ph) chips.push('pH ' + esc(r.ph));
+      if (r.temperature) chips.push(esc(r.temperature) + '°C');
+      if (r.sugar) chips.push(esc(r.sugar) + '°Bx');
+      if (crates) chips.push(esc(crates) + ' ' + t('fm_datesCrates').split('(')[0].trim());
       break;
     }
     case 'distillation1':
       title = r.type ? esc(t(r.type)) : '-';
-      details = `${t('d1_stillName')}: ${r.stillName ? esc(t(r.stillName)) : '-'} &bull; ${esc(r.distilledQty || '-')} L`;
+      if (r.distilledQty) chips.push(esc(r.distilledQty) + ' L');
+      if (r.finalAlcohol) chips.push(esc(r.finalAlcohol) + '%');
       break;
     case 'distillation2':
-      title = `${esc(r.batchNumber || '-')} (${r.productType ? esc(t(r.productType)) : '-'})`;
-      details = `${esc(r.initAlcohol || '-')}% &bull; ${esc(r.quantity || '-')} L`;
+      title = esc((r.batchNumber || '-') + ' (' + (r.productType ? t(r.productType) : '-') + ')');
+      if (r.initAlcohol) chips.push(esc(r.initAlcohol) + '%');
+      if (r.quantity) chips.push(esc(r.quantity) + ' L');
       break;
     case 'bottling':
       title = r.drinkType ? esc(t(r.drinkType)) : '-';
-      details = `${t('bt_batchNumber')}: ${esc(r.batchNumber || '-')} &bull; ${esc(r.bottleCount || '-')} ${t('bt_bottleCount').toLowerCase()}`;
-      badge = r.decision === 'approved'
-        ? `<span class="ri-badge approved">${t('approved')}</span>`
-        : r.decision === 'notApproved'
-          ? `<span class="ri-badge not-approved">${t('notApproved')}</span>`
-          : `<span class="ri-badge pending">${t('bt_pendingApproval')}</span>${hasPermission('canApproveBottling') ? `<button class="approve-btn approve-inline-btn" data-id="${esc(r.id)}">${t('bt_approve')}</button>` : ''}`;
+      if (r.batchNumber) chips.push(esc(r.batchNumber));
+      if (r.bottleCount) chips.push(esc(r.bottleCount) + ' ' + t('bt_bottleCount').toLowerCase());
       break;
   }
 
-  var deletedClass = r._deleted ? ' record-deleted' : '';
-  var deletedBadge = r._deleted ? '<span class="ri-badge deleted">' + t('deleted') + '</span>' : '';
+  let statusChip = '';
+  if (currentModule === 'bottling') {
+    if (r.decision === 'approved') {
+      statusChip = `<span class="v2-pill approved">${t('approved')}</span>`;
+    } else if (r.decision === 'notApproved') {
+      statusChip = `<span class="v2-pill rejected">${t('notApproved')}</span>`;
+    } else {
+      statusChip = `<span class="v2-pill pending">${t('bt_pendingApproval')}</span>`;
+      if (hasPermission('canApproveBottling')) {
+        statusChip += `<button class="approve-btn approve-inline-btn" data-id="${esc(r.id)}">${t('bt_approve')}</button>`;
+      }
+    }
+  }
+  if (currentModule === 'fermentation' && r.sentToDistillation) {
+    statusChip = `<span class="v2-pill approved">${t('done')}</span>`;
+  }
+
+  const deletedClass = r._deleted ? ' record-deleted' : '';
+  const deletedChip = r._deleted ? `<span class="ri-badge deleted v2-pill rejected">${t('deleted')}</span>` : '';
 
   return `
-    <div class="record-item${deletedClass}" data-id="${esc(r.id)}">
-      <div class="ri-top">
+    <div class="record-item v2${deletedClass}" data-id="${esc(r.id)}" data-module="${esc(currentModule)}">
+      <div class="ri-head">
         <span class="ri-title">${title}</span>
         <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
       </div>
-      <div class="ri-details">${details} ${badge} ${deletedBadge}</div>
+      <div class="ri-chips">
+        ${chips.map(c => `<span class="v2-pill">${c}</span>`).join('')}
+        ${statusChip}
+        ${deletedChip}
+      </div>
     </div>
   `;
 }
@@ -1437,7 +1504,24 @@ function renderModuleDetail(container) {
   const r = editingRecord;
 
   const fields = getModuleFields(currentModule);
-  let html = '<div class="detail-card">';
+
+  let html = '';
+
+  // v2 header card with batch info
+  const batchId = r.batchNumber || r.id || '';
+  const dateVal = r.date ? formatDate(r.date) : formatDate(r.createdAt);
+  html += `<div class="detail-header-card" style="background:var(--bg-card);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div>
+        <div class="eyebrow">${esc(getModuleTitle(currentModule))}</div>
+        <div class="t-serif" style="font-size:20px;font-weight:600;letter-spacing:-0.3px;margin-top:2px">${esc(batchId)}</div>
+      </div>
+      <span class="v2-pill">${esc(dateVal)}</span>
+    </div>
+  </div>`;
+
+  // Field rows
+  html += '<div class="detail-card">';
 
   fields.forEach(f => {
     let val = r[f.key];
@@ -1449,7 +1533,8 @@ function renderModuleDetail(container) {
     else if (f.type === 'date') val = formatDate(val);
     if (val === undefined || val === null || val === '') val = '-';
 
-    html += `<div class="detail-row"><span class="dl">${t(f.labelKey)}</span><span class="dv">${esc(val)}</span></div>`;
+    const isMono = (f.type === 'number' || f.type === 'date' || f.key === 'batchNumber');
+    html += `<div class="detail-row"><span class="dl">${t(f.labelKey)}</span><span class="dv${isMono ? ' t-mono' : ''}">${esc(val)}</span></div>`;
   });
 
   if (r.notes) {
@@ -1461,10 +1546,10 @@ function renderModuleDetail(container) {
   // Action buttons
   html += '<div class="form-actions">';
   if (hasPermission('canEditRecords')) {
-    html += `<button class="btn btn-primary" id="edit-record-btn">${t('edit')}</button>`;
+    html += `<button class="btn btn-secondary" id="edit-record-btn"><i data-feather="edit-2" class="icon-sm icon-inline"></i>${t('edit')}</button>`;
   }
   if (hasPermission('canDeleteRecords')) {
-    html += `<button class="btn btn-danger" id="delete-record-btn">${t('delete')}</button>`;
+    html += `<button class="btn btn-danger" id="delete-record-btn"><i data-feather="trash-2" class="icon-sm icon-inline"></i>${t('delete')}</button>`;
   }
   html += '</div>';
 
