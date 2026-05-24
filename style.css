@@ -197,6 +197,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 /* ── App Shell ── */
 #app {
+  width: 100%;
   height: 100%;
   height: 100dvh;
   display: flex;
