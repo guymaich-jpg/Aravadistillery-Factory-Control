@@ -1472,7 +1472,7 @@ function renderDeclareInventory(container) {
 
   container.innerHTML = `
     <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px">
-      <div class="user-badge" style="width:40px;height:40px;font-size:15px">${esc(getUserDisplayName().charAt(0))}</div>
+      <div class="user-badge" style="width:40px;height:40px;font-size:15px">${esc((getUserDisplayName() || session?.username || '?').charAt(0))}</div>
       <div style="flex:1">
         <div style="font-size:14px;font-weight:600">${esc(getUserDisplayName())}</div>
         <div style="font-size:11px;color:var(--text-muted)">${t('declare_declarer')} · ${esc(session.role)}</div>
