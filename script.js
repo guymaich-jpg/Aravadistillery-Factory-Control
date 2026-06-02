@@ -1626,6 +1626,7 @@ function renderDeclareInventory(container) {
     lines.forEach(l => { newBase[l.spirit_type] = l.counted_qty; });
     newBase.declared_at = record.declared_at;
     setData(STORE_KEYS.inventoryBase, [newBase]);
+    syncInventorySnapshot('declare');
 
     currentScreen = 'home'; _navDirection = 'back'; renderApp();
     setTimeout(() => { if (typeof showToast === 'function') showToast(t('declare_success')); }, 100);
