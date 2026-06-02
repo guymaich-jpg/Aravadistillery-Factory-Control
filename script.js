@@ -4,14 +4,14 @@
 
 // ---------- State ----------
 // Restore navigation state from sessionStorage so refresh keeps the user's place
-let currentScreen = sessionStorage.getItem('fc_screen') || 'dashboard';
+let currentScreen = sessionStorage.getItem('fc_screen') || 'home';
 let currentModule = sessionStorage.getItem('fc_module') || null;
 let currentView = sessionStorage.getItem('fc_view') || 'list';
 let editingRecord = null;
 
 // Persist navigation state on every change
 function _persistNavState() {
-  sessionStorage.setItem('fc_screen', currentScreen || 'dashboard');
+  sessionStorage.setItem('fc_screen', currentScreen || 'home');
   if (currentModule) sessionStorage.setItem('fc_module', currentModule);
   else sessionStorage.removeItem('fc_module');
   sessionStorage.setItem('fc_view', currentView || 'list');
@@ -26,7 +26,7 @@ function _syncHashToState() {
   if (currentModule) {
     hash = '#/' + currentModule;
     if (currentView && currentView !== 'list') hash += '/' + currentView;
-  } else if (currentScreen && currentScreen !== 'dashboard') {
+  } else if (currentScreen && currentScreen !== 'home') {
     hash = '#/' + currentScreen;
   }
   if (location.hash !== hash) {
@@ -44,14 +44,14 @@ function _restoreStateFromHash() {
   if (segment === 'invite' && hash[1]) {
     authMode = 'invite';
     _inviteToken = hash[1];
-    currentScreen = 'dashboard';
+    currentScreen = 'home';
     currentModule = null;
     currentView = 'list';
     return;
   }
 
   const moduleNames = ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling', 'inventory'];
-  const screenNames = ['dashboard', 'backoffice'];
+  const screenNames = ['dashboard', 'backoffice', 'home', 'declare', 'menu'];
 
   if (moduleNames.includes(segment)) {
     currentModule = segment;
@@ -62,7 +62,7 @@ function _restoreStateFromHash() {
     currentModule = null;
     currentView = 'list';
   } else {
-    currentScreen = 'dashboard';
+    currentScreen = 'home';
     currentModule = null;
     currentView = 'list';
   }
@@ -578,7 +578,7 @@ function renderApp() {
 
   if (!session) {
     // Clear nav state when logged out
-    currentScreen = 'dashboard';
+    currentScreen = 'home';
     currentModule = null;
     currentView = 'list';
     _persistNavState();
@@ -618,8 +618,14 @@ function renderApp() {
     renderBackoffice(content);
   } else if (currentScreen === 'spiritStock') {
     renderSpiritStock(content);
-  } else {
+  } else if (currentScreen === 'declare') {
+    renderDeclareInventory(content);
+  } else if (currentScreen === 'menu') {
+    renderMenu(content);
+  } else if (currentScreen === 'dashboard') {
     renderDashboard(content);
+  } else {
+    renderHomeInventory(content);
   }
 
   if (typeof feather !== 'undefined') feather.replace();
@@ -637,7 +643,7 @@ function renderApp() {
 function checkSecurity() {
   const session = getSession();
   if (!session && currentScreen !== 'login') {
-    currentScreen = 'dashboard'; // Reset
+    currentScreen = 'home'; // Reset
     renderApp();
   }
 }
@@ -811,7 +817,7 @@ function bindLogin() {
           return;
         }
         if (session) {
-          currentScreen = 'dashboard';
+          currentScreen = 'home';
           currentModule = null;
           renderApp();
         } else {
@@ -1047,9 +1053,13 @@ function notifyInviteAccepted(token, username) {
 // ============================================================
 function renderHeader() {
   const session = getSession();
-  const showBack = currentModule !== null;
+  const showBack = currentModule !== null || currentScreen === 'declare' || currentScreen === 'menu' || currentScreen === 'dashboard';
   const title = currentModule ? getModuleTitle(currentModule)
     : currentScreen === 'backoffice' ? t('nav_backoffice')
+    : currentScreen === 'home' ? t('home_title')
+    : currentScreen === 'declare' ? t('declare_title')
+    : currentScreen === 'menu' ? t('menu_title')
+    : currentScreen === 'dashboard' ? t('nav_dashboard')
     : t('appName');
   const roleClass = session.role === 'worker' ? 'worker' : '';
   const isDark = (document.documentElement.getAttribute('data-theme') || 'light') === 'dark';
@@ -1091,7 +1101,7 @@ function getModuleTitle(mod) {
 // ============================================================
 function renderBottomNav() {
   const items = [
-    { id: 'dashboard', icon: 'grid', label: 'nav_dashboard' },
+    { id: 'home', icon: 'home', label: 'nav_home' },
     { id: 'receiving', icon: 'package', label: 'nav_receiving' },
     { id: 'production', icon: 'activity', label: 'nav_production' },
     { id: 'spiritStock', icon: 'droplet', label: 'nav_spiritStock' },
@@ -1106,7 +1116,7 @@ function renderBottomNav() {
   return `
     <nav class="bottom-nav">
       ${items.map(it => `
-        <button class="nav-item ${currentScreen === it.id ? 'active' : ''}" data-nav="${it.id}">
+        <button class="nav-item ${(currentScreen === it.id || (it.id === 'home' && (currentScreen === 'home' || currentScreen === 'declare' || currentScreen === 'menu'))) ? 'active' : ''}" data-nav="${it.id}">
           <i data-feather="${it.icon}"></i>
           ${t(it.label)}
         </button>
@@ -1132,7 +1142,7 @@ function bindNav() {
       currentView = 'list';
       editingRecord = null;
 
-      if (nav === 'dashboard') { currentModule = null; _navDirection = 'back'; }
+      if (nav === 'home') { currentModule = null; _navDirection = 'back'; }
       else if (nav === 'receiving') { currentModule = 'rawMaterials'; }
       else if (nav === 'production') { currentModule = 'fermentation'; }
       else if (nav === 'bottling') { currentModule = 'bottling'; }
@@ -1152,9 +1162,15 @@ function bindNav() {
       if (currentView === 'form' || currentView === 'detail') {
         currentView = 'list';
         editingRecord = null;
+      } else if (currentScreen === 'declare' || currentScreen === 'menu') {
+        currentScreen = 'home';
+        currentModule = null;
+      } else if (currentScreen === 'dashboard') {
+        currentScreen = 'home';
+        currentModule = null;
       } else {
         currentModule = null;
-        currentScreen = 'dashboard';
+        currentScreen = 'home';
       }
       renderApp();
     });
@@ -1298,6 +1314,370 @@ function renderDashboard(container) {
           renderApp();
         }
       }
+    });
+  });
+}
+
+// ============================================================
+// INVENTORY-FIRST HOME
+// ============================================================
+
+const SPIRIT_COLORS = {
+  drink_arak: 'var(--m-ferm)',
+  drink_gin: 'var(--m-d1)',
+  drink_edv: 'var(--m-d2)',
+  drink_licorice: 'var(--m-date)',
+  drink_brandyVS: 'var(--m-bot)',
+  drink_brandyVSOP: 'var(--m-raw)',
+  drink_brandyMed: 'var(--m-inv)',
+};
+
+function _computeBottleInventoryTotals() {
+  const bottlingRecords = getData(STORE_KEYS.bottling);
+  const bottleInv = {};
+  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
+  bottlingRecords.forEach(r => {
+    if (r.drinkType && r.decision === 'approved') {
+      bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+    }
+  });
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  const baseInv = {};
+  if (baseRecords.length > 0) {
+    DRINK_TYPES.forEach(dt => { baseInv[dt] = parseInt(baseRecords[0][dt]) || 0; });
+  }
+  const totals = {};
+  let grandTotal = 0;
+  DRINK_TYPES.forEach(dt => {
+    totals[dt] = (bottleInv[dt] || 0) + (baseInv[dt] || 0);
+    grandTotal += totals[dt];
+  });
+  return { totals, grandTotal };
+}
+
+function renderHomeInventory(container) {
+  const session = getSession();
+  const { totals, grandTotal } = _computeBottleInventoryTotals();
+  const maxCount = Math.max(1, ...Object.values(totals));
+
+  const declarations = getData(STORE_KEYS.inventoryDeclarations);
+  const latestDecl = declarations.length > 0 ? declarations[0] : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const countedToday = latestDecl && latestDecl.declared_at && latestDecl.declared_at.slice(0, 10) === today;
+
+  const dateStr = new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const lastDeclStr = latestDecl
+    ? `${formatDate(latestDecl.createdAt)} · ${esc(latestDecl.createdBy || '')}`
+    : '—';
+
+  container.innerHTML = `
+    <h1 class="sr-only">${t('home_title')}</h1>
+    <div class="welcome-card inv-hero">
+      <h2>${t('welcome')}, ${esc(getUserDisplayName())}</h2>
+      <div class="welcome-eyebrow">
+        <span>${t('home_currentStock')}</span>
+        <span style="opacity:0.5">·</span>
+        <span>${esc(dateStr)}</span>
+      </div>
+      <div class="inv-hero-num">
+        <span class="t-serif">${grandTotal.toLocaleString()}</span>
+        <span class="inv-hero-unit">${t('home_bottles')}<br>${t('home_inStock')}</span>
+      </div>
+      <div class="inv-hero-status">
+        <i data-feather="alert-triangle"></i>
+        ${countedToday ? t('home_countedToday') : t('home_notCountedToday')}
+      </div>
+      <div class="inv-hero-foot">
+        <span>${t('home_lastDeclared')}</span>
+        <span class="t-mono">${lastDeclStr}</span>
+      </div>
+    </div>
+
+    <div class="v2-section-head">
+      <div class="eyebrow">${t('home_byType')}</div>
+      <div class="see-all" id="home-full-inv">${t('home_fullInventory')}</div>
+    </div>
+    <div class="card" style="padding:4px 14px">
+      ${DRINK_TYPES.map(dt => {
+        const count = totals[dt] || 0;
+        const color = SPIRIT_COLORS[dt] || 'var(--accent)';
+        const pct = maxCount > 0 ? (count / maxCount * 100) : 0;
+        return `
+        <div class="inv-bd-row">
+          <div class="inv-bd-dot" style="background:${color}"></div>
+          <div class="inv-bd-name">${esc(t(dt))}</div>
+          <div class="inv-bd-bar"><span style="width:${pct.toFixed(1)}%;background:${color}"></span></div>
+          <div class="inv-bd-num t-mono">${count}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <button class="btn btn-primary btn-block declare-btn" id="home-declare-btn">
+      <i data-feather="edit-3"></i> ${t('home_declareBtn')}
+    </button>
+    <div class="declare-hint">${t('home_declareHint')}</div>
+
+    <div class="v2-section-head" style="margin-top:6px">
+      <div class="eyebrow">${t('home_goToMenu')}</div>
+    </div>
+    <div class="hub-grid">
+      <div class="hub-tile" data-target="menu-production">
+        <div class="hub-icon" style="background:color-mix(in oklab, var(--m-ferm) 14%, transparent);color:var(--m-ferm)"><i data-feather="layers"></i></div>
+        <div class="hub-title t-serif">${t('home_production')}</div>
+        <div class="hub-sub">${t('home_productionSub')}</div>
+        <div class="hub-go"><i data-feather="arrow-right"></i></div>
+      </div>
+      <div class="hub-tile" data-target="menu-admin">
+        <div class="hub-icon" style="background:color-mix(in oklab, var(--m-date) 14%, transparent);color:var(--m-date)"><i data-feather="settings"></i></div>
+        <div class="hub-title t-serif">${t('home_admin')}</div>
+        <div class="hub-sub">${t('home_adminSub')}</div>
+        <div class="hub-go"><i data-feather="arrow-right"></i></div>
+      </div>
+    </div>
+  `;
+
+  const declareBtn = container.querySelector('#home-declare-btn');
+  if (declareBtn) declareBtn.addEventListener('click', () => {
+    currentScreen = 'declare'; _navDirection = 'forward'; renderApp();
+  });
+
+  container.querySelectorAll('.hub-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      currentScreen = 'menu'; _navDirection = 'forward'; renderApp();
+    });
+  });
+
+  const fullInvLink = container.querySelector('#home-full-inv');
+  if (fullInvLink) fullInvLink.addEventListener('click', () => {
+    currentModule = 'inventory'; currentView = 'list'; _navDirection = 'forward'; renderApp();
+  });
+}
+
+// ============================================================
+// DECLARE INVENTORY
+// ============================================================
+function renderDeclareInventory(container) {
+  const session = getSession();
+  const { totals, grandTotal } = _computeBottleInventoryTotals();
+  const now = new Date();
+  const cycleLabel = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  const dateStr = now.toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { day: 'numeric', month: 'short' });
+
+  container.innerHTML = `
+    <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px">
+      <div class="user-badge" style="width:40px;height:40px;font-size:15px">${esc(getUserDisplayName().charAt(0))}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${esc(getUserDisplayName())}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${t('declare_declarer')} · ${esc(session.role)}</div>
+      </div>
+      <span class="v2-pill approved">${t('declare_cycle')} ${esc(cycleLabel)}</span>
+    </div>
+
+    <div class="v2-section-head"><div class="eyebrow">${t('declare_countByType')}</div></div>
+    <div class="card" style="padding:6px 14px 10px">
+      <div class="count-head">
+        <span>${t('declare_type')}</span>
+        <span>${t('declare_system')}</span>
+        <span>${t('declare_counted')}</span>
+        <span>${t('declare_diff')}</span>
+      </div>
+      ${DRINK_TYPES.map(dt => {
+        const sys = totals[dt] || 0;
+        const color = SPIRIT_COLORS[dt] || 'var(--accent)';
+        return `
+        <div class="count-row" data-dt="${esc(dt)}">
+          <div class="count-cname"><span class="inv-bd-dot" style="background:${color}"></span> ${esc(t(dt))}</div>
+          <div class="count-sys t-mono">${sys}</div>
+          <input class="input count-input t-mono" type="number" data-dt="${esc(dt)}" data-sys="${sys}" value="" placeholder="—" inputmode="numeric">
+          <div class="count-diff t-mono zero">—</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="count-total" id="declare-totals">
+      <div>
+        <div class="eyebrow">${t('declare_totalCounted')}</div>
+        <div class="t-serif" style="font-size:26px;font-weight:600;margin-top:2px">— <span style="font-size:13px;color:var(--text-muted)">${t('home_bottles')}</span></div>
+      </div>
+      <div style="text-align:${currentLang === 'he' ? 'left' : 'right'}">
+        <div class="eyebrow">${t('declare_netDiff')}</div>
+        <div class="t-mono count-diff zero" style="font-size:18px;font-weight:600;margin-top:4px">—</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label-form">${t('declare_note')}</label>
+      <textarea class="textarea" id="declare-note" placeholder="${t('declare_notePlaceholder')}"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="label-form">${t('declare_signature')}</label>
+      <div class="sig-pad-wrapper">
+        <canvas id="sig-canvas"></canvas>
+        <button class="sig-clear-btn" id="sig-clear">${t('sigClear') || 'Clear'}</button>
+      </div>
+      <div class="sig-meta" id="sig-meta"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-secondary" style="flex:1" id="declare-cancel">${t('cancel')}</button>
+      <button class="btn btn-primary" style="flex:1" id="declare-confirm"><i data-feather="check"></i> ${t('declare_confirm')}</button>
+    </div>
+  `;
+
+  // Live diff computation
+  function updateDiffs() {
+    let totalCounted = 0;
+    let totalDiff = 0;
+    let hasAny = false;
+    container.querySelectorAll('.count-input').forEach(input => {
+      const sys = parseInt(input.dataset.sys) || 0;
+      const val = input.value.trim();
+      const diffEl = input.closest('.count-row').querySelector('.count-diff');
+      if (val !== '') {
+        hasAny = true;
+        const counted = parseInt(val) || 0;
+        totalCounted += counted;
+        const diff = counted - sys;
+        totalDiff += diff;
+        diffEl.textContent = diff > 0 ? '+' + diff : String(diff);
+        diffEl.className = 'count-diff t-mono ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : 'zero');
+      } else {
+        diffEl.textContent = '—';
+        diffEl.className = 'count-diff t-mono zero';
+      }
+    });
+    const totalsEl = container.querySelector('#declare-totals');
+    if (totalsEl) {
+      const countedDiv = totalsEl.children[0].querySelector('.t-serif');
+      const diffDiv = totalsEl.children[1].querySelector('.count-diff');
+      if (hasAny) {
+        countedDiv.innerHTML = `${totalCounted.toLocaleString()} <span style="font-size:13px;color:var(--text-muted)">${t('home_bottles')}</span>`;
+        diffDiv.textContent = totalDiff > 0 ? '+' + totalDiff : String(totalDiff);
+        diffDiv.className = 'count-diff t-mono ' + (totalDiff > 0 ? 'pos' : totalDiff < 0 ? 'neg' : 'zero');
+      } else {
+        countedDiv.innerHTML = `— <span style="font-size:13px;color:var(--text-muted)">${t('home_bottles')}</span>`;
+        diffDiv.textContent = '—';
+        diffDiv.className = 'count-diff t-mono zero';
+      }
+    }
+  }
+  container.querySelectorAll('.count-input').forEach(input => {
+    input.addEventListener('input', updateDiffs);
+  });
+
+  // Signature pad
+  setTimeout(() => initSignaturePad(), 50);
+
+  // Cancel
+  const cancelBtn = container.querySelector('#declare-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => {
+    currentScreen = 'home'; _navDirection = 'back'; renderApp();
+  });
+
+  // Confirm
+  const confirmBtn = container.querySelector('#declare-confirm');
+  if (confirmBtn) confirmBtn.addEventListener('click', () => {
+    if (!signatureCanvas) return;
+    const pixels = sigCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
+    let hasSignature = false;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] > 0) { hasSignature = true; break; }
+    }
+    if (!hasSignature) {
+      alert(t('declare_errorSignature'));
+      return;
+    }
+
+    const lines = [];
+    let countedTotal = 0;
+    let netDiff = 0;
+    container.querySelectorAll('.count-input').forEach(input => {
+      const dt = input.dataset.dt;
+      const sys = parseInt(input.dataset.sys) || 0;
+      const val = input.value.trim();
+      const counted = val !== '' ? (parseInt(val) || 0) : sys;
+      const diff = counted - sys;
+      lines.push({ spirit_type: dt, system_qty: sys, counted_qty: counted, diff });
+      countedTotal += counted;
+      netDiff += diff;
+    });
+
+    const record = {
+      declared_at: new Date().toISOString(),
+      cycle_label: cycleLabel,
+      lines,
+      counted_total: countedTotal,
+      net_diff: netDiff,
+      note: (container.querySelector('#declare-note') || {}).value || '',
+      signature: signatureCanvas.toDataURL(),
+    };
+    addRecord(STORE_KEYS.inventoryDeclarations, record);
+    currentScreen = 'home'; _navDirection = 'back'; renderApp();
+    setTimeout(() => { if (typeof showToast === 'function') showToast(t('declare_success')); }, 100);
+  });
+}
+
+// ============================================================
+// MENU HUB
+// ============================================================
+function renderMenu(container) {
+  const productionItems = [
+    { screen: 'dashboard', module: null, icon: 'grid', label: 'nav_dashboard', sub: 'menu_dashboardSub', color: 'var(--m-ferm)' },
+    { screen: null, module: 'rawMaterials', icon: 'package', label: 'mod_rawMaterials', sub: 'menu_rawMaterialsSub', color: 'var(--m-raw)' },
+    { screen: null, module: 'dateReceiving', icon: 'sun', label: 'mod_dateReceiving', sub: 'menu_dateReceivingSub', color: 'var(--m-date)' },
+    { screen: null, module: 'fermentation', icon: 'thermometer', label: 'mod_fermentation', sub: 'menu_fermentationSub', color: 'var(--m-ferm)' },
+    { screen: null, module: 'distillation1', icon: 'droplet', label: 'mod_distillation1', sub: 'menu_distillation1Sub', color: 'var(--m-d1)' },
+    { screen: null, module: 'distillation2', icon: 'filter', label: 'mod_distillation2', sub: 'menu_distillation2Sub', color: 'var(--m-d2)' },
+    { screen: null, module: 'bottling', icon: 'check-circle', label: 'mod_bottling', sub: 'menu_bottlingSub', color: 'var(--m-bot)' },
+  ];
+  const adminItems = [
+    { screen: null, module: 'inventory', icon: 'database', label: 'mod_inventory', sub: 'menu_inventorySub', color: 'var(--m-inv)' },
+    { screen: 'spiritStock', module: null, icon: 'droplet', label: 'nav_spiritStock', sub: 'menu_spiritStockSub', color: 'var(--m-d1)' },
+  ];
+  if (hasPermission('canManageUsers')) {
+    adminItems.push({ screen: 'backoffice', module: null, icon: 'settings', label: 'nav_backoffice', sub: 'menu_backofficeSub', color: 'var(--m-raw)' });
+  }
+
+  function renderGroup(title, items) {
+    return `
+      <div class="v2-section-head"><div class="eyebrow">${esc(title)}</div></div>
+      <div class="card" style="padding:2px 14px;margin-top:8px">
+        ${items.map(it => `
+          <div class="menu-row" data-screen="${esc(it.screen || '')}" data-module="${esc(it.module || '')}">
+            <div class="menu-ico" style="background:color-mix(in oklab, ${it.color} 14%, transparent);color:${it.color}">
+              <i data-feather="${it.icon}"></i>
+            </div>
+            <div class="menu-main">
+              <div class="menu-th">${esc(t(it.label))}</div>
+              <div class="menu-sub">${esc(t(it.sub))}</div>
+            </div>
+            <div class="menu-chev"><i data-feather="chevron-right"></i></div>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <h1 class="sr-only">${t('menu_title')}</h1>
+    ${renderGroup(t('menu_production'), productionItems)}
+    ${renderGroup(t('menu_admin'), adminItems)}
+  `;
+
+  container.querySelectorAll('.menu-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const screen = row.dataset.screen;
+      const module = row.dataset.module;
+      _navDirection = 'forward';
+      if (module) {
+        currentModule = module;
+        currentView = 'list';
+        currentScreen = module;
+      } else if (screen) {
+        currentScreen = screen;
+        currentModule = null;
+      }
+      renderApp();
     });
   });
 }

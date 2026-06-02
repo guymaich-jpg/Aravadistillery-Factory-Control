@@ -52,7 +52,7 @@ test.describe('Language: In-app', () => {
     expect(await page.evaluate(() => document.documentElement.dir)).toBe('ltr');
 
     // All nav labels translated
-    await expect(page.locator('[data-nav="dashboard"]')).toContainText('แดชบอร์ด');
+    await expect(page.locator('[data-nav="home"]')).toContainText('หน้าหลัก');
     await expect(page.locator('[data-nav="receiving"]')).toContainText('การรับของ');
     await expect(page.locator('[data-nav="production"]')).toContainText('การผลิต');
     await expect(page.locator('[data-nav="bottling"]')).toContainText('การบรรจุขวด');

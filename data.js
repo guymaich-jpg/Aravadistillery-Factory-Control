@@ -12,6 +12,7 @@ const STORE_KEYS = {
   inventoryVersions: 'factory_inventoryVersions',
   inventoryCounts: 'factory_inventoryCounts',
   inventoryBase: 'factory_inventoryBase',
+  inventoryDeclarations: 'factory_inventoryDeclarations',
   customSuppliers: 'factory_customSuppliers',
   users: 'factory_users',
 };
@@ -292,7 +293,7 @@ function exportAllData() {
     'factory_rawMaterials', 'factory_dateReceiving', 'factory_fermentation',
     'factory_distillation1', 'factory_distillation2', 'factory_bottling',
     'factory_inventoryVersions', 'factory_inventoryCounts', 'factory_inventoryBase',
-    'factory_customSuppliers'
+    'factory_inventoryDeclarations', 'factory_customSuppliers'
   ];
   const today = new Date().toISOString().slice(0, 10);
   keys.forEach(key => {

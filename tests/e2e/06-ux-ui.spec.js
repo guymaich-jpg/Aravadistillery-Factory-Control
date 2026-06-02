@@ -14,6 +14,9 @@ test.describe('Navigation', () => {
   });
 
   test('all module cards on dashboard are clickable', async ({ page }) => {
+    // Navigate from Home → Menu → Dashboard
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     const cards = page.locator('.module-card');
     const count = await cards.count();
     expect(count).toBeGreaterThan(0);
@@ -35,10 +38,10 @@ test.describe('Navigation', () => {
     await expect(page.locator('.fab-add')).toBeVisible();
   });
 
-  test('back button from list returns to dashboard', async ({ page }) => {
+  test('back button from list returns to home', async ({ page }) => {
     await page.click('[data-nav="receiving"]');
     await page.click('#header-back');
-    await expect(page.locator('.module-grid')).toBeVisible();
+    await expect(page.locator('.inv-hero')).toBeVisible();
   });
 });
 
@@ -53,6 +56,9 @@ test.describe('Screen Transitions', () => {
   });
 
   test('directional animation on forward, back, and cancel', async ({ page }) => {
+    // Navigate to Dashboard first (Home → Menu → Dashboard)
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     // Forward
     await page.click('.module-card >> nth=0');
     await expect(page.locator('#screen-content')).toHaveClass(/nav-forward/);
@@ -90,12 +96,18 @@ test.describe('Dashboard UI', () => {
   });
 
   test('dashboard shows correct stat and module card counts', async ({ page }) => {
+    // Navigate from Home → Menu → Dashboard
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     await expect(page.locator('.stat-card')).toHaveCount(3);
     await expect(page.locator('.module-card')).toHaveCount(7);
     await expect(page.locator('.mc-count').first()).toBeVisible();
   });
 
   test('third stat card shows pending approvals dynamically', async ({ page }) => {
+    // Navigate from Home → Menu → Dashboard
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     const thirdStatNum = page.locator('.stat-card >> nth=2 >> .stat-num');
     const text = await thirdStatNum.textContent();
     expect(Number(text)).toBeGreaterThanOrEqual(0);
@@ -116,8 +128,10 @@ test.describe('Dashboard UI', () => {
     await page.click('#form-save');
     await page.waitForTimeout(500);
 
-    // Go to dashboard — activity should appear
-    await page.click('[data-nav="dashboard"]');
+    // Go to Home, then Dashboard via menu — activity should appear
+    await page.click('[data-nav="home"]');
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     await expect(page.locator('.recent-activity-item').first()).toBeVisible();
 
     // Click recent item → detail
@@ -244,6 +258,9 @@ test.describe('CSS Consistency', () => {
     test.skip(testInfo.project.name === 'Mobile Chrome', 'Desktop only — CSS checks');
     await freshApp(page);
     await loginAsAdmin(page);
+    // Navigate from Home → Menu → Dashboard
+    await page.click('.hub-tile >> nth=0');
+    await page.click('.menu-row[data-screen="dashboard"]');
     const statRadius = await page.locator('.stat-card >> nth=0').evaluate(el =>
       getComputedStyle(el).borderRadius
     );

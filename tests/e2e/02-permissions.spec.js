@@ -43,7 +43,7 @@ test.describe('Permissions - Admin', () => {
 
   test('admin sees all nav items', async ({ page }) => {
     await expect(page.locator('[data-nav="backoffice"]')).toBeVisible();
-    await expect(page.locator('[data-nav="dashboard"]')).toBeVisible();
+    await expect(page.locator('[data-nav="home"]')).toBeVisible();
     await expect(page.locator('[data-nav="receiving"]')).toBeVisible();
     await expect(page.locator('[data-nav="production"]')).toBeVisible();
     await expect(page.locator('[data-nav="bottling"]')).toBeVisible();
