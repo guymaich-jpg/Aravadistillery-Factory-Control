@@ -1333,19 +1333,26 @@ const SPIRIT_COLORS = {
 };
 
 function _computeBottleInventoryTotals() {
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  const baseInv = {};
+  let baseDeclaredAt = null;
+  if (baseRecords.length > 0) {
+    DRINK_TYPES.forEach(dt => { baseInv[dt] = parseInt(baseRecords[0][dt]) || 0; });
+    baseDeclaredAt = baseRecords[0].declared_at || null;
+  }
+
+  // Only count bottling records created AFTER the last declaration
   const bottlingRecords = getData(STORE_KEYS.bottling);
   const bottleInv = {};
   DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
   bottlingRecords.forEach(r => {
     if (r.drinkType && r.decision === 'approved') {
-      bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+      if (!baseDeclaredAt || (r.createdAt && r.createdAt > baseDeclaredAt)) {
+        bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+      }
     }
   });
-  const baseRecords = getData(STORE_KEYS.inventoryBase);
-  const baseInv = {};
-  if (baseRecords.length > 0) {
-    DRINK_TYPES.forEach(dt => { baseInv[dt] = parseInt(baseRecords[0][dt]) || 0; });
-  }
+
   const totals = {};
   let grandTotal = 0;
   DRINK_TYPES.forEach(dt => {
@@ -1613,6 +1620,13 @@ function renderDeclareInventory(container) {
       signature: signatureCanvas.toDataURL(),
     };
     addRecord(STORE_KEYS.inventoryDeclarations, record);
+
+    // Update inventoryBase with declared counts so Home reflects physical reality
+    const newBase = {};
+    lines.forEach(l => { newBase[l.spirit_type] = l.counted_qty; });
+    newBase.declared_at = record.declared_at;
+    setData(STORE_KEYS.inventoryBase, [newBase]);
+
     currentScreen = 'home'; _navDirection = 'back'; renderApp();
     setTimeout(() => { if (typeof showToast === 'function') showToast(t('declare_success')); }, 100);
   });
