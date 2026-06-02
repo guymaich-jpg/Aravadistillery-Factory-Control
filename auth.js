@@ -424,9 +424,10 @@ function hasPermission(perm) {
 function getUserDisplayName() {
   const session = getSession();
   if (!session) return '';
-  if (currentLang === 'he') return session.nameHe || session.name;
-  if (currentLang === 'th') return session.nameTh || session.name;
-  return session.name;
+  const fallback = session.name || session.displayName || session.username || '';
+  if (currentLang === 'he') return session.nameHe || fallback;
+  if (currentLang === 'th') return session.nameTh || fallback;
+  return fallback;
 }
 
 function getUserRole() {
