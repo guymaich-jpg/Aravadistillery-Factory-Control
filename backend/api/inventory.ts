@@ -53,7 +53,7 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
     const bottles: Record<string, number> = {};
     DRINK_TYPES.forEach(dt => { bottles[dt] = 0; });
 
-    snap.docs.forEach(doc => {
+    snap.docs.forEach((doc: any) => {
       const r = doc.data();
       if (r.drinkType && r.decision === 'approved') {
         const count = parseInt(r.bottleCount, 10) || 0;

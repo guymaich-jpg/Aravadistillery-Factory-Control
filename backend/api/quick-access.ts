@@ -60,7 +60,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
 
     const snap = await adminDb.collection(COLLECTION).orderBy('label').get();
     const results: QuickAccessDoc[] = [];
-    snap.forEach(doc => results.push(doc.data() as QuickAccessDoc));
+    snap.forEach((doc: any) => results.push(doc.data() as QuickAccessDoc));
     return res.status(200).json({ criteria: results, count: results.length });
   } catch (e: any) {
     return res.status(500).json({ error: 'Failed to read quick-access: ' + e.message });

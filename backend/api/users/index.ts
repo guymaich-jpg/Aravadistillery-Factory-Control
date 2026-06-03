@@ -39,7 +39,7 @@ async function handleList(req: VercelRequest, res: VercelResponse) {
 
   try {
     const snap = await adminDb.collection(collection).get();
-    const users = snap.docs.map(doc => {
+    const users = snap.docs.map((doc: any) => {
       const data = doc.data();
       // Never return passwords
       delete data.password;
