@@ -489,8 +489,8 @@ function syncInventorySnapshot(triggeredBy) {
   // Push inventory to backend for CRM reads (backend writes to Firestore)
   if (typeof apiUpdateInventory === 'function') {
     apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
-      if (!result) {
-        // Backend unavailable — write directly to Firestore as fallback
+      if (!result || result.error) {
+        // Backend unavailable or error — write directly to Firestore as fallback
         fbSetDoc('factory_inventory', 'current', {
           bottles: { ...bottleInv },
           total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
