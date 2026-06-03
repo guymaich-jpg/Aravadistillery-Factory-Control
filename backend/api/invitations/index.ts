@@ -39,7 +39,7 @@ async function handleList(req: VercelRequest, res: VercelResponse) {
     const snap = await adminDb.collection(collection)
       .orderBy('createdAt', 'desc')
       .get();
-    const invitations = snap.docs.map(doc => ({ ...doc.data(), _fbId: doc.id }));
+    const invitations = snap.docs.map((doc: any) => ({ ...doc.data(), _fbId: doc.id }));
     return res.status(200).json({ invitations });
   } catch (e: any) {
     return res.status(500).json({ error: 'Failed to list invitations: ' + e.message });

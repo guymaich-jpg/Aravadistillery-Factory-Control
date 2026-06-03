@@ -484,43 +484,29 @@ function syncInventorySnapshot(triggeredBy) {
     });
   }
 
-  console.log('[syncInventorySnapshot]', triggeredBy, 'bottleInv:', JSON.stringify(bottleInv));
+  console.log('[sync]', triggeredBy, 'bottleInv:', JSON.stringify(bottleInv));
 
-  // Push inventory to backend for CRM reads (backend writes to Firestore)
-  if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
-      if (!result || result.error) {
-        // Backend unavailable or error — write directly to Firestore as fallback
-        fbSetDoc('factory_inventory', 'current', {
-          bottles: { ...bottleInv },
-          total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
-          updatedAt: new Date().toISOString(),
-          updatedBy: session?.username || 'system',
-          trigger: triggeredBy || 'save',
-        });
-        syncCrmStockLevels(bottleInv);
-      }
-    }).catch(function() {
-      // Backend call failed — write directly to Firestore as fallback
-      fbSetDoc('factory_inventory', 'current', {
-        bottles: { ...bottleInv },
-        total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
-        updatedAt: new Date().toISOString(),
-        updatedBy: session?.username || 'system',
-        trigger: triggeredBy || 'save',
-      });
-      syncCrmStockLevels(bottleInv);
-    });
-  } else {
-    // api-client not loaded — write directly to Firestore
+  // Write directly to Firestore (primary path — immediate, no backend dependency)
+  if (typeof fbSetDoc === 'function') {
     fbSetDoc('factory_inventory', 'current', {
       bottles: { ...bottleInv },
       total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
       updatedAt: new Date().toISOString(),
       updatedBy: session?.username || 'system',
       trigger: triggeredBy || 'save',
+    }).then(function(r) {
+      if (r) console.log('[sync] factory_inventory/current OK');
+      else console.warn('[sync] factory_inventory/current returned null (Firebase not ready?)');
+    }).catch(function(e) {
+      console.error('[sync] factory_inventory/current error:', e);
     });
-    syncCrmStockLevels(bottleInv);
+  }
+
+  syncCrmStockLevels(bottleInv);
+
+  // Also notify backend (fire-and-forget for any server-side processing)
+  if (typeof apiUpdateInventory === 'function') {
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').catch(function() {});
   }
 }
 

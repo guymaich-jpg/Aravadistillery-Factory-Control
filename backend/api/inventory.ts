@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../lib/cors';
 import { verifyRequest } from '../lib/auth';
-import { adminDb } from '../lib/firebase-admin';
+import { adminDb, getFirebaseInitError } from '../lib/firebase-admin';
 import { syncToCrmStockLevels } from '../lib/crm-sync';
 
 const DRINK_TYPES = [
@@ -9,19 +9,14 @@ const DRINK_TYPES = [
   'drink_brandyVS', 'drink_brandyVSOP', 'drink_brandyMed',
 ];
 
-/**
- * GET /api/inventory
- * Returns the current bottle inventory from the factory_inventory/current doc.
- * Falls back to computing from factory_bottling if the doc doesn't exist.
- *
- * POST /api/inventory
- * Receives an inventory snapshot from Factory Control and writes it to
- * factory_inventory/current in Firestore. The CRM reads this doc.
- */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
-  // Authenticate caller
+  const initErr = getFirebaseInitError();
+  if (initErr) {
+    return res.status(503).json({ error: 'Firebase not configured: ' + initErr });
+  }
+
   const decoded = await verifyRequest(req.headers.authorization);
   if (!decoded) {
     return res.status(401).json({ error: 'Unauthorized — invalid or missing token' });
@@ -58,7 +53,7 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
     const bottles: Record<string, number> = {};
     DRINK_TYPES.forEach(dt => { bottles[dt] = 0; });
 
-    snap.docs.forEach(doc => {
+    snap.docs.forEach((doc: any) => {
       const r = doc.data();
       if (r.drinkType && r.decision === 'approved') {
         const count = parseInt(r.bottleCount, 10) || 0;

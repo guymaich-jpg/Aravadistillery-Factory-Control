@@ -1,14 +1,11 @@
 import { adminAuth } from './firebase-admin';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 
-/**
- * Verify a Firebase ID token from the Authorization header.
- * Returns the decoded token (with uid, email, custom claims) or null if invalid.
- */
 export async function verifyRequest(
   authHeader: string | undefined
 ): Promise<DecodedIdToken | null> {
   if (!authHeader?.startsWith('Bearer ')) return null;
+  if (!adminAuth) return null;
 
   const token = authHeader.slice(7);
   try {
