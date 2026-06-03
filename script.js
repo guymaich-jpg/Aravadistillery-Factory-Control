@@ -376,7 +376,10 @@ function togglePalette() {
 // Called as fallback when the backend API is unavailable.
 // CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
 function syncCrmStockLevels(bottleInv) {
-  if (typeof fbSetDoc !== 'function') return;
+  if (typeof fbSetDoc !== 'function') {
+    console.warn('[CRM sync] fbSetDoc not available');
+    return;
+  }
   var DRINK_TO_CRM = {
     drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
     drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
@@ -388,6 +391,7 @@ function syncCrmStockLevels(bottleInv) {
     aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
   });
   var now = new Date().toISOString();
+  console.log('[CRM sync] Writing stockLevels:', aggregated);
   Object.keys(aggregated).forEach(function(productId) {
     fbSetDoc('stockLevels', productId, {
       productId: productId,
@@ -395,6 +399,11 @@ function syncCrmStockLevels(bottleInv) {
       unit: 'בקבוק',
       lastUpdated: now,
       factoryLastSync: now,
+    }, true).then(function(r) {
+      if (r) console.log('[CRM sync] stockLevels/' + productId + ' = ' + aggregated[productId]);
+      else console.error('[CRM sync] stockLevels/' + productId + ' FAILED (returned null)');
+    }).catch(function(e) {
+      console.error('[CRM sync] stockLevels/' + productId + ' ERROR:', e);
     });
   });
 }
@@ -474,6 +483,8 @@ function syncInventorySnapshot(triggeredBy) {
       records: [record],
     });
   }
+
+  console.log('[syncInventorySnapshot]', triggeredBy, 'bottleInv:', JSON.stringify(bottleInv));
 
   // Push inventory to backend for CRM reads (backend writes to Firestore)
   if (typeof apiUpdateInventory === 'function') {
