@@ -506,7 +506,9 @@ function syncInventorySnapshot(triggeredBy) {
 
   // Also notify backend (fire-and-forget for any server-side processing)
   if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').catch(function() {});
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(r) {
+      if (r && r.error) console.warn('[sync] backend:', r.status, r.error);
+    }).catch(function() {});
   }
 }
 
