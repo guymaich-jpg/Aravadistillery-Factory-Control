@@ -409,22 +409,26 @@ function syncInventorySnapshot(triggeredBy) {
   const d1Records = getData(STORE_KEYS.distillation1);
   const d2Records = getData(STORE_KEYS.distillation2);
 
+  // Base inventory (read first so we can filter bottling by declaration date)
+  const baseRecords = getData(STORE_KEYS.inventoryBase);
+  const baseDeclaredAt = (baseRecords.length > 0 && baseRecords[0].declared_at) || null;
+
   const bottleInv = {};
   DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
-  bottlingRecords.forEach(r => {
-    if (r.drinkType && r.decision === 'approved') {
-      bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
-    }
-  });
-
-  // Include base inventory in totals
-  const baseRecords = getData(STORE_KEYS.inventoryBase);
   if (baseRecords.length > 0) {
     const latestBase = baseRecords[0];
     DRINK_TYPES.forEach(dt => {
       bottleInv[dt] = (bottleInv[dt] || 0) + (parseInt(latestBase[dt]) || 0);
     });
   }
+  // Only count bottling records created after the last declaration
+  bottlingRecords.forEach(r => {
+    if (r.drinkType && r.decision === 'approved') {
+      if (!baseDeclaredAt || (r.createdAt && r.createdAt > baseDeclaredAt)) {
+        bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
+      }
+    }
+  });
 
   const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
   const totalDatesInFerm = fermRecords.reduce((sum, r) => {
