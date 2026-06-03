@@ -490,6 +490,7 @@ function syncInventorySnapshot(triggeredBy) {
   if (typeof apiUpdateInventory === 'function') {
     apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
       if (!result || result.error) {
+        console.warn('[syncInventorySnapshot] Backend failed:', result?.error || 'unavailable', '— using direct Firestore fallback');
         // Backend unavailable or error — write directly to Firestore as fallback
         fbSetDoc('factory_inventory', 'current', {
           bottles: { ...bottleInv },
