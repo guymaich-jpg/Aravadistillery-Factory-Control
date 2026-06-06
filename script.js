@@ -376,10 +376,7 @@ function togglePalette() {
 // Called as fallback when the backend API is unavailable.
 // CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
 function syncCrmStockLevels(bottleInv) {
-  if (typeof fbSetDoc !== 'function') {
-    console.warn('[CRM sync] fbSetDoc not available');
-    return;
-  }
+  if (typeof fbSetDoc !== 'function') return;
   var DRINK_TO_CRM = {
     drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
     drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
@@ -391,7 +388,6 @@ function syncCrmStockLevels(bottleInv) {
     aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
   });
   var now = new Date().toISOString();
-  console.log('[CRM sync] Writing stockLevels:', aggregated);
   Object.keys(aggregated).forEach(function(productId) {
     fbSetDoc('stockLevels', productId, {
       productId: productId,
@@ -399,12 +395,7 @@ function syncCrmStockLevels(bottleInv) {
       unit: 'בקבוק',
       lastUpdated: now,
       factoryLastSync: now,
-    }, true).then(function(r) {
-      if (r) console.log('[CRM sync] stockLevels/' + productId + ' = ' + aggregated[productId]);
-      else console.error('[CRM sync] stockLevels/' + productId + ' FAILED (returned null)');
-    }).catch(function(e) {
-      console.error('[CRM sync] stockLevels/' + productId + ' ERROR:', e);
-    });
+    }, true).catch(function() {});
   });
 }
 
@@ -484,8 +475,6 @@ function syncInventorySnapshot(triggeredBy) {
     });
   }
 
-  console.log('[sync]', triggeredBy, 'bottleInv:', JSON.stringify(bottleInv));
-
   // Write directly to Firestore (primary path — immediate, no backend dependency)
   if (typeof fbSetDoc === 'function') {
     fbSetDoc('factory_inventory', 'current', {
@@ -494,21 +483,14 @@ function syncInventorySnapshot(triggeredBy) {
       updatedAt: new Date().toISOString(),
       updatedBy: session?.username || 'system',
       trigger: triggeredBy || 'save',
-    }).then(function(r) {
-      if (r) console.log('[sync] factory_inventory/current OK');
-      else console.warn('[sync] factory_inventory/current returned null (Firebase not ready?)');
-    }).catch(function(e) {
-      console.error('[sync] factory_inventory/current error:', e);
-    });
+    }).catch(function() {});
   }
 
   syncCrmStockLevels(bottleInv);
 
   // Also notify backend (fire-and-forget for any server-side processing)
   if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(r) {
-      if (r && r.error) console.warn('[sync] backend:', r.status, r.error);
-    }).catch(function() {});
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').catch(function() {});
   }
 }
 

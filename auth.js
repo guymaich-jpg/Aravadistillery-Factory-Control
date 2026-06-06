@@ -43,25 +43,28 @@ function validateEmail(email) {
 // --- Rate limiting (AUTH-06) ---
 const _loginAttempts = {};
 
-// The two owner accounts — login is by email + password
-// Passwords are pre-hashed to avoid exposing plaintext credentials in source
+// Owner accounts — usernames and roles only.
+// Emails and passwords are NEVER stored in source code.
+// Authentication is handled exclusively by Firebase Auth (server-side).
+// Email addresses are loaded at runtime from Firestore (factory_users collection).
+// Offline fallback requires prior online authentication to populate localStorage.
 const DEFAULT_USERS = [
   {
     username: 'guymaich',
-    password: 'hashed:1ap7bdv',
+    password: null,   // no client-side password — Firebase Auth is required
     role: 'admin',
     name: 'Guy Maich',
     nameHe: 'גיא מייך',
-    email: 'guymaich@gmail.com',
+    email: '',        // loaded at runtime from Firestore, never hardcoded
     status: 'active',
   },
   {
     username: 'yonatangarini',
-    password: 'hashed:1ekzbmw',
+    password: null,   // no client-side password — Firebase Auth is required
     role: 'admin',
     name: 'Yonatan Garini',
     nameHe: 'יונתן גריני',
-    email: 'yonatangarini@gmail.com',
+    email: '',        // loaded at runtime from Firestore, never hardcoded
     status: 'active',
   },
 ];
@@ -231,19 +234,35 @@ async function authenticate(emailOrUsername, password) {
     }
   }
 
-  // --- Strategy 2: Fallback to local hash check (Firebase unavailable) ---
+  // --- Strategy 2: Firebase is required — no client-side password fallback ---
+  // Owner accounts have no stored password hash. Firebase Auth is mandatory.
+  // Non-owner accounts added via the backend API also use Firebase Auth.
   if (!localUser) {
     if (!_loginAttempts[key]) _loginAttempts[key] = [];
     _loginAttempts[key].push(now);
     return null;
   }
 
+  // Reject login if no password hash available (owner accounts, Firebase-managed accounts)
+  if (!localUser.password) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
+
+  // Legacy: worker accounts created before Firebase Auth migration may still have local hashes
   const hashedInput = hashPassword(password);
   let passwordMatch = false;
 
-  if (localUser.password && localUser.password.startsWith('hashed:')) {
+  if (localUser.password.startsWith('hashed:')) {
     passwordMatch = localUser.password === hashedInput;
   } else if (localUser.password === password) {
+    // Upgrade legacy plaintext password to hashed (AUTH-01)
+    const idx = users.findIndex(u => u.username === localUser.username);
+    if (idx !== -1) {
+      users[idx].password = hashedInput;
+      localStorage.setItem('factory_users', JSON.stringify(users));
+    }
     passwordMatch = true;
   }
 
@@ -251,15 +270,6 @@ async function authenticate(emailOrUsername, password) {
     if (!_loginAttempts[key]) _loginAttempts[key] = [];
     _loginAttempts[key].push(now);
     return null;
-  }
-
-  // Upgrade legacy plaintext password to hashed (AUTH-01)
-  if (localUser.password && !localUser.password.startsWith('hashed:')) {
-    const idx = users.findIndex(u => u.username === localUser.username);
-    if (idx !== -1) {
-      users[idx].password = hashedInput;
-      localStorage.setItem('factory_users', JSON.stringify(users));
-    }
   }
 
   delete _loginAttempts[key];
