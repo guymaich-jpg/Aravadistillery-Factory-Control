@@ -1,30 +1,25 @@
 // ============================================================
 // sync.js — Google Sheets sync & CRM sync
 // ============================================================
-
-const SHEETS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz4IIUXvDoo7qJH1Ytn7hEWZ85Ek7hViA9riSezMZCXQbjKQG3VwfppQlq0kuTwOHT3/exec';
-const INVENTORY_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
+// Google Sheets sync is proxied through the backend (/api/sheets-sync).
+// The actual Apps Script URL is stored server-side — never in client code.
 
 // Sync state for the visual indicator
 let _syncQueue = 0;
 
 // ── Sync infrastructure ──────────────────────────────────────
 
-// Sends a POST to GAS. Always fire-and-forget (no-cors), with 1 retry and console logging.
+// Sends a POST via the backend proxy to Google Sheets.
+// Fire-and-forget with 1 retry.
 async function postToSheets(payload) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
+  if (!API_BASE) return; // backend required for sheets sync
 
   _syncQueue++;
   updateSyncIndicator('syncing');
 
   const attempt = async (n) => {
     try {
-      await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
-      });
+      await apiCall('POST', '/api/sheets-sync', payload);
       return true;
     } catch (err) {
       if (n < 1) {
@@ -47,15 +42,13 @@ async function postToSheets(payload) {
   updateSyncIndicator(_syncQueue > 0 ? 'syncing' : 'success');
 }
 
-// Verifies sync via GET request (GAS doGet supports CORS — we can read the response)
+// Verifies sync status via the backend proxy.
 async function verifySyncStatus(sheetName) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return { verified: false, error: 'no-url' };
+  if (!API_BASE) return { verified: false, error: 'no-backend' };
   try {
-    const resp = await fetch(`${url}?action=syncStatus&sheet=${encodeURIComponent(sheetName)}`);
-    if (!resp.ok) return { verified: false, error: 'http-' + resp.status };
-    const data = await resp.json();
-    return { verified: true, ...data };
+    const result = await apiCall('GET', '/api/sheets-sync?sheet=' + encodeURIComponent(sheetName));
+    if (!result || result.error) return { verified: false, error: result?.error || 'api-error' };
+    return { verified: true, ...result };
   } catch (err) {
     return { verified: false, error: err.message };
   }
@@ -166,10 +159,7 @@ async function _writeInventoryToFirestore(bottleInv, session, triggeredBy) {
     trigger: triggeredBy || 'save',
   };
 
-  var ok = await _retryFbSetDoc('factory_inventory', 'current', doc, 2);
-  if (!ok) {
-    console.error('[sync] Failed to write inventory to Firestore after retries');
-  }
+  await _retryFbSetDoc('factory_inventory', 'current', doc, 2);
 
   await _retrySyncCrmStockLevels(bottleInv, 2);
 }
@@ -193,11 +183,10 @@ async function _retrySyncCrmStockLevels(bottleInv, retries) {
   for (var i = 0; i <= retries; i++) {
     try {
       syncCrmStockLevels(bottleInv);
-      return; // syncCrmStockLevels is fire-and-forget per product, best we can do
+      return;
     } catch (e) { /* retry */ }
     if (i < retries) await new Promise(function(r) { setTimeout(r, 1000); });
   }
-  console.error('[sync] Failed to sync CRM stock levels after retries');
 }
 
 // Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
@@ -266,15 +255,13 @@ function syncInventorySnapshot(triggeredBy) {
     ...DRINK_TYPES.map(dt => tHe(dt)),
   ];
 
-  if (SHEETS_SYNC_URL) {
-    postToSheets({
-      sheetName: tHe('mod_inventory'),
-      action: 'append',
-      keys,
-      labels,
-      records: [record],
-    });
-  }
+  postToSheets({
+    sheetName: tHe('mod_inventory'),
+    action: 'append',
+    keys,
+    labels,
+    records: [record],
+  });
 
   // Push inventory to backend for CRM reads (backend writes to Firestore).
   // Always fall back to direct Firestore write when the backend is unavailable
