@@ -202,44 +202,30 @@ async function authenticate(emailOrUsername, password) {
       u.username.toLowerCase() === key;
   });
 
+  // Reject immediately if user doesn't exist locally (no role/permissions available)
+  if (!localUser) {
+    if (!_loginAttempts[key]) _loginAttempts[key] = [];
+    _loginAttempts[key].push(now);
+    return null;
+  }
+
   // Resolve the email to use for Firebase Auth
-  const emailForAuth = localUser ? localUser.email : (key.includes('@') ? key : null);
+  const emailForAuth = localUser.email || (key.includes('@') ? key : null);
 
   // --- Strategy 1: Try Firebase Auth first ---
   if (emailForAuth && typeof fbAuthSignIn === 'function' && _firebaseReady && _auth) {
     try {
       const fbUser = await fbAuthSignIn(emailForAuth, password);
-      if (fbUser && localUser) {
-        // Firebase Auth succeeded — build session from local user DB
+      if (fbUser) {
         delete _loginAttempts[key];
         const session = { ...localUser, loginTime: Date.now(), lastActivity: Date.now() };
         delete session.password;
         localStorage.setItem('factory_session', JSON.stringify(session));
         return session;
       }
-      if (fbUser && !localUser) {
-        // Firebase Auth succeeded but no local user record — shouldn't normally happen,
-        // but record a failed attempt (no role/permissions available)
-        if (!_loginAttempts[key]) _loginAttempts[key] = [];
-        _loginAttempts[key].push(now);
-        return null;
-      }
-      // fbUser is null — Firebase Auth rejected or account doesn't exist yet.
-      // Fall through to local hash check as a safety net.
-      // Firebase Auth rejected — fall through to local hash check
     } catch (e) {
-      // Firebase Auth threw unexpectedly — fall through to local check
       // Firebase Auth unavailable — fall through to local check
     }
-  }
-
-  // --- Strategy 2: Firebase is required — no client-side password fallback ---
-  // Owner accounts have no stored password hash. Firebase Auth is mandatory.
-  // Non-owner accounts added via the backend API also use Firebase Auth.
-  if (!localUser) {
-    if (!_loginAttempts[key]) _loginAttempts[key] = [];
-    _loginAttempts[key].push(now);
-    return null;
   }
 
   // Reject login if no password hash available (owner accounts, Firebase-managed accounts)
