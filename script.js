@@ -1193,6 +1193,19 @@ function renderMenu(container) {
 // ============================================================
 // MODULE LIST VIEW
 // ============================================================
+// Pagination state per module
+const _listPageSize = 20;
+const _listPages = {};
+const _listSearch = {};
+
+function _filterRecords(records, query) {
+  if (!query) return records;
+  const q = query.toLowerCase();
+  return records.filter(r => {
+    return Object.values(r).some(v => v && String(v).toLowerCase().includes(q));
+  });
+}
+
 function renderModuleList(container) {
   if (currentModule === 'inventory') {
     renderInventory(container);
@@ -1216,7 +1229,12 @@ function renderModuleList(container) {
     ];
   }
 
-  const records = getData(storeKey);
+  const allRecords = getData(storeKey);
+  const searchQuery = _listSearch[currentModule] || '';
+  const filtered = _filterRecords(allRecords, searchQuery);
+  const page = _listPages[currentModule] || 1;
+  const visible = filtered.slice(0, page * _listPageSize);
+  const hasMore = visible.length < filtered.length;
 
   container.innerHTML = `
     ${tabs ? `
@@ -1227,7 +1245,15 @@ function renderModuleList(container) {
       </div>
     ` : ''}
 
-    ${hasPermission('canExportData') && records.length ? `
+    ${allRecords.length > 5 ? `
+      <div class="search-bar">
+        <i data-feather="search" class="icon-sm search-icon"></i>
+        <input type="search" class="form-input search-input" id="list-search"
+          placeholder="${t('search')}" value="${esc(searchQuery)}" aria-label="${t('search')}">
+      </div>
+    ` : ''}
+
+    ${hasPermission('canExportData') && filtered.length ? `
       <div class="export-btn-wrap">
         <button class="btn btn-secondary btn-export" id="export-btn">
           <i data-feather="download" class="icon-sm icon-inline"></i>${t('exportCSV')}
@@ -1236,19 +1262,21 @@ function renderModuleList(container) {
     ` : ''}
 
     <div class="v2-section-head">
-      <div class="eyebrow">${t('recentEntries')} (${records.length})</div>
+      <div class="eyebrow">${t('recentEntries')} (${filtered.length})</div>
+      ${filtered.length > _listPageSize ? `<div class="list-paging">${t('showingXofY').replace('{x}', visible.length).replace('{y}', filtered.length)}</div>` : ''}
     </div>
 
-    ${records.length === 0 ? `
+    ${filtered.length === 0 ? `
       <div class="empty-state empty-state-v2">
         <div class="e-icon"><i data-feather="inbox"></i></div>
         <h3>${t('noData')}</h3>
-        ${hasPermission('canAddRecords') ? `<p>${t('tapPlusToAdd')}</p>` : ''}
+        ${hasPermission('canAddRecords') && !searchQuery ? `<p>${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
-        ${records.map(r => renderRecordItem(r)).join('')}
+        ${visible.map(r => renderRecordItem(r)).join('')}
       </div>
+      ${hasMore ? `<button class="btn btn-secondary load-more-btn" id="load-more">${t('showMore')}</button>` : ''}
     `}
   `;
 
@@ -1285,11 +1313,38 @@ function renderModuleList(container) {
     });
   }
 
+  // Bind search
+  const searchInput = container.querySelector('#list-search');
+  if (searchInput) {
+    let _searchTimeout = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(_searchTimeout);
+      _searchTimeout = setTimeout(() => {
+        _listSearch[currentModule] = searchInput.value.trim();
+        _listPages[currentModule] = 1;
+        renderModuleList(container);
+        if (typeof feather !== 'undefined') feather.replace();
+        const newInput = container.querySelector('#list-search');
+        if (newInput) { newInput.focus(); newInput.selectionStart = newInput.value.length; }
+      }, 300);
+    });
+  }
+
+  // Bind load more
+  const loadMoreBtn = container.querySelector('#load-more');
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      _listPages[currentModule] = (page || 1) + 1;
+      renderModuleList(container);
+      if (typeof feather !== 'undefined') feather.replace();
+    });
+  }
+
   // Bind approve buttons (bottling quick-approve for admin)
   container.querySelectorAll('.approve-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (records.find(r => r.id === btn.dataset.id)) {
+      if (filtered.find(r => r.id === btn.dataset.id)) {
         updateRecord(storeKey, btn.dataset.id, { decision: 'approved' });
         syncModuleToSheets(currentModule);
         syncInventorySnapshot('approve');
@@ -1301,7 +1356,7 @@ function renderModuleList(container) {
   // Bind record items
   container.querySelectorAll('.record-item').forEach(item => {
     item.addEventListener('click', () => {
-      editingRecord = records.find(r => r.id === item.dataset.id);
+      editingRecord = filtered.find(r => r.id === item.dataset.id);
       currentView = 'detail';
       _navDirection = 'forward';
       renderApp();
