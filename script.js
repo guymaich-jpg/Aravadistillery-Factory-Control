@@ -2106,6 +2106,7 @@ function renderFormField(f, val) {
         <div class="form-group">
           <label class="form-label">${t(f.labelKey)}${reqMark}</label>
           <input type="number" class="form-input" id="field-${f.key}" value="${esc(val)}" step="${f.step || 'any'}" min="${f.min ?? ''}" max="${f.max ?? ''}" placeholder="${f.placeholder || ''}">
+          ${f.hint ? '<div class="field-hint">' + esc(f.hint) + '</div>' : ''}
         </div>`;
 
     case 'text':
@@ -2279,6 +2280,17 @@ function saveCurrentForm() {
       }
     }
   });
+  // Validate number field min/max constraints
+  fields.forEach(f => {
+    if (f.type === 'number') {
+      const fieldEl = document.querySelector(`#field-${f.key}`);
+      if (fieldEl && fieldEl.value !== '' && !fieldEl.validity.valid) {
+        missing.push(t(f.labelKey));
+        fieldEl.classList.add('field-error');
+      }
+    }
+  });
+
   if (missing.length > 0) {
     showToast(`${t('required')}: ${missing.join(', ')}`);
     // Scroll to first error
@@ -2935,7 +2947,7 @@ function getModuleFields(mod) {
         { key: 'batchNumber', labelKey: 'bt_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102' },
         { key: 'barrelNumber', labelKey: 'bt_barrelNumber', type: 'text', placeholder: 'e.g. B1, B2' },
         { key: 'd2Date', labelKey: 'bt_d2Date', type: 'date' },
-        { key: 'alcohol', labelKey: 'bt_alcohol', type: 'number', required: true, step: '0.001', min: 0, max: 1 },
+        { key: 'alcohol', labelKey: 'bt_alcohol', type: 'number', required: true, step: '0.001', min: 0, max: 1, hint: '0.40 = 40%' },
         { key: 'filtered', labelKey: 'bt_filtered', type: 'toggle' },
         {
           key: 'color', labelKey: 'bt_color', type: 'select', noCustom: true,
@@ -3025,7 +3037,7 @@ function renderBackoffice(container) {
           <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
             aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false">
         </div>
-        <select class="form-select bo-role-select" id="invite-role" aria-label="${t('role')}"
+        <select class="form-select bo-role-select" id="invite-role" aria-label="${t('role')}">
           <option value="worker">${t('role_worker')}</option>
           <option value="manager">${t('role_manager')}</option>
           <option value="admin">${t('role_admin')}</option>
