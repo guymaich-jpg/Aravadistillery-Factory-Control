@@ -542,6 +542,7 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof initIndexedDB === 'function') initIndexedDB();
   if (typeof initFirebase === 'function') initFirebase();
   if (typeof initFirestoreSync === 'function') initFirestoreSync();
   // Check backend availability (non-blocking)

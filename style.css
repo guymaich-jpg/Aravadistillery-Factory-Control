@@ -1497,6 +1497,25 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   opacity: 0;
 }
 
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--accent, #c9821a);
+  color: #fff;
+  text-align: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 9999;
+  animation: slideDown 0.3s ease-out;
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
 .sync-dot {
   width: 7px;
   height: 7px;
