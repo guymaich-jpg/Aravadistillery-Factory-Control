@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../../lib/cors';
 import { adminDb } from '../../lib/firebase-admin';
+import { withRateLimit } from '../../lib/ratelimit';
 
 /**
  * GET /api/invitations/:token?app=factory|crm
@@ -8,7 +9,7 @@ import { adminDb } from '../../lib/firebase-admin';
  *
  * Returns: { valid, invitation? } or { valid: false, reason }
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   if (req.method !== 'GET') {
@@ -54,3 +55,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ valid: false, reason: 'Server error: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);
