@@ -11,30 +11,11 @@
     <meta name="color-scheme" content="light dark">
     <meta name="description" content="Arava Distillery — Production Control System">
     <!-- Security: CSP via meta tag (note: frame-ancestors requires HTTP header, not supported in meta tags) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://*.gstatic.com https://aravadistillery-factory-control.vercel.app; img-src 'self' data: blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://*.gstatic.com https://aravadistillery-factory-control.vercel.app; img-src 'self' data: blob:;">
     <link rel="icon" href="data:,">
     <link rel="manifest" href="manifest.json">
     <title>Arava Distillery · ייצור</title>
-    <script>
-      // Apply stored language/direction before first paint to avoid flash
-      (function() {
-        var lang = localStorage.getItem('factory_lang') || 'he';
-        document.documentElement.lang = lang;
-        document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
-        // Apply stored theme (or system default) before paint to prevent flash
-        var storedTheme = localStorage.getItem('factory_theme');
-        if (storedTheme) {
-          document.documentElement.setAttribute('data-theme', storedTheme);
-        } else {
-          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-        }
-        var storedPalette = localStorage.getItem('factory_palette');
-        if (storedPalette) {
-          document.documentElement.setAttribute('data-palette', storedPalette);
-        }
-      })();
-    </script>
+    <script src="init-theme.js?v=1.14.0"></script>
     <link rel="stylesheet" href="style.css?v=1.14.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

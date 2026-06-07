@@ -163,7 +163,7 @@ function renderLogin() {
   if (authMode === 'request') return renderRequestAccess();
 
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -196,7 +196,7 @@ function renderLogin() {
 
 function renderRequestAccess() {
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -231,7 +231,7 @@ function renderRequestAccess() {
 // ============================================================
 function renderInviteRegistration() {
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -387,6 +387,12 @@ function bindLogin() {
       history.replaceState(null, '', location.pathname);
       renderApp();
     });
+  }
+
+  // --- Language toggle on login/request/invite screens ---
+  const loginLangBtn = $('.login-lang-toggle');
+  if (loginLangBtn) {
+    loginLangBtn.addEventListener('click', () => { toggleLang(); });
   }
 }
 
@@ -566,10 +572,10 @@ function renderHeader() {
       </div>
       <span class="header-title t-serif">${esc(title)}</span>
       <div class="header-right">
-        <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
+        <button class="theme-btn" aria-label="${t('toggleTheme') || 'Toggle theme'}">
           ${isDark ? '<i data-feather="sun" class="icon-sm"></i>' : '<i data-feather="moon" class="icon-sm"></i>'}
         </button>
-        <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
+        <button class="lang-btn">${t('langToggle')}</button>
         <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" class="icon-sm"></i></button>
       </div>
     </header>
@@ -676,6 +682,18 @@ function bindNav() {
       logout();
       renderApp();
     });
+  }
+
+  // Theme toggle (header)
+  const themeBtn = $('.theme-btn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => { toggleTheme(); });
+  }
+
+  // Language toggle (header)
+  const langBtn = $('.lang-btn');
+  if (langBtn) {
+    langBtn.addEventListener('click', () => { toggleLang(); });
   }
 }
 
