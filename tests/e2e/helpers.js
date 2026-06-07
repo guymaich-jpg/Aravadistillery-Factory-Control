@@ -1,7 +1,18 @@
 // Shared helpers for all e2e tests
 const { expect } = require('@playwright/test');
 
-// Test users — seeded into localStorage for manager/worker tests
+// Test users — seeded into localStorage for role-specific tests.
+// These are CI-only accounts with non-production credentials.
+const TEST_ADMIN = {
+  username: 'testadmin',
+  password: 'Admin123',
+  email: 'testadmin@test.com',
+  role: 'admin',
+  name: 'Test Admin',
+  nameHe: 'מנהל בדיקה',
+  status: 'active',
+};
+
 const TEST_MANAGER = {
   username: 'testmanager',
   password: 'manager123',
@@ -36,20 +47,20 @@ async function freshApp(page) {
 }
 
 /**
- * Seed test manager and worker users into localStorage (after freshApp)
+ * Seed test admin, manager, and worker users into localStorage (after freshApp)
  */
 async function seedTestUsers(page) {
-  await page.evaluate(([mgr, wrk]) => {
+  await page.evaluate(([adm, mgr, wrk]) => {
     const existing = JSON.parse(localStorage.getItem('factory_users') || 'null') || [];
-    const toAdd = [mgr, wrk].filter(u => !existing.find(e => e.username === u.username));
+    const toAdd = [adm, mgr, wrk].filter(u => !existing.find(e => e.username === u.username));
     localStorage.setItem('factory_users', JSON.stringify([...existing, ...toAdd]));
-  }, [TEST_MANAGER, TEST_WORKER]);
+  }, [TEST_ADMIN, TEST_MANAGER, TEST_WORKER]);
 }
 
 /**
  * Login with given credentials (email or username)
  */
-async function login(page, emailOrUser = 'guymaich@gmail.com', password = 'Guy12345') {
+async function login(page, emailOrUser, password) {
   await page.fill('#login-user', emailOrUser);
   await page.fill('#login-pass', password);
   await page.click('#login-btn');
@@ -57,10 +68,11 @@ async function login(page, emailOrUser = 'guymaich@gmail.com', password = 'Guy12
 }
 
 /**
- * Login as admin (full access) — uses hardcoded owner account
+ * Login as admin (full access) — uses seeded CI test account (no real credentials)
  */
 async function loginAsAdmin(page) {
-  return login(page, 'guymaich@gmail.com', 'Guy12345');
+  await seedTestUsers(page);
+  return login(page, TEST_ADMIN.email, TEST_ADMIN.password);
 }
 
 /**
@@ -89,5 +101,5 @@ async function logout(page) {
 
 module.exports = {
   freshApp, login, loginAsAdmin, loginAsManager, loginAsWorker, logout, seedTestUsers,
-  TEST_MANAGER, TEST_WORKER,
+  TEST_ADMIN, TEST_MANAGER, TEST_WORKER,
 };
