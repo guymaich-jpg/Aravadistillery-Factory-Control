@@ -413,6 +413,13 @@ const I18N = {
     menu_inventorySub: "Stock counts & history",
     menu_spiritStockSub: "Distillation pipeline view",
     menu_backofficeSub: "Users, roles & permissions",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "Batch Approve",
+    selectedCount: "{count} selected",
+    approveAll: "Approve All",
+    recordsPerModule: "Records per Module",
+    noRecordsYet: "No records yet",
   },
 
   he: {
@@ -825,6 +832,13 @@ const I18N = {
     menu_inventorySub: "ספירות מלאי והיסטוריה",
     menu_spiritStockSub: "תצוגת צנרת זיקוק",
     menu_backofficeSub: "משתמשים, תפקידים והרשאות",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "אישור קבוצתי",
+    selectedCount: "נבחרו {count}",
+    approveAll: "אשר הכל",
+    recordsPerModule: "רשומות למודול",
+    noRecordsYet: "אין רשומות עדיין",
   },
 
   th: {
@@ -1234,6 +1248,13 @@ const I18N = {
     menu_inventorySub: "ยอดสต็อกและประวัติ",
     menu_spiritStockSub: "ท่อส่งการกลั่น",
     menu_backofficeSub: "ผู้ใช้ บทบาท สิทธิ์",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "Batch Approve",
+    selectedCount: "{count} selected",
+    approveAll: "Approve All",
+    recordsPerModule: "Records per Module",
+    noRecordsYet: "No records yet",
   },
 };
 

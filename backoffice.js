@@ -542,6 +542,9 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
   if (typeof initIndexedDB === 'function') initIndexedDB();
   if (typeof initFirebase === 'function') initFirebase();
   if (typeof initFirestoreSync === 'function') initFirestoreSync();
