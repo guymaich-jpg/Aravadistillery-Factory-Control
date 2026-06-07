@@ -3,8 +3,9 @@ import { handleCors } from '../../lib/cors';
 import { verifyRequest, hasManagementAccess } from '../../lib/auth';
 import { adminAuth, adminDb } from '../../lib/firebase-admin';
 import { validateOwnerOperation } from '../../lib/owners';
+import { withRateLimit } from '../../lib/ratelimit';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const decoded = await verifyRequest(req.headers.authorization);
@@ -156,3 +157,5 @@ async function handleDelete(req: VercelRequest, res: VercelResponse, username: s
     return res.status(500).json({ error: 'Failed to delete user: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);

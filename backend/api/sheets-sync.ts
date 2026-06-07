@@ -5,8 +5,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../lib/cors';
 import { verifyRequest } from '../lib/auth';
+import { withRateLimit } from '../lib/ratelimit';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const sheetsUrl = process.env.SHEETS_SYNC_URL;
@@ -55,3 +56,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withRateLimit(handler);

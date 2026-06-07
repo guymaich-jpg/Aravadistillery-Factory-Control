@@ -3,8 +3,9 @@ import { handleCors } from '../../lib/cors';
 import { verifyRequest, hasManagementAccess } from '../../lib/auth';
 import { adminAuth, adminDb } from '../../lib/firebase-admin';
 import { isOwner, validateOwnerOperation } from '../../lib/owners';
+import { withRateLimit } from '../../lib/ratelimit';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   // Authenticate caller
@@ -122,3 +123,5 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to create user: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);

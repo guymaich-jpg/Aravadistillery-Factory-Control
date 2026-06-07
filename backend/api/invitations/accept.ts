@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../../lib/cors';
 import { adminAuth, adminDb } from '../../lib/firebase-admin';
+import { withRateLimit } from '../../lib/ratelimit';
 
 /**
  * POST /api/invitations/accept
@@ -9,7 +10,7 @@ import { adminAuth, adminDb } from '../../lib/firebase-admin';
  *
  * Body: { token, password, name, nameHe?, nameTh?, app? }
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   if (req.method !== 'POST') {
@@ -103,3 +104,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Registration failed: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);
