@@ -3217,6 +3217,96 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 /* ============================================================
+   DASHBOARD CHART
+   ============================================================ */
+.dashboard-chart {
+  width: 100%;
+  max-width: 100%;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.dashboard-chart .chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.dashboard-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-bar {
+  transition: opacity 0.2s ease;
+}
+.chart-bar:hover {
+  opacity: 0.8;
+}
+
+/* ============================================================
+   BATCH ACTION BAR
+   ============================================================ */
+.batch-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  transform: translateY(0);
+  transition: transform 0.25s ease;
+}
+.batch-action-bar .batch-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.batch-action-bar .btn {
+  font-size: 13px;
+  padding: 8px 16px;
+}
+.batch-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-inline-end: 8px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.record-item.v2.has-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+.record-item.v2.has-checkbox .ri-content {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-theme="dark"] .batch-action-bar {
+  background: rgba(26, 30, 27, 0.9);
+  border-top-color: rgba(239, 239, 236, 0.1);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] .dashboard-chart {
+  background: var(--bg-card);
+}
+
+/* ============================================================
    REDUCED MOTION — disable all animations for a11y
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {

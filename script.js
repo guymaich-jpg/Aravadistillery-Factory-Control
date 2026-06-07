@@ -682,6 +682,49 @@ function bindNav() {
 // ============================================================
 // DASHBOARD
 // ============================================================
+
+function _renderDashboardBarChart(modules) {
+  const chartModules = modules.filter(m => m.store);
+  const counts = chartModules.map(m => getData(m.store).length);
+  const maxCount = Math.max(...counts, 1);
+
+  if (counts.every(c => c === 0)) {
+    return `<div class="dashboard-chart"><div class="chart-title">${t('recordsPerModule')}</div><p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">${t('noRecordsYet')}</p></div>`;
+  }
+
+  const barHeight = 28;
+  const labelWidth = 120;
+  const chartPadding = 8;
+  const gap = 6;
+  const svgHeight = chartModules.length * (barHeight + gap) + chartPadding * 2;
+  const svgWidth = 400;
+  const barAreaWidth = svgWidth - labelWidth - 50;
+
+  const bars = chartModules.map((m, i) => {
+    const count = counts[i];
+    const barW = Math.max((count / maxCount) * barAreaWidth, 2);
+    const y = chartPadding + i * (barHeight + gap);
+    const label = getModuleTitle(m.key);
+    // Use module CSS variable colors mapped to actual values for SVG
+    const colors = ['#3F5147', '#8B6914', '#2C332F', '#5C6E64', '#7D4E24', '#4A3728', '#3D5A52'];
+    const color = colors[i] || '#3F5147';
+    return `
+      <g class="chart-bar">
+        <text x="${labelWidth - 8}" y="${y + barHeight / 2 + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="11" font-family="var(--font-ui)">${esc(label)}</text>
+        <rect x="${labelWidth}" y="${y + 4}" width="${barW}" height="${barHeight - 8}" rx="3" fill="${color}" opacity="0.85"/>
+        <text x="${labelWidth + barW + 6}" y="${y + barHeight / 2 + 4}" fill="var(--text)" font-size="11" font-weight="600" font-family="var(--font-ui)">${count}</text>
+      </g>`;
+  }).join('');
+
+  return `
+    <div class="dashboard-chart">
+      <div class="chart-title">${t('recordsPerModule')}</div>
+      <svg viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${t('recordsPerModule')}">
+        ${bars}
+      </svg>
+    </div>`;
+}
+
 function renderDashboard(container) {
   const session = getSession();
   const modules = [
@@ -779,6 +822,8 @@ function renderDashboard(container) {
         }).join('')}
       </div>
     ` : ''}
+
+    ${_renderDashboardBarChart(modules)}
   `;
 
   // Bind module cards
@@ -1197,6 +1242,7 @@ function renderMenu(container) {
 const _listPageSize = 20;
 const _listPages = {};
 const _listSearch = {};
+let _batchSelected = new Set();
 
 function _filterRecords(records, query) {
   if (!query) return records;
@@ -1206,6 +1252,20 @@ function _filterRecords(records, query) {
   });
 }
 
+function _canBatchApprove() {
+  const session = getSession();
+  return session && (session.role === 'admin' || session.role === 'manager');
+}
+
+function _renderBatchActionBar() {
+  if (_batchSelected.size === 0) return '';
+  return `<div class="batch-action-bar" id="batch-action-bar">
+    <span class="batch-count">${t('selectedCount').replace('{count}', _batchSelected.size)}</span>
+    <button class="btn btn-primary" id="batch-approve-btn">${t('approveAll')}</button>
+    <button class="btn btn-secondary" id="batch-cancel-btn">${t('cancel')}</button>
+  </div>`;
+}
+
 function renderModuleList(container) {
   if (currentModule === 'inventory') {
     renderInventory(container);
@@ -1213,6 +1273,8 @@ function renderModuleList(container) {
   }
   const storeKey = STORE_KEYS[currentModule];
   if (!storeKey) { container.innerHTML = '<p>Unknown module</p>'; return; }
+
+  const showBatchCheckboxes = _canBatchApprove();
 
   // Sub-tabs for receiving and production
   let tabs = null;
@@ -1274,10 +1336,12 @@ function renderModuleList(container) {
       </div>
     ` : `
       <div class="record-list">
-        ${visible.map(r => renderRecordItem(r)).join('')}
+        ${visible.map(r => renderRecordItem(r, showBatchCheckboxes)).join('')}
       </div>
       ${hasMore ? `<button class="btn btn-secondary load-more-btn" id="load-more">${t('showMore')}</button>` : ''}
     `}
+
+    ${showBatchCheckboxes ? _renderBatchActionBar() : ''}
   `;
 
   // FAB
@@ -1300,6 +1364,7 @@ function renderModuleList(container) {
       if (sc) _scrollPositions[(currentModule || currentScreen) + ':' + currentView] = sc.scrollTop;
       currentModule = btn.dataset.tab;
       currentView = 'list';
+      _batchSelected = new Set();
       renderApp();
     });
   });
@@ -1353,6 +1418,30 @@ function renderModuleList(container) {
     });
   });
 
+  // Bind batch checkboxes
+  if (showBatchCheckboxes) {
+    container.querySelectorAll('.batch-checkbox').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const id = cb.dataset.id;
+        if (cb.checked) {
+          _batchSelected.add(id);
+        } else {
+          _batchSelected.delete(id);
+        }
+        // Re-render batch bar only
+        const existingBar = container.querySelector('#batch-action-bar');
+        if (existingBar) existingBar.remove();
+        if (_batchSelected.size > 0) {
+          container.insertAdjacentHTML('beforeend', _renderBatchActionBar());
+          _bindBatchBarButtons(container, storeKey);
+        }
+      });
+      cb.addEventListener('click', (e) => e.stopPropagation());
+    });
+    _bindBatchBarButtons(container, storeKey);
+  }
+
   // Bind record items
   container.querySelectorAll('.record-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -1364,7 +1453,33 @@ function renderModuleList(container) {
   });
 }
 
-function renderRecordItem(r) {
+function _bindBatchBarButtons(container, storeKey) {
+  const approveBtn = container.querySelector('#batch-approve-btn');
+  if (approveBtn) {
+    approveBtn.addEventListener('click', () => {
+      const session = getSession();
+      const approver = session ? (session.username || session.name || '') : '';
+      _batchSelected.forEach(id => {
+        updateRecord(storeKey, id, { status: 'approved', approvedBy: approver });
+      });
+      if (typeof syncModuleToSheets === 'function') syncModuleToSheets(currentModule);
+      showToast(t('approveAll') + ' ✓');
+      _batchSelected = new Set();
+      renderApp();
+    });
+  }
+  const cancelBtn = container.querySelector('#batch-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      _batchSelected = new Set();
+      container.querySelectorAll('.batch-checkbox').forEach(cb => { cb.checked = false; });
+      const bar = container.querySelector('#batch-action-bar');
+      if (bar) bar.remove();
+    });
+  }
+}
+
+function renderRecordItem(r, showCheckbox) {
   let title = '';
   const chips = [];
 
@@ -1424,16 +1539,22 @@ function renderRecordItem(r) {
   const deletedClass = r._deleted ? ' record-deleted' : '';
   const deletedChip = r._deleted ? `<span class="ri-badge deleted v2-pill rejected">${t('deleted')}</span>` : '';
 
+  const checkboxHtml = showCheckbox ? `<input type="checkbox" class="batch-checkbox" data-id="${esc(r.id)}" ${_batchSelected.has(r.id) ? 'checked' : ''} aria-label="${t('batchApprove')}">` : '';
+  const hasCheckboxClass = showCheckbox ? ' has-checkbox' : '';
+
   return `
-    <div class="record-item v2${deletedClass}" data-id="${esc(r.id)}" data-module="${esc(currentModule)}">
-      <div class="ri-head">
-        <span class="ri-title">${title}</span>
-        <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
-      </div>
-      <div class="ri-chips">
-        ${chips.map(c => `<span class="v2-pill">${c}</span>`).join('')}
-        ${statusChip}
-        ${deletedChip}
+    <div class="record-item v2${deletedClass}${hasCheckboxClass}" data-id="${esc(r.id)}" data-module="${esc(currentModule)}">
+      ${checkboxHtml}
+      <div class="ri-content">
+        <div class="ri-head">
+          <span class="ri-title">${title}</span>
+          <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
+        </div>
+        <div class="ri-chips">
+          ${chips.map(c => `<span class="v2-pill">${c}</span>`).join('')}
+          ${statusChip}
+          ${deletedChip}
+        </div>
       </div>
     </div>
   `;
