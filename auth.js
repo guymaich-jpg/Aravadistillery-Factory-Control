@@ -43,11 +43,10 @@ function validateEmail(email) {
 // --- Rate limiting (AUTH-06) ---
 const _loginAttempts = {};
 
-// Owner accounts — usernames and roles only.
-// Emails and passwords are NEVER stored in source code.
-// Authentication is handled exclusively by Firebase Auth (server-side).
-// Email addresses are loaded at runtime from Firestore (factory_users collection).
-// Offline fallback requires prior online authentication to populate localStorage.
+// Owner accounts — Firebase Auth is the sole password source.
+// Passwords are NEVER stored in source code (password: null always).
+// Login emails are stored here so the authenticate() function can look up
+// the local user record after Firebase Auth succeeds. Emails are not secret.
 const DEFAULT_USERS = [
   {
     username: 'guymaich',
@@ -55,7 +54,7 @@ const DEFAULT_USERS = [
     role: 'admin',
     name: 'Guy Maich',
     nameHe: 'גיא מייך',
-    email: '',        // loaded at runtime from Firestore, never hardcoded
+    email: 'guymaich@gmail.com',
     status: 'active',
   },
   {
@@ -64,7 +63,7 @@ const DEFAULT_USERS = [
     role: 'admin',
     name: 'Yonatan Garini',
     nameHe: 'יונתן גריני',
-    email: '',        // loaded at runtime from Firestore, never hardcoded
+    email: 'yonatangarini@gmail.com',
     status: 'active',
   },
 ];
@@ -661,3 +660,4 @@ function generateInviteToken() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
     + Math.random().toString(36).slice(2, 9);
 }
+
