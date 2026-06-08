@@ -421,6 +421,16 @@ const I18N = {
     recordsPerModule: "Records per Module",
     noRecordsYet: "No records yet",
 
+    // ---------- Record Archiving ----------
+    archiveRecords: "Archive Records",
+    archiveOldRecords: "Archive old records",
+    recordsOlderThan: "Records older than {months} months",
+    archived: "Archived",
+    confirmArchive: "Archive {count} records?",
+    archiveCount: "{count} old records",
+    noOldRecords: "No old records to archive",
+    archiveSuccess: "{count} records archived successfully",
+
     // ---------- Error Log ----------
     errorLog: "Error Log",
     clearLog: "Clear Log",
@@ -845,6 +855,16 @@ const I18N = {
     recordsPerModule: "רשומות למודול",
     noRecordsYet: "אין רשומות עדיין",
 
+    // ---------- Record Archiving ----------
+    archiveRecords: "ארכיון רשומות",
+    archiveOldRecords: "העבר לארכיון רשומות ישנות",
+    recordsOlderThan: "רשומות ישנות מ-{months} חודשים",
+    archived: "הועבר לארכיון",
+    confirmArchive: "האם להעביר {count} רשומות לארכיון?",
+    archiveCount: "{count} רשומות ישנות",
+    noOldRecords: "אין רשומות ישנות לארכיון",
+    archiveSuccess: "{count} רשומות הועברו לארכיון בהצלחה",
+
     // ---------- Error Log ----------
     errorLog: "יומן שגיאות",
     clearLog: "נקה יומן",
@@ -1265,6 +1285,16 @@ const I18N = {
     approveAll: "Approve All",
     recordsPerModule: "Records per Module",
     noRecordsYet: "No records yet",
+
+    // ---------- Record Archiving ----------
+    archiveRecords: "เก็บถาวร",
+    archiveOldRecords: "เก็บถาวรรายการเก่า",
+    recordsOlderThan: "รายการที่เก่ากว่า {months} เดือน",
+    archived: "เก็บถาวรแล้ว",
+    confirmArchive: "เก็บถาวร {count} รายการ?",
+    archiveCount: "{count} รายการเก่า",
+    noOldRecords: "ไม่มีรายการเก่าที่จะเก็บถาวร",
+    archiveSuccess: "เก็บถาวร {count} รายการเรียบร้อย",
   },
 };
 
