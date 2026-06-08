@@ -259,6 +259,95 @@ const STILL_NAMES = ['d1_still_amiti', 'd1_still_aladdin'];
 
 const D2_PRODUCT_TYPES = ['drink_edv', 'drink_arak', 'drink_gin'];
 
+// ---- Record Archiving ----
+// Moves records older than `monthsOld` months from the active store
+// to an archive key (factory_<module>_archive). Nothing is deleted —
+// records are COPIED first, then removed from the active set only if
+// the copy succeeded.
+
+function archiveOldRecords(moduleName, monthsOld) {
+  monthsOld = monthsOld || 6;
+  var key = STORE_KEYS[moduleName];
+  if (!key) return 0;
+
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsOld);
+  var cutoffISO = cutoff.toISOString();
+
+  var data = getData(key);
+  var toArchive = [];
+  var toKeep = [];
+
+  data.forEach(function (r) {
+    var ts = r.createdAt || '';
+    if (ts && ts < cutoffISO) {
+      toArchive.push(r);
+    } else {
+      toKeep.push(r);
+    }
+  });
+
+  if (toArchive.length === 0) return 0;
+
+  // Step 1: COPY to archive key (append to any existing archive)
+  var archiveKey = key + '_archive';
+  var existing;
+  try {
+    existing = JSON.parse(localStorage.getItem(archiveKey) || '[]');
+  } catch (e) {
+    existing = [];
+  }
+
+  // Avoid duplicates — only add records whose id isn't already archived
+  var archivedIds = {};
+  existing.forEach(function (r) { if (r.id) archivedIds[r.id] = true; });
+  var newArchived = [];
+  toArchive.forEach(function (r) {
+    if (r.id && !archivedIds[r.id]) {
+      newArchived.push(r);
+    }
+  });
+
+  var mergedArchive = existing.concat(newArchived);
+
+  try {
+    localStorage.setItem(archiveKey, JSON.stringify(mergedArchive));
+  } catch (e) {
+    // If storage fails, abort — don't remove from active set
+    return 0;
+  }
+
+  // Step 2: Verify the archive write succeeded before removing from active
+  try {
+    var verify = JSON.parse(localStorage.getItem(archiveKey) || '[]');
+    if (verify.length < mergedArchive.length) return 0; // write truncated
+  } catch (e) {
+    return 0;
+  }
+
+  // Step 3: Remove archived records from active set
+  setData(key, toKeep);
+
+  return newArchived.length;
+}
+
+function countOldRecords(moduleName, monthsOld) {
+  monthsOld = monthsOld || 6;
+  var key = STORE_KEYS[moduleName];
+  if (!key) return 0;
+
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsOld);
+  var cutoffISO = cutoff.toISOString();
+
+  var data = getData(key);
+  var count = 0;
+  data.forEach(function (r) {
+    if (r.createdAt && r.createdAt < cutoffISO) count++;
+  });
+  return count;
+}
+
 // ---- CSV Export ----
 function exportToCSV(keyOrData, filename) {
   let data = Array.isArray(keyOrData) ? keyOrData : getData(keyOrData);

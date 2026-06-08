@@ -100,6 +100,12 @@ function renderBackoffice(container) {
         <i data-feather="download"></i> ${t('exportAllData')}
       </button>
     </div>
+
+    <div class="archive-section bo-section">
+      <div class="section-title section-title-mb">${t('archiveRecords')}</div>
+      <p class="backoffice-subtitle">${t('archiveOldRecords')}</p>
+      <div class="archive-module-list" id="archive-module-list"></div>
+    </div>
   `;
 
   // Bind export
@@ -110,6 +116,52 @@ function renderBackoffice(container) {
         exportAllData();
       }
     });
+  }
+
+  // Populate archive section
+  var archiveListEl = container.querySelector('#archive-module-list');
+  if (archiveListEl) {
+    var archiveModules = ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling'];
+    var archiveHtml = '';
+    var hasOldRecords = false;
+    archiveModules.forEach(function(mod) {
+      var count = typeof countOldRecords === 'function' ? countOldRecords(mod, 6) : 0;
+      var total = typeof getRecordCount === 'function' ? getRecordCount(STORE_KEYS[mod]) : 0;
+      archiveHtml += '<div class="archive-module-row">'
+        + '<div class="archive-module-info">'
+        + '<span class="archive-module-name">' + t('mod_' + mod) + '</span>'
+        + '<span class="archive-module-count">'
+        + (count > 0
+          ? t('archiveCount').replace('{count}', count) + ' / ' + total + ' ' + t('totalRecords').toLowerCase()
+          : t('noOldRecords'))
+        + '</span>'
+        + '</div>'
+        + (count > 0
+          ? '<button class="btn btn-secondary archive-btn" data-module="' + mod + '" data-count="' + count + '">'
+            + '<i data-feather="archive"></i> ' + t('archiveRecords')
+            + '</button>'
+          : '')
+        + '</div>';
+      if (count > 0) hasOldRecords = true;
+    });
+    archiveListEl.innerHTML = archiveHtml;
+
+    // Bind archive buttons
+    archiveListEl.querySelectorAll('.archive-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var mod = btn.dataset.module;
+        var count = parseInt(btn.dataset.count, 10);
+        var msg = t('confirmArchive').replace('{count}', count);
+        if (!confirm(msg)) return;
+        var archived = typeof archiveOldRecords === 'function' ? archiveOldRecords(mod, 6) : 0;
+        if (archived > 0) {
+          showToast(t('archiveSuccess').replace('{count}', archived));
+          renderBackoffice(container);
+        }
+      });
+    });
+
+    if (typeof feather !== 'undefined') feather.replace();
   }
 
   // Bind Sync All — pushes every module to Sheets at once
