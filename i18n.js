@@ -420,6 +420,11 @@ const I18N = {
     approveAll: "Approve All",
     recordsPerModule: "Records per Module",
     noRecordsYet: "No records yet",
+
+    // ---------- Error Log ----------
+    errorLog: "Error Log",
+    clearLog: "Clear Log",
+    noErrors: "No errors",
   },
 
   he: {
@@ -839,6 +844,11 @@ const I18N = {
     approveAll: "אשר הכל",
     recordsPerModule: "רשומות למודול",
     noRecordsYet: "אין רשומות עדיין",
+
+    // ---------- Error Log ----------
+    errorLog: "יומן שגיאות",
+    clearLog: "נקה יומן",
+    noErrors: "אין שגיאות",
   },
 
   th: {

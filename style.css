@@ -3307,6 +3307,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 }
 
 /* ============================================================
+   ERROR LOG (admin backoffice)
+   ============================================================ */
+.error-log-section { margin-top: var(--space-lg, 1.5rem); }
+.error-log-item { font-size: 0.8rem; padding: 0.5rem; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+.error-log-item .error-time { color: var(--text-secondary); }
+.error-log-item .error-msg { color: var(--danger, #dc3545); }
+
+/* ============================================================
    REDUCED MOTION — disable all animations for a11y
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
