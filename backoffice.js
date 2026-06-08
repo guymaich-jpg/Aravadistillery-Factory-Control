@@ -253,6 +253,12 @@ function renderBackoffice(container) {
 
   // Load invitations from GAS on backoffice render
   loadInvitationsList(container);
+
+  // Show error log for admin users only
+  var session = getSession();
+  if (session && session.role === 'admin') {
+    renderErrorLog(container);
+  }
 }
 
 // Fetch invitations from backend API (primary) or GAS (fallback) and render
@@ -528,6 +534,71 @@ function renderUserForm(container) {
 // ============================================================
 
 // ============================================================
+// ERROR LOGGING
+// ============================================================
+function _logClientError(errorInfo) {
+  try {
+    var errors = JSON.parse(localStorage.getItem('factory_error_log') || '[]');
+    errors.push({
+      type: errorInfo.type,
+      message: errorInfo.message,
+      source: errorInfo.source,
+      line: errorInfo.line,
+      col: errorInfo.col,
+      stack: errorInfo.stack,
+      timestamp: new Date().toISOString(),
+      url: location.href,
+      userAgent: navigator.userAgent
+    });
+    // Keep only last 50 errors
+    while (errors.length > 50) errors.shift();
+    localStorage.setItem('factory_error_log', JSON.stringify(errors));
+  } catch (e) { /* storage full or unavailable — ignore */ }
+}
+
+function renderErrorLog(container) {
+  var errors = [];
+  try {
+    errors = JSON.parse(localStorage.getItem('factory_error_log') || '[]');
+  } catch (e) { /* ignore */ }
+
+  var recent = errors.slice(-20).reverse();
+
+  var section = document.createElement('div');
+  section.className = 'error-log-section bo-section';
+  section.innerHTML = '<div class="section-title section-title-mb">' + t('errorLog') + '</div>';
+
+  if (recent.length === 0) {
+    section.innerHTML += '<div class="empty-state empty-state-compact"><p>' + t('noErrors') + '</p></div>';
+  } else {
+    var list = document.createElement('div');
+    list.className = 'record-list';
+    recent.forEach(function(err) {
+      var item = document.createElement('div');
+      item.className = 'error-log-item';
+      var time = err.timestamp ? new Date(err.timestamp).toLocaleString() : '';
+      item.innerHTML = '<span class="error-time">' + esc(time) + '</span> '
+        + '<strong>[' + esc(err.type || 'error') + ']</strong> '
+        + '<span class="error-msg">' + esc(err.message || '') + '</span>';
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+  }
+
+  var clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-secondary';
+  clearBtn.style.marginTop = '10px';
+  clearBtn.textContent = t('clearLog');
+  clearBtn.addEventListener('click', function() {
+    localStorage.removeItem('factory_error_log');
+    renderApp();
+  });
+  section.appendChild(clearBtn);
+
+  container.appendChild(section);
+}
+
+// ============================================================
 // AUTO HARD-REFRESH
 // ============================================================
 function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
@@ -542,6 +613,15 @@ function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Global error capture for monitoring
+  window.onerror = function(msg, src, line, col, err) {
+    _logClientError({ type: 'error', message: String(msg), source: src, line: line, col: col, stack: err && err.stack });
+    return false; // Don't suppress the error
+  };
+  window.onunhandledrejection = function(e) {
+    _logClientError({ type: 'unhandledrejection', message: String(e.reason), stack: e.reason && e.reason.stack });
+  };
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
