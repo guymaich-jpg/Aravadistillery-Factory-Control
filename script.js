@@ -2,6 +2,31 @@
 // script.js — Core UI Rendering (forms, lists, details, views)
 // ============================================================
 
+// ---- Focus Trap Utility (accessibility) ----
+function _trapFocus(modalEl) {
+  var focusable = modalEl.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (focusable.length === 0) return function() {};
+  var first = focusable[0];
+  var last = focusable[focusable.length - 1];
+  first.focus();
+
+  function handler(e) {
+    if (e.key === 'Escape') {
+      var closeBtn = modalEl.querySelector('.mpd-cancel, .modal-close, .inv-sign-cancel');
+      if (closeBtn) closeBtn.click();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  modalEl.addEventListener('keydown', handler);
+  return function() { modalEl.removeEventListener('keydown', handler); };
+}
+
 // ---- Manager Password Modal (required for any delete action) ----
 function showManagerPasswordModal(onSuccess) {
   // Remove any existing modal
@@ -29,9 +54,11 @@ function showManagerPasswordModal(onSuccess) {
 
   const input = modal.querySelector('#mpd-password');
   const errorEl = modal.querySelector('#mpd-error');
-  input.focus();
 
-  const close = () => modal.remove();
+  const dialog = modal.querySelector('.manager-pwd-dialog');
+  const _releaseFocus = _trapFocus(dialog);
+
+  const close = () => { _releaseFocus(); modal.remove(); };
 
   modal.querySelector('.mpd-cancel').addEventListener('click', close);
   modal.querySelector('.manager-pwd-backdrop').addEventListener('click', close);
@@ -175,12 +202,12 @@ function renderLogin() {
 
       <div class="login-form">
         <div class="field">
-          <label class="label-form">${t('emailAddress')}</label>
+          <label class="label-form" for="login-user">${t('emailAddress')}</label>
           <input type="email" id="login-user" placeholder="${t('emailAddress')}"
             aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <div class="field">
-          <label class="label-form">${t('password')}</label>
+          <label class="label-form" for="login-pass">${t('password')}</label>
           <input type="password" id="login-pass" placeholder="${t('password')}"
             aria-label="${t('password')}" autocomplete="current-password">
         </div>
@@ -208,10 +235,12 @@ function renderRequestAccess() {
 
       <div class="login-form">
         <div class="field">
+          <label class="label-form" for="req-name">${t('fullName')}</label>
           <input type="text" id="req-name" placeholder="${t('fullName')}"
             aria-label="${t('fullName')}" autocomplete="name">
         </div>
         <div class="field">
+          <label class="label-form" for="req-email">${t('emailAddress')}</label>
           <input type="email" id="req-email" placeholder="${t('emailAddress')}"
             aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
@@ -251,16 +280,20 @@ function renderInviteRegistration() {
 
       <div id="invite-form-wrap" class="login-form invite-form-hidden">
         <div class="field">
+          <label class="label-form" for="inv-email">${t('emailAddress')}</label>
           <input type="email" id="inv-email" placeholder="${t('emailAddress')}" disabled
             aria-label="${t('emailAddress')}" class="invite-email-locked" autocomplete="email">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-name">${t('nameEnglish')}</label>
           <input type="text" id="inv-name" placeholder="${t('nameEnglish')}" aria-label="${t('nameEnglish')}" autocomplete="name">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-nameHe">${t('nameHebrew')}</label>
           <input type="text" id="inv-nameHe" placeholder="${t('nameHebrew')}" aria-label="${t('nameHebrew')}" dir="rtl" autocomplete="off">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-password">${t('password')}</label>
           <input type="password" id="inv-password" placeholder="${t('password')}" aria-label="${t('password')}" autocomplete="new-password">
         </div>
         <button class="login-btn" id="inv-submit-btn">${t('createAccount')}</button>
@@ -1799,14 +1832,14 @@ function renderFormField(f, val) {
     case 'date':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="date" class="form-input" id="field-${f.key}" value="${esc(val || todayStr())}">
         </div>`;
 
     case 'number':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="number" class="form-input" id="field-${f.key}" value="${esc(val)}" step="${f.step || 'any'}" min="${f.min ?? ''}" max="${f.max ?? ''}" placeholder="${f.placeholder || ''}">
           ${f.hint ? '<div class="field-hint">' + esc(f.hint) + '</div>' : ''}
         </div>`;
@@ -1814,7 +1847,7 @@ function renderFormField(f, val) {
     case 'text':
       return `
         <div class="form-group${f.hidden ? ' form-group-hidden' : ''}">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="text" class="form-input" id="field-${f.key}" value="${esc(val)}" placeholder="${f.placeholder || ''}">
         </div>`;
 
@@ -1825,7 +1858,7 @@ function renderFormField(f, val) {
       const skipAddNew = f.noCustom === true;
       return `
         <div class="form-group custom-select-group" data-field-key="${f.key}">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <select class="form-select" id="field-${f.key}">
             <option value="">${t('selectOne')}</option>
             ${(f.options || []).map(o => {
@@ -1851,7 +1884,7 @@ function renderFormField(f, val) {
     case 'cascading-select':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <select class="form-select" id="field-${f.key}" data-cascade-parent="${f.parentKey}">
             <option value="">${t('selectOne')}</option>
           </select>
@@ -1862,7 +1895,7 @@ function renderFormField(f, val) {
       return `
         <div class="form-group">
           <div class="toggle-row">
-            <span class="toggle-label">${t(f.labelKey)}${reqMark}</span>
+            <label class="toggle-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
             <label class="toggle-switch">
               <input type="checkbox" id="field-${f.key}" ${checked}>
               <span class="toggle-slider"></span>
@@ -1874,7 +1907,7 @@ function renderFormField(f, val) {
       const parts = (val || '').split('-');
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}</label>
+          <label class="form-label" for="field-${f.key}-start">${t(f.labelKey)}</label>
           <div class="time-range-row">
             <input type="time" class="form-input" id="field-${f.key}-start" value="${esc(parts[0] || '')}">
             <span>—</span>
@@ -2403,7 +2436,10 @@ function showSignInventoryModal(bottleInv, baseInv) {
   document.body.appendChild(overlay);
   if (typeof feather !== 'undefined') feather.replace();
 
-  const close = () => overlay.remove();
+  const modalContent = overlay.querySelector('.modal-content');
+  const _releaseFocus = _trapFocus(modalContent);
+
+  const close = () => { _releaseFocus(); overlay.remove(); };
   overlay.querySelector('.modal-close').addEventListener('click', close);
   overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2474,7 +2510,10 @@ function showImportBaseInventoryModal() {
   document.body.appendChild(overlay);
   if (typeof feather !== 'undefined') feather.replace();
 
-  const close = () => overlay.remove();
+  const modalContent = overlay.querySelector('.modal-content');
+  const _releaseFocus = _trapFocus(modalContent);
+
+  const close = () => { _releaseFocus(); overlay.remove(); };
   overlay.querySelector('.modal-close').addEventListener('click', close);
   overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
