@@ -86,7 +86,7 @@
 
   --text:           #EFEFEC;
   --text-secondary: rgba(239, 239, 236, 0.65);
-  --text-muted:     rgba(239, 239, 236, 0.35);
+  --text-muted:     rgba(239, 239, 236, 0.65);
 
   /* Accent: muted sage — legible on dark forest green */
   --accent:      #8BAF96;
@@ -1335,6 +1335,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   color: var(--text-muted);
   cursor: pointer;
   padding: 0 4px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
@@ -2333,6 +2338,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border: none;
   cursor: pointer;
   padding: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;

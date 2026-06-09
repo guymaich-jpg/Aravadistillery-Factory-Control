@@ -124,15 +124,25 @@ function _renderSparkline(data, color) {
   return `<div class="sparkline-wrap"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${pts}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></div>`;
 }
 
-function showToast(msg) {
+function showToast(msg, type) {
+  type = type || 'success';
   let toast = $('.toast');
   if (!toast) {
     toast = el('div', 'toast');
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
     document.body.appendChild(toast);
   }
+  // Use assertive for errors so screen readers announce immediately
+  if (type === 'error') {
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+  } else {
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+  }
   toast.textContent = msg;
+  toast.classList.remove('toast-success', 'toast-error', 'toast-info');
+  toast.classList.add('toast-' + type);
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
+  var duration = type === 'error' ? 4000 : 2500;
+  setTimeout(function() { toast.classList.remove('show'); }, duration);
 }
