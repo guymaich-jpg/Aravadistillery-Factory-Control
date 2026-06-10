@@ -358,13 +358,23 @@ function syncInventorySnapshot(triggeredBy) {
       updatedAt: new Date().toISOString(),
       updatedBy: session?.username || 'system',
       trigger: triggeredBy || 'save',
-    }).catch(function() {});
+    }).catch(function(err) {
+      console.warn('[inventory-sync] Firestore factory_inventory write failed:', err && (err.code || err.message || err));
+    });
   }
 
   syncCrmStockLevels(bottleInv);
 
   // Also notify backend (fire-and-forget for any server-side processing)
   if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').catch(function() {});
+    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
+      if (result && result.error) {
+        console.warn('[inventory-sync] Backend API returned error:', result.error, '(HTTP ' + (result.status || '?') + ')');
+      } else if (result && result.success) {
+        console.info('[inventory-sync] Backend API synced OK');
+      }
+    }).catch(function(err) {
+      console.warn('[inventory-sync] Backend API network error:', err && (err.message || err));
+    });
   }
 }
