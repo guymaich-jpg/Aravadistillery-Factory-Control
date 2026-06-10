@@ -337,6 +337,30 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   outline: none;
 }
 
+/* Dark mode: login form focus ring uses accent token instead of hardcoded dark green */
+[data-theme="dark"] .login-form input:focus {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+}
+
+/* Dark mode: login button uses accent token */
+[data-theme="dark"] .login-btn {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+[data-theme="dark"] .login-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* Dark mode: login logo mark */
+[data-theme="dark"] .login-logo-mark {
+  background: var(--accent);
+}
+
+[data-theme="dark"] .login-logo {
+  background: var(--accent);
+}
+
 .login-form input::placeholder { color: var(--text-muted); }
 
 .login-btn {
@@ -424,6 +448,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .signup-role-select:focus { border-color: var(--accent); }
 .signup-role-select option { background: var(--bg-card); color: var(--text); }
+
+/* Dark mode: lighten SVG chevron stroke for signup select */
+[data-theme="dark"] .signup-role-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23bbbbcc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
 
 .login-lang-toggle {
   position: absolute;
@@ -626,7 +655,14 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   touch-action: manipulation;
 }
 
-.nav-item.active { color: var(--accent); }
+.nav-item.active {
+  color: var(--accent);
+  background: rgba(161, 175, 122, 0.1);
+}
+
+[data-theme="dark"] .nav-item.active {
+  background: rgba(161, 175, 122, 0.15);
+}
 
 .nav-item:focus-visible {
   outline: 2px solid var(--accent);
@@ -642,7 +678,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   left: 50%;
   transform: translateX(-50%);
   width: 28px;
-  height: 2.5px;
+  height: 3px;
   background: var(--accent);
   border-radius: 0 0 3px 3px;
 }
@@ -733,7 +769,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 2.5px;
-  padding-left: 2px;
+  padding-inline-start: 2px;
 }
 
 /* Module Grid */
@@ -938,7 +974,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   letter-spacing: 0.4px;
 }
 
-.form-label .req { color: var(--danger); margin-left: 2px; }
+.form-label .req { color: var(--danger); margin-inline-start: 2px; }
 
 .form-input,
 .form-select,
@@ -1012,6 +1048,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   background-repeat: no-repeat;
   background-position: right 0 center;
   padding-right: 20px;
+}
+
+/* Dark mode: lighten SVG chevron stroke for form selects */
+[data-theme="dark"] .form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23bbbbcc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 .form-textarea {
@@ -1238,7 +1279,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .inv-table th,
 .inv-table td {
   padding: 12px 14px;
-  text-align: left;
+  text-align: start;
   font-size: 14px;
   border-bottom: 1px solid var(--separator);
 }
@@ -1275,7 +1316,24 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 /* 4-column inventory table */
 .inv-table-4col th,
 .inv-table-4col td { padding: 10px 10px; font-size: 13px; }
-.inv-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 16px; }
+.inv-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+  position: relative;
+}
+.inv-table-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--bg));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
 .stock-warning { color: var(--warning, #f59e0b); font-weight: 600; }
 
 .inv-last-signed {
@@ -1647,7 +1705,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .sig-clear {
   position: absolute;
-  top: 8px; right: 8px;
+  top: 8px; inset-inline-end: 8px;
   background: var(--bg-surface);
   border: 1px solid var(--separator);
   color: var(--text-secondary);
@@ -1773,7 +1831,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .detail-row .dv {
   color: var(--text);
   font-weight: 600;
-  text-align: right;
+  text-align: end;
   max-width: 58%;
 }
 
@@ -2393,6 +2451,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
 .invite-form-hidden { display: none; }
 
+/* Dark mode: invite email locked field */
+[data-theme="dark"] .invite-email-locked {
+  background: var(--bg-input) !important;
+}
+
 /* Login switch margin override */
 .login-switch-mt { margin-top: 24px; }
 
@@ -2437,7 +2500,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .inv-hero::after {
   content: '';
   position: absolute;
-  right: -44px; top: -44px;
+  inset-inline-end: -44px; top: -44px;
   width: 150px; height: 150px;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 50%;
@@ -2517,7 +2580,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   overflow: hidden;
 }
 .inv-bd-bar > div { height: 100%; border-radius: 3px; }
-.inv-bd-num { font-size: 13px; font-weight: 600; text-align: right; }
+.inv-bd-num { font-size: 13px; font-weight: 600; text-align: end; }
 
 /* Declare button + hint */
 .declare-btn { min-height: 54px; font-size: 13px; }
@@ -2553,7 +2616,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .hub-tile::before {
   content: '';
   position: absolute;
-  left: 0; top: 0; bottom: 0;
+  inset-inline-start: 0; top: 0; bottom: 0;
   width: 3px;
   background: var(--m, var(--accent));
 }
@@ -2568,7 +2631,7 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 .hub-icon svg { width: 22px; height: 22px; stroke-width: 1.5; }
 .hub-title { font-family: var(--font-serif); font-size: 16px; font-weight: 500; letter-spacing: 0.2px; }
 .hub-sub { font-size: 11px; color: var(--text-muted); }
-.hub-go { position: absolute; right: 11px; bottom: 11px; color: var(--text-faint); }
+.hub-go { position: absolute; inset-inline-end: 11px; bottom: 11px; color: var(--text-faint); }
 .hub-go svg { width: 16px; height: 16px; }
 
 /* Declare count table */
@@ -2586,22 +2649,22 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-muted);
-  text-align: right;
+  text-align: end;
 }
-.count-head span:first-child { text-align: left; }
+.count-head span:first-child { text-align: start; }
 .count-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .count-row:last-child { border-bottom: none; }
 .count-cname { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
 .count-cname .d { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
-.count-sys { text-align: right; font-size: 13px; color: var(--text-muted); }
+.count-sys { text-align: end; font-size: 13px; color: var(--text-muted); }
 .count-input {
-  text-align: right;
+  text-align: end;
   font-size: 14px;
   font-weight: 600;
   height: 38px;
   padding: 0 8px;
 }
-.count-diff { text-align: right; font-size: 12px; font-weight: 600; }
+.count-diff { text-align: end; font-size: 12px; font-weight: 600; }
 .count-diff.pos { color: var(--success); }
 .count-diff.neg { color: var(--danger); }
 .count-diff.zero { color: var(--text-faint); }
