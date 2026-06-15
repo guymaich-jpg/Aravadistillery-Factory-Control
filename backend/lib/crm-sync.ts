@@ -27,7 +27,7 @@ export async function syncToCrmStockLevels(
   bottles: Record<string, number>,
   updatedBy: string,
 ): Promise<void> {
-  // Aggregate by CRM product ID (e.g. 3 brandy types sum into product 5)
+  // Aggregate by CRM product ID (1:1 mapping for all 7 drink types)
   const aggregated = new Map<string, number>();
 
   for (const [drinkType, count] of Object.entries(bottles)) {
