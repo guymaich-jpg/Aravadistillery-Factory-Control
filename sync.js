@@ -123,12 +123,12 @@ function syncModuleToSheets(module) {
 
 // Sync bottle counts to the CRM stockLevels Firestore collection.
 // Called as fallback when the backend API is unavailable.
-// CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
+// CRM products: 1=ערק, 2=ליקוריץ, 3=EDV, 4=ג'ין, 5=ברנדי VS, 6=ברנדי VSOP, 7=ברנדי ים תיכוני
 function syncCrmStockLevels(bottleInv) {
   if (typeof fbSetDoc !== 'function') return;
   var DRINK_TO_CRM = {
     drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
-    drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
+    drink_brandyVS: '5', drink_brandyVSOP: '6', drink_brandyMed: '7',
   };
   var aggregated = {};
   Object.keys(bottleInv).forEach(function(dt) {
