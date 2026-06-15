@@ -101,82 +101,14 @@ function syncModuleToSheets(module) {
 
   const records = getData(storeKey);
 
-  // Build field definitions — bypass permission filter for sync
-  // so decision/all fields always appear in the sheet regardless of who is logged in
-  const allModuleFields = {
-    rawMaterials: [
-      { key: 'date', labelKey: 'rm_receiveDate' },
-      { key: 'supplier', labelKey: 'rm_supplier' },
-      { key: 'category', labelKey: 'rm_category' },
-      { key: 'item', labelKey: 'rm_item' },
-      { key: 'weight', labelKey: 'rm_weight' },
-      { key: 'unit', labelKey: 'rm_unit' },
-      { key: 'expiry', labelKey: 'rm_expiry' },
-      { key: 'tithing', labelKey: 'rm_tithing' },
-      { key: 'healthCert', labelKey: 'rm_healthCert' },
-      { key: 'kosher', labelKey: 'rm_kosher' },
-    ],
-    dateReceiving: [
-      { key: 'date', labelKey: 'dr_receiveDate' },
-      { key: 'supplier', labelKey: 'dr_supplier' },
-      { key: 'weight', labelKey: 'dr_weight' },
-      { key: 'tithing', labelKey: 'dr_tithing' },
-      { key: 'expiryPeriod', labelKey: 'dr_expiryPeriod' },
-      { key: 'qtyInDate', labelKey: 'dr_qtyInDate' },
-    ],
-    fermentation: [
-      { key: 'date', labelKey: 'fm_date' },
-      { key: 'tankSize', labelKey: 'fm_tankSize' },
-      { key: 'datesCrates', labelKey: 'fm_datesCrates' },
-      { key: 'temperature', labelKey: 'fm_temperature' },
-      { key: 'sugar', labelKey: 'fm_sugar' },
-      { key: 'ph', labelKey: 'fm_ph' },
-      { key: 'sentToDistillation', labelKey: 'fm_sentToDistillation' },
-    ],
-    distillation1: [
-      { key: 'date', labelKey: 'd1_date' },
-      { key: 'type', labelKey: 'd1_type' },
-      { key: 'stillName', labelKey: 'd1_stillName' },
-      { key: 'fermDate', labelKey: 'd1_fermDate' },
-      { key: 'distQty', labelKey: 'd1_distQty' },
-      { key: 'initAlcohol', labelKey: 'd1_initAlcohol' },
-      { key: 'finalAlcohol', labelKey: 'd1_finalAlcohol' },
-      { key: 'temp', labelKey: 'd1_temp' },
-      { key: 'timeRange', labelKey: 'd1_timeRange' },
-      { key: 'distilledQty', labelKey: 'd1_distilledQty' },
-    ],
-    distillation2: [
-      { key: 'date', labelKey: 'd2_date' },
-      { key: 'productType', labelKey: 'd2_productType' },
-      { key: 'd1Dates', labelKey: 'd2_d1Dates' },
-      { key: 'batchNumber', labelKey: 'd2_batchNumber' },
-      { key: 'initAlcohol', labelKey: 'd2_initAlcohol' },
-      { key: 'headSep', labelKey: 'd2_headSep' },
-      { key: 'tailAlcohol', labelKey: 'd2_tailAlcohol' },
-      { key: 'temp', labelKey: 'd2_temp' },
-      { key: 'timeRange', labelKey: 'd2_timeRange' },
-      { key: 'quantity', labelKey: 'd2_quantity' },
-      { key: 'd1InputQty', labelKey: 'd2_d1InputQty' },
-    ],
-    bottling: [
-      { key: 'date', labelKey: 'bt_bottlingDate' },
-      { key: 'drinkType', labelKey: 'bt_drinkType' },
-      { key: 'batchNumber', labelKey: 'bt_batchNumber' },
-      { key: 'barrelNumber', labelKey: 'bt_barrelNumber' },
-      { key: 'd2Date', labelKey: 'bt_d2Date' },
-      { key: 'alcohol', labelKey: 'bt_alcohol' },
-      { key: 'filtered', labelKey: 'bt_filtered' },
-      { key: 'color', labelKey: 'bt_color' },
-      { key: 'taste', labelKey: 'bt_taste' },
-      { key: 'contaminants', labelKey: 'bt_contaminants' },
-      { key: 'bottleCount', labelKey: 'bt_bottleCount' },
-      { key: 'd2InputQty', labelKey: 'bt_d2InputQty' },
-      { key: 'decision', labelKey: 'bt_decision' },
-    ],
-  };
-
-  const fields = allModuleFields[module];
-  if (!fields) return;
+  // Derive sync fields from the authoritative getModuleFields() registry,
+  // bypassing the permission filter by always including bottling's 'decision'.
+  var baseFields = typeof getModuleFields === 'function' ? getModuleFields(module) : [];
+  var fields = baseFields.map(function(f) { return { key: f.key, labelKey: f.labelKey }; });
+  if (module === 'bottling' && !fields.some(function(f) { return f.key === 'decision'; })) {
+    fields.push({ key: 'decision', labelKey: 'bt_decision' });
+  }
+  if (!fields || fields.length === 0) return;
 
   const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
   const labels = [...fields.map(f => tHe(f.labelKey)), tHe('notes'), 'Created At'];

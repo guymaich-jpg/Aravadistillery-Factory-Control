@@ -2,7 +2,7 @@
 // Service Worker — Factory Control PWA
 // ============================================================
 
-const CACHE_NAME = 'factory-v1.14.0';
+const CACHE_NAME = 'factory-v1.15.0';
 
 // App shell files to pre-cache on install
 const APP_SHELL = [
@@ -10,6 +10,7 @@ const APP_SHELL = [
   '/index.html',
   '/style.css',
   '/manifest.json',
+  '/init-theme.js',
   '/auth.js',
   '/data.js',
   '/script.js',
@@ -17,7 +18,6 @@ const APP_SHELL = [
   '/firestore-sync.js',
   '/i18n.js',
   '/api-client.js',
-  '/sync.js',
   '/sheets-sync.js',
   '/storage.js',
   '/helpers.js',

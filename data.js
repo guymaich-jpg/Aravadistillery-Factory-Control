@@ -280,7 +280,7 @@ function archiveOldRecords(moduleName, monthsOld) {
 
   data.forEach(function (r) {
     var ts = r.createdAt || '';
-    if (ts && ts < cutoffISO) {
+    if (ts && new Date(ts).getTime() < cutoff.getTime()) {
       toArchive.push(r);
     } else {
       toKeep.push(r);
@@ -317,15 +317,7 @@ function archiveOldRecords(moduleName, monthsOld) {
     return 0;
   }
 
-  // Step 2: Verify the archive write succeeded before removing from active
-  try {
-    var verify = JSON.parse(localStorage.getItem(archiveKey) || '[]');
-    if (verify.length < mergedArchive.length) return 0; // write truncated
-  } catch (e) {
-    return 0;
-  }
-
-  // Step 3: Remove archived records from active set
+  // Step 2: Remove archived records from active set
   setData(key, toKeep);
 
   return newArchived.length;
@@ -338,12 +330,12 @@ function countOldRecords(moduleName, monthsOld) {
 
   var cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - monthsOld);
-  var cutoffISO = cutoff.toISOString();
+  var cutoffMs = cutoff.getTime();
 
   var data = getData(key);
   var count = 0;
   data.forEach(function (r) {
-    if (r.createdAt && r.createdAt < cutoffISO) count++;
+    if (r.createdAt && new Date(r.createdAt).getTime() < cutoffMs) count++;
   });
   return count;
 }
