@@ -61,7 +61,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // ============================================================
-// FETCH — Cache-first for static, network-first for API
+// FETCH — Network-first for app files, cache-first for CDN assets
 // ============================================================
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
@@ -69,14 +69,19 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
-  // Check if this is an API request
-  const isAPI = API_DOMAINS.some((domain) => url.hostname.includes(domain) || url.pathname.includes(domain));
+  // Same-origin (app shell + API): always network-first so code updates
+  // take effect immediately. Cache is fallback for offline only.
+  if (url.origin === self.location.origin) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
 
+  // Cross-origin API: network-first
+  const isAPI = API_DOMAINS.some((domain) => url.hostname.includes(domain));
   if (isAPI) {
-    // Network-first for API calls
     event.respondWith(networkFirst(event.request));
   } else {
-    // Cache-first for static assets
+    // Cross-origin static assets (fonts, CDN scripts): cache-first for speed
     event.respondWith(cacheFirst(event.request));
   }
 });
