@@ -2,7 +2,7 @@
 // Service Worker — Factory Control PWA
 // ============================================================
 
-const CACHE_NAME = 'factory-v1.15.0';
+const CACHE_NAME = 'factory-v1.16.0';
 
 // App shell files to pre-cache on install
 const APP_SHELL = [

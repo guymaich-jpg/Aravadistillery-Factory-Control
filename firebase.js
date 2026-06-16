@@ -54,11 +54,11 @@ function initFirebase() {
   }
 
   const BASE = 'https://www.gstatic.com/firebasejs/9.23.0';
-  Promise.all([
-    loadScript(BASE + '/firebase-app-compat.js'),
+  loadScript(BASE + '/firebase-app-compat.js')
+  .then(() => Promise.all([
     loadScript(BASE + '/firebase-firestore-compat.js'),
     loadScript(BASE + '/firebase-auth-compat.js'),
-  ]).then(() => {
+  ])).then(() => {
     try {
       if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
