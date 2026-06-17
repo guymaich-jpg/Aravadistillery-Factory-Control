@@ -67,10 +67,10 @@ function initFirebase() {
       _auth = firebase.auth();
       _firebaseReady = true;
     } catch (e) {
-      // Init failed — localStorage fallback
+      console.error('[Firebase] Init failed, using localStorage fallback:', e.message || e);
     }
-  }).catch(() => {
-    // SDK load failed — localStorage fallback
+  }).catch((e) => {
+    console.error('[Firebase] SDK load failed, using localStorage fallback:', e.message || e);
   });
 }
 

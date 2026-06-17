@@ -2,7 +2,8 @@
 // Service Worker — Factory Control PWA
 // ============================================================
 
-const CACHE_NAME = 'factory-v1.16.0';
+const APP_VERSION = '1.17.0';
+const CACHE_NAME = 'factory-v' + APP_VERSION;
 
 // App shell files to pre-cache on install
 const APP_SHELL = [
@@ -23,15 +24,15 @@ const APP_SHELL = [
   '/helpers.js',
   '/module-fields.js',
   '/backoffice.js',
-  '/google-apps-script.js'
 ];
 
 // API domains — use network-first strategy
 const API_DOMAINS = [
   'script.google.com',
+  'script.googleusercontent.com',
   'firebaseio.com',
   'googleapis.com',
-  'vercel'
+  'aravadistillery-factory-control.vercel.app',
 ];
 
 // ============================================================
@@ -77,7 +78,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Cross-origin API: network-first
-  const isAPI = API_DOMAINS.some((domain) => url.hostname.includes(domain));
+  const isAPI = API_DOMAINS.some((domain) => url.hostname.endsWith(domain));
   if (isAPI) {
     event.respondWith(networkFirst(event.request));
   } else {
@@ -94,15 +95,13 @@ function cacheFirst(request) {
   return caches.match(request).then((cached) => {
     if (cached) return cached;
     return fetch(request).then((response) => {
-      // Cache successful responses for same-origin static assets
-      if (response.ok && response.type === 'basic') {
+      if (response.ok) {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
       }
       return response;
     });
   }).catch(() => {
-    // If both cache and network fail, return offline fallback for navigation
     if (request.mode === 'navigate') {
       return caches.match('/index.html');
     }
@@ -112,20 +111,18 @@ function cacheFirst(request) {
 
 function networkFirst(request) {
   return fetch(request).then((response) => {
-    // Cache successful API responses for offline use
     if (response.ok) {
       const clone = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
     }
     return response;
   }).catch(() => {
-    // Network failed — try cache
-    return caches.match(request).then((cached) => {
+    return caches.match(request, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
-      return new Response(JSON.stringify({ error: 'offline' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      if (request.mode === 'navigate') {
+        return caches.match('/index.html');
+      }
+      return new Response('', { status: 503, statusText: 'Service Unavailable' });
     });
   });
 }
