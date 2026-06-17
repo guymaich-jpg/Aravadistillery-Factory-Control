@@ -15,7 +15,7 @@ function renderBackoffice(container) {
   if (typeof syncUsersFromBackend === 'function' && !container._syncStarted) {
     container._syncStarted = true;
     syncUsersFromBackend().then(synced => {
-      if (synced && synced.length !== getUsers().length) {
+      if (synced && JSON.stringify(synced) !== JSON.stringify(getUsers())) {
         renderBackoffice(container); // re-render with merged data
       }
     }).catch(() => {});
@@ -677,7 +677,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
-  if (typeof initIndexedDB === 'function') initIndexedDB();
   if (typeof initFirebase === 'function') initFirebase();
   if (typeof initFirestoreSync === 'function') initFirestoreSync();
   // Check backend availability (non-blocking)

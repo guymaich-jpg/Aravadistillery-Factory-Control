@@ -33,8 +33,8 @@ test.describe('CRM Integration: Inventory Sync', () => {
       return calls;
     });
 
-    // Verify correct CRM product ID mapping
-    expect(result.length).toBe(5); // 5 unique CRM product IDs
+    // Verify correct CRM product ID mapping (7 products, 1:1 mapping)
+    expect(result.length).toBe(7);
 
     const byId = {};
     result.forEach(c => { byId[c.docId] = c; });
@@ -49,14 +49,20 @@ test.describe('CRM Integration: Inventory Sync', () => {
     // Product 2 = Licorice
     expect(byId['2'].data.currentStock).toBe(5);
 
-    // Product 3 = ADV/EDV
+    // Product 3 = EDV
     expect(byId['3'].data.currentStock).toBe(8);
 
     // Product 4 = Gin
     expect(byId['4'].data.currentStock).toBe(3);
 
-    // Product 5 = Brandy (aggregated: VS + VSOP + Med = 2+4+1 = 7)
-    expect(byId['5'].data.currentStock).toBe(7);
+    // Product 5 = Brandy VS
+    expect(byId['5'].data.currentStock).toBe(2);
+
+    // Product 6 = Brandy VSOP
+    expect(byId['6'].data.currentStock).toBe(4);
+
+    // Product 7 = Mediterranean Brandy
+    expect(byId['7'].data.currentStock).toBe(1);
 
     // All entries have required CRM fields
     result.forEach(c => {

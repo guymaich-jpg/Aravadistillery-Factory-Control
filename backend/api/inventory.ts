@@ -78,6 +78,10 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
 // ---- POST: receive inventory update from Factory Control ----
 async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: string) {
   try {
+    if (!adminDb) {
+      return res.status(503).json({ error: 'Firestore not available (adminDb is null)' });
+    }
+
     const { bottles, trigger } = req.body || {};
 
     if (!bottles || typeof bottles !== 'object') {
@@ -121,7 +125,11 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
 
     return res.status(200).json({ success: true, ...inventoryDoc });
   } catch (e: any) {
-    return res.status(500).json({ error: 'Failed to update inventory: ' + e.message });
+    console.error('[inventory POST]', e.code || '', e.message || e);
+    return res.status(500).json({
+      error: 'Failed to update inventory: ' + (e.message || 'unknown'),
+      code: e.code || undefined,
+    });
   }
 }
 

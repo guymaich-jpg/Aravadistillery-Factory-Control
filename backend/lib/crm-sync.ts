@@ -3,9 +3,8 @@ import { adminDb } from './firebase-admin';
 /**
  * Mapping from factory drink types to CRM product catalog IDs.
  * CRM products (from seed.ts):
- *   1 = ערק,  2 = ליקריץ,  3 = ADV,  4 = ג'ין,  5 = ברנדי,  6 = שונות
- *
- * Multiple factory types map to the same CRM product (brandies → 5).
+ *   1 = ערק,  2 = ליקוריץ,  3 = EDV,  4 = ג'ין,
+ *   5 = ברנדי VS,  6 = ברנדי VSOP,  7 = ברנדי ים תיכוני
  */
 const DRINK_TO_CRM_PRODUCT: Record<string, string> = {
   drink_arak:       '1',
@@ -13,8 +12,8 @@ const DRINK_TO_CRM_PRODUCT: Record<string, string> = {
   drink_edv:        '3',
   drink_gin:        '4',
   drink_brandyVS:   '5',
-  drink_brandyVSOP: '5',
-  drink_brandyMed:  '5',
+  drink_brandyVSOP: '6',
+  drink_brandyMed:  '7',
 };
 
 /**
@@ -28,7 +27,7 @@ export async function syncToCrmStockLevels(
   bottles: Record<string, number>,
   updatedBy: string,
 ): Promise<void> {
-  // Aggregate by CRM product ID (e.g. 3 brandy types sum into product 5)
+  // Aggregate by CRM product ID (1:1 mapping for all 7 drink types)
   const aggregated = new Map<string, number>();
 
   for (const [drinkType, count] of Object.entries(bottles)) {

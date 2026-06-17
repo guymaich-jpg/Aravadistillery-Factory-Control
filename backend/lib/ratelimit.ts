@@ -20,10 +20,9 @@ const WINDOW_MS = 60_000; // 1 minute
 // Max request body size: 1 MB
 const MAX_BODY_SIZE = 1_048_576;
 
-/**
- * Clean up expired entries from the store.
- * Called on each request to prevent memory leaks.
- */
+let _cleanupCounter = 0;
+const CLEANUP_INTERVAL = 100;
+
 function cleanup(): void {
   const now = Date.now();
   for (const [key, entry] of store) {
@@ -40,7 +39,10 @@ export function rateLimit(
   ip: string,
   method: string
 ): { allowed: boolean; remaining: number; retryAfter: number } {
-  cleanup();
+  if (++_cleanupCounter >= CLEANUP_INTERVAL) {
+    _cleanupCounter = 0;
+    cleanup();
+  }
 
   const isWrite = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
   const limit = isWrite ? WRITE_LIMIT : READ_LIMIT;

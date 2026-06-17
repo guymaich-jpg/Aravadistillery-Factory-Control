@@ -1308,11 +1308,12 @@ function _filterRecords(records, query) {
   if (!query) return records;
   const q = query.toLowerCase();
   return records.filter(r => {
-    return Object.values(r).some(v => v && String(v).toLowerCase().includes(q));
+    return Object.values(r).some(v => v != null && String(v).toLowerCase().includes(q));
   });
 }
 
 function _canBatchApprove() {
+  if (currentModule !== 'bottling') return false;
   const session = getSession();
   return session && (session.role === 'admin' || session.role === 'manager');
 }
@@ -1520,7 +1521,7 @@ function _bindBatchBarButtons(container, storeKey) {
       const session = getSession();
       const approver = session ? (session.username || session.name || '') : '';
       _batchSelected.forEach(id => {
-        updateRecord(storeKey, id, { status: 'approved', approvedBy: approver });
+        updateRecord(storeKey, id, { decision: 'approved', approvedBy: approver });
       });
       if (typeof syncModuleToSheets === 'function') syncModuleToSheets(currentModule);
       showToast(t('approveAll') + ' ✓');
