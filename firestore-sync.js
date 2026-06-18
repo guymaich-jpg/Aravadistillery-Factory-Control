@@ -28,7 +28,10 @@ function initFirestoreSync() {
   var maxAttempts = 20; // 10 seconds (20 × 500ms)
   var poll = setInterval(function () {
     attempts++;
-    if (isFirebaseReady()) {
+    // Wait for both Firebase SDK and auth state to be resolved.
+    // Without auth, Firestore security rules will reject reads.
+    var authReady = typeof _auth !== 'undefined' && _auth && _auth.currentUser;
+    if (isFirebaseReady() && authReady) {
       clearInterval(poll);
       _hydrateAllCollections();
     } else if (attempts >= maxAttempts) {

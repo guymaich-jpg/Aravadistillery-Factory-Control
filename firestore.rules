@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// Firestore Security Rules for Arava Distillery Factory Control
+// Firebase project: aravadistillery-crm (shared with CRM app)
+//
+// Backend (Admin SDK) bypasses all rules — these only apply to
+// client-side SDK access from the Factory Control and CRM web apps.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: caller is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: caller has admin role in custom claims
+    function isAdmin() {
+      return isAuth() && request.auth.token.role == 'admin';
+    }
+
+    // Helper: caller has admin or manager role
+    function isManager() {
+      return isAuth() && (request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
+    }
+
+    // ── Factory production data ──────────────────────────────
+    // All authenticated factory users can read/write production records.
+    // Collections: factory_rawMaterials, factory_dateReceiving,
+    //   factory_fermentation, factory_distillation1, factory_distillation2,
+    //   factory_bottling
+    match /factory_{module}/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isManager();
+    }
+
+    // ── Factory inventory (singleton doc: current) ───────────
+    // Read by authenticated users. Written by backend (Admin SDK) only.
+    match /factory_inventory/{docId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ── Factory users ────────────────────────────────────────
+    // Readable by authenticated users (for login flow).
+    // Writable only by admin/manager (user management).
+    match /factory_users/{docId} {
+      allow read: if isAuth();
+      allow write: if isManager();
+    }
+
+    // ── Factory invitations ──────────────────────────────────
+    // Managed via backend API (Admin SDK). No client-side writes.
+    // Readable by managers for the invitation list.
+    match /factory_invitations/{docId} {
+      allow read: if isManager();
+      allow write: if false;
+    }
+
+    // ── Factory custom options (dropdown values) ─────────────
+    // All authenticated users can read and add custom options.
+    // Only managers can delete (cleanup).
+    match /factory_customOptions/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // ── Factory quick access ─────────────────────────────────
+    // Managed via backend API. No direct client writes.
+    match /factory_quickAccess/{docId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ── CRM stock levels (cross-app sync) ────────────────────
+    // Written by Factory backend (Admin SDK).
+    // Readable by CRM users for inventory display.
+    match /stockLevels/{docId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ── CRM collections ──────────────────────────────────────
+    // Basic auth-gated rules for CRM-side collections.
+    match /clients/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /orders/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /products/{docId} {
+      allow read: if isAuth();
+      allow write: if isManager();
+    }
+
+    match /stockMovements/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+
+    match /inventoryBatches/{docId} {
+      allow read: if isAuth();
+      allow write: if isManager();
+    }
+
+    match /users/{docId} {
+      allow read: if isAuth();
+      allow write: if isManager();
+    }
+
+    match /invitations/{docId} {
+      allow read: if isManager();
+      allow write: if false;
+    }
+
+    // ── Schema metadata ──────────────────────────────────────
+    match /meta/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── Default deny ─────────────────────────────────────────
+    // Any collection not explicitly matched above is denied.
+  }
+}
