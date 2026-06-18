@@ -90,6 +90,20 @@ function addRecord(key, record) {
 }
 
 function updateRecord(key, id, updates) {
+  // Validate: reject prototype pollution keys
+  const dangerousKeys = ['__proto__', 'constructor'];
+  for (const k of Object.keys(updates)) {
+    if (dangerousKeys.includes(k)) {
+      return null;
+    }
+  }
+
+  // Validate: limit update size to 100KB
+  const updatesJSON = JSON.stringify(updates);
+  if (updatesJSON.length > 100 * 1024) {
+    return null;
+  }
+
   const data = getData(key);
   const idx = data.findIndex(r => r.id === id);
   if (idx !== -1) {

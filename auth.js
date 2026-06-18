@@ -3,16 +3,40 @@
 // ============================================================
 
 // --- Password hashing (AUTH-01, AUTH-02, AUTH-03) ---
-function hashPassword(password) {
-  // Simple hash for client-side storage — not a substitute for server-side bcrypt
-  let hash = 0x811c9dc5; // FNV offset basis
+
+// Legacy FNV-1a — kept only for verifying old hashes during migration
+function _hashPasswordLegacy(password) {
+  let hash = 0x811c9dc5;
   for (let i = 0; i < password.length; i++) {
     hash ^= password.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193); // FNV prime
+    hash = Math.imul(hash, 0x01000193);
   }
-  // Add salt-like mixing with password length
   hash = hash ^ (password.length * 0x5bd1e995);
   return 'hashed:' + (hash >>> 0).toString(36);
+}
+
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const hashB64 = btoa(String.fromCharCode(...new Uint8Array(bits)));
+  return 'pbkdf2:' + saltB64 + ':' + hashB64;
+}
+
+async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  if (storedHash.startsWith('pbkdf2:')) {
+    const [, saltB64, expectedB64] = storedHash.split(':');
+    const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);
+    return btoa(String.fromCharCode(...new Uint8Array(bits))) === expectedB64;
+  }
+  if (storedHash.startsWith('hashed:')) return storedHash === _hashPasswordLegacy(password);
+  return storedHash === password;
 }
 
 // --- Password complexity validation (AUTH-08) ---
@@ -236,19 +260,15 @@ async function authenticate(emailOrUsername, password) {
   }
 
   // Legacy: worker accounts created before Firebase Auth migration may still have local hashes
-  const hashedInput = hashPassword(password);
   let passwordMatch = false;
 
-  if (localUser.password.startsWith('hashed:')) {
-    passwordMatch = localUser.password === hashedInput;
-  } else if (localUser.password === password) {
-    // Upgrade legacy plaintext password to hashed (AUTH-01)
+  passwordMatch = await verifyPassword(password, localUser.password);
+  if (passwordMatch && !localUser.password.startsWith('pbkdf2:')) {
     const idx = users.findIndex(u => u.username === localUser.username);
     if (idx !== -1) {
-      users[idx].password = hashedInput;
+      users[idx].password = await hashPassword(password);
       localStorage.setItem('factory_users', JSON.stringify(users));
     }
-    passwordMatch = true;
   }
 
   if (!passwordMatch) {
@@ -448,8 +468,8 @@ async function updateUser(username, updates) {
       const users = getUsers();
       const idx = users.findIndex(u => u.username === username);
       if (idx !== -1) {
-        if (updates.password && !updates.password.startsWith('hashed:')) {
-          updates.password = hashPassword(updates.password);
+        if (updates.password && !updates.password.startsWith('hashed:') && !updates.password.startsWith('pbkdf2:')) {
+          updates.password = await hashPassword(updates.password);
         }
         users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
         localStorage.setItem('factory_users', JSON.stringify(users));
@@ -469,8 +489,8 @@ async function updateUser(username, updates) {
     const rawPassword = updates.password; // keep plaintext for Firebase sync
 
     // Hash password if it's being updated (AUTH-03)
-    if (updates.password && !updates.password.startsWith('hashed:')) {
-      updates.password = hashPassword(updates.password);
+    if (updates.password && !updates.password.startsWith('hashed:') && !updates.password.startsWith('pbkdf2:')) {
+      updates.password = await hashPassword(updates.password);
     }
     users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
     localStorage.setItem('factory_users', JSON.stringify(users));
@@ -539,8 +559,8 @@ async function createUser(userData) {
     });
     if (apiResult && !apiResult.error) {
       // Backend succeeded — also save to localStorage for offline access
-      const hashedPw = (userData.password && !userData.password.startsWith('hashed:'))
-        ? hashPassword(userData.password) : userData.password;
+      const hashedPw = (userData.password && !userData.password.startsWith('hashed:') && !userData.password.startsWith('pbkdf2:'))
+        ? await hashPassword(userData.password) : userData.password;
       const newUser = {
         ...userData,
         password: hashedPw,
@@ -586,8 +606,8 @@ async function createUser(userData) {
   }
 
   // Hash password before storing locally (AUTH-01)
-  const hashedPw = (userData.password && !userData.password.startsWith('hashed:'))
-    ? hashPassword(userData.password)
+  const hashedPw = (userData.password && !userData.password.startsWith('hashed:') && !userData.password.startsWith('pbkdf2:'))
+    ? await hashPassword(userData.password)
     : userData.password;
 
   const newUser = {

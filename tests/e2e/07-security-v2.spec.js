@@ -53,14 +53,13 @@ test.describe('Security: Delete requires manager password', () => {
     await expect(page.locator('.manager-pwd-dialog')).toBeVisible();
     await page.fill('#mpd-password', 'wrongpassword');
     await page.click('.mpd-confirm');
-    const errorText = await page.locator('#mpd-error').textContent();
-    expect(errorText.trim().length).toBeGreaterThan(0);
+    await expect(page.locator('#mpd-error')).not.toBeEmpty();
     await expect(page.locator('.manager-pwd-dialog')).toBeVisible();
 
-    // Correct password → callback fires
+    // Correct password → callback fires (async verification)
     await page.fill('#mpd-password', 'manager123');
     await page.click('.mpd-confirm');
-    expect(await page.evaluate(() => !!window._callbackFired)).toBe(true);
+    await expect.poll(() => page.evaluate(() => !!window._callbackFired)).toBe(true);
   });
 
   test('cancel closes modal without triggering delete', async ({ page }) => {
