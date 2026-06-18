@@ -63,17 +63,18 @@ function showManagerPasswordModal(onSuccess) {
   modal.querySelector('.mpd-cancel').addEventListener('click', close);
   modal.querySelector('.manager-pwd-backdrop').addEventListener('click', close);
 
-  const doConfirm = () => {
+  const doConfirm = async () => {
     const pwd = input.value;
     if (!pwd) { errorEl.textContent = t('required'); return; }
 
     // Verify: must be a manager or admin password
     const users = getUsers();
-    const hashedPwd = typeof hashPassword === 'function' ? hashPassword(pwd) : pwd;
-    const authorized = users.find(
-      u => (u.role === 'manager' || u.role === 'admin') &&
-           (u.password === hashedPwd || u.password === pwd)
-    );
+    let authorized = null;
+    for (const u of users) {
+      if ((u.role === 'manager' || u.role === 'admin') && u.password) {
+        if (await verifyPassword(pwd, u.password)) { authorized = u; break; }
+      }
+    }
     if (!authorized) {
       errorEl.textContent = t('deleteWrongPassword');
       input.value = '';
