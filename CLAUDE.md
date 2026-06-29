@@ -85,3 +85,21 @@ All data in `localStorage` under `factory_*` keys (e.g., `factory_rawMaterials`,
 - Section markers: `// ===`
 - Default test accounts: `admin`/`admin123`, `manager`/`manager123`, `worker1`/`worker123`
 - 3 roles: Admin (full + backoffice), Manager (full production), Worker (add + view only)
+
+## Project Plan & Recent Improvements
+
+Two-phase improvement plan executed in the Jun 6–7 2026 work session, spanning both the Factory Control and CRM apps. Both phases are **shipped** (Factory Control v1.12.0, CRM v6.3.0).
+
+### Phase 1 — Live inventory sync (Feature)
+- The CRM app consumes **live inventory data from Factory Control** (data sync + inventory refresh).
+- Factory Control side: expose inventory data in a clean, scalable, **backward-compatible** way.
+- Status: ✅ Done.
+
+### Phase 2 — Security hardening
+- Remove hardcoded credentials (see commit `d192eaa`).
+- Move Google **Sheets sync behind a backend proxy** (`firestore-sync.js` / `backend/`).
+- Add **security headers**.
+- **Iframe-break / clickjacking protection**.
+- Status: ✅ Done.
+
+> Note: reconstructed from the Jun 6–7 session summary. Update this section as the plan evolves.
