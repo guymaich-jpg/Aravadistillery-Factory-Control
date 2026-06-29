@@ -1,497 +1,30 @@
 // ============================================================
-// script.js — Factory Control App (main controller)
+// script.js — Core UI Rendering (forms, lists, details, views)
 // ============================================================
 
-// ---------- State ----------
-// Restore navigation state from sessionStorage so refresh keeps the user's place
-let currentScreen = sessionStorage.getItem('fc_screen') || 'home';
-let currentModule = sessionStorage.getItem('fc_module') || null;
-let currentView = sessionStorage.getItem('fc_view') || 'list';
-let editingRecord = null;
+// ---- Focus Trap Utility (accessibility) ----
+function _trapFocus(modalEl) {
+  var focusable = modalEl.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (focusable.length === 0) return function() {};
+  var first = focusable[0];
+  var last = focusable[focusable.length - 1];
+  first.focus();
 
-// Persist navigation state on every change
-function _persistNavState() {
-  sessionStorage.setItem('fc_screen', currentScreen || 'home');
-  if (currentModule) sessionStorage.setItem('fc_module', currentModule);
-  else sessionStorage.removeItem('fc_module');
-  sessionStorage.setItem('fc_view', currentView || 'list');
-}
-
-// --- Hash-based routing for browser back/forward ---
-let _suppressHashChange = false;
-
-function _syncHashToState() {
-  _suppressHashChange = true;
-  let hash = '#/';
-  if (currentModule) {
-    hash = '#/' + currentModule;
-    if (currentView && currentView !== 'list') hash += '/' + currentView;
-  } else if (currentScreen && currentScreen !== 'home') {
-    hash = '#/' + currentScreen;
-  }
-  if (location.hash !== hash) {
-    history.pushState(null, '', hash);
-  }
-  _suppressHashChange = false;
-}
-
-function _restoreStateFromHash() {
-  const hash = location.hash.replace('#/', '').split('/');
-  const segment = hash[0] || '';
-  const view = hash[1] || 'list';
-
-  // Handle invitation links: #/invite/TOKEN
-  if (segment === 'invite' && hash[1]) {
-    authMode = 'invite';
-    _inviteToken = hash[1];
-    currentScreen = 'home';
-    currentModule = null;
-    currentView = 'list';
-    return;
-  }
-
-  const moduleNames = ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling', 'inventory'];
-  const screenNames = ['dashboard', 'backoffice', 'home', 'declare', 'menu'];
-
-  if (moduleNames.includes(segment)) {
-    currentModule = segment;
-    currentScreen = segment === 'inventory' ? 'inventory' : segment;
-    currentView = (view === 'form' || view === 'detail') ? view : 'list';
-  } else if (screenNames.includes(segment)) {
-    currentScreen = segment;
-    currentModule = null;
-    currentView = 'list';
-  } else {
-    currentScreen = 'home';
-    currentModule = null;
-    currentView = 'list';
-  }
-  // Can't restore editingRecord from URL, fall back to list
-  if ((currentView === 'form' || currentView === 'detail') && !editingRecord) {
-    currentView = 'list';
-  }
-}
-
-window.addEventListener('popstate', () => {
-  if (_suppressHashChange) return;
-  _restoreStateFromHash();
-  renderApp();
-});
-let signatureCanvas = null;
-let sigCtx = null;
-let sigDrawing = false;
-let _navDirection = 'none'; // 'forward' | 'back' | 'none' — for iOS-style transitions
-const _scrollPositions = {}; // keyed by "screen:module" — preserves scroll on tab switch
-
-// ---------- Helpers ----------
-const $ = sel => document.querySelector(sel);
-const $$ = sel => document.querySelectorAll(sel);
-// NOTE: el() sets innerHTML — callers must ensure any user data is escaped via esc()
-const el = (tag, cls, html) => {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (html !== undefined) e.innerHTML = html;
-  return e;
-};
-
-// HTML escape helper — prevents XSS when interpolating user data into innerHTML
-function esc(s) {
-  if (s === null || s === undefined) return '';
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function todayStr() { return new Date().toISOString().slice(0, 10); }
-
-function formatDate(d) {
-  if (!d) return '-';
-  try { return new Date(d).toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB'); }
-  catch { return d; }
-}
-
-function _renderSparkline(data, color) {
-  if (!data || data.length < 2) return '';
-  const w = 80, h = 22;
-  const max = Math.max(...data), min = Math.min(...data);
-  const pts = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((d - min) / (max - min || 1)) * h;
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const c = color || 'var(--accent)';
-  return `<div class="sparkline-wrap"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${pts}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></div>`;
-}
-
-function showToast(msg) {
-  let toast = $('.toast');
-  if (!toast) {
-    toast = el('div', 'toast');
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-    document.body.appendChild(toast);
-  }
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
-}
-
-// ============================================================
-// GOOGLE SHEETS SYNC
-// ============================================================
-const SHEETS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz4IIUXvDoo7qJH1Ytn7hEWZ85Ek7hViA6riSezMZCXQbjKQG3VwfppQlq0kuTwOHT3/exec';
-const INVENTORY_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
-
-// Sync state for the visual indicator
-let _syncQueue = 0;
-
-// ── Sync infrastructure ──────────────────────────────────────
-
-// Sends a POST to GAS. Always fire-and-forget (no-cors), with 1 retry and console logging.
-async function postToSheets(payload) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
-
-  _syncQueue++;
-  updateSyncIndicator('syncing');
-
-  const attempt = async (n) => {
-    try {
-      await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
-      });
-      return true;
-    } catch (err) {
-      if (n < 1) {
-        await new Promise(r => setTimeout(r, 2000));
-        return attempt(n + 1);
-      }
-      return false;
+  function handler(e) {
+    if (e.key === 'Escape') {
+      var closeBtn = modalEl.querySelector('.mpd-cancel, .modal-close, .inv-sign-cancel');
+      if (closeBtn) closeBtn.click();
+      return;
     }
-  };
-
-  const sent = await attempt(0);
-  _syncQueue--;
-
-  if (!sent) {
-    updateSyncIndicator(_syncQueue > 0 ? 'syncing' : 'error');
-    showToast(t('syncFailed'));
-    return;
-  }
-
-  updateSyncIndicator(_syncQueue > 0 ? 'syncing' : 'success');
-}
-
-// Verifies sync via GET request (GAS doGet supports CORS — we can read the response)
-async function verifySyncStatus(sheetName) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return { verified: false, error: 'no-url' };
-  try {
-    const resp = await fetch(`${url}?action=syncStatus&sheet=${encodeURIComponent(sheetName)}`);
-    if (!resp.ok) return { verified: false, error: 'http-' + resp.status };
-    const data = await resp.json();
-    return { verified: true, ...data };
-  } catch (err) {
-    return { verified: false, error: err.message };
-  }
-}
-
-// Shows a small persistent pill in the corner: Syncing / Synced / Sync failed
-function updateSyncIndicator(state) {
-  let indicator = document.querySelector('.sync-indicator');
-  if (!indicator) {
-    indicator = document.createElement('div');
-    indicator.className = 'sync-indicator';
-    document.body.appendChild(indicator);
-  }
-
-  indicator.className = 'sync-indicator sync-' + state;
-
-  switch (state) {
-    case 'syncing':
-      indicator.innerHTML = '<span class="sync-dot pulse"></span>' + t('syncInProgress');
-      break;
-    case 'success':
-      indicator.innerHTML = '<span class="sync-dot green"></span>' + t('syncSuccess');
-      setTimeout(() => { if (indicator.classList.contains('sync-success')) indicator.classList.add('sync-fade'); }, 4000);
-      break;
-    case 'error':
-      indicator.innerHTML = '<span class="sync-dot red"></span>' + t('syncFailed');
-      break;
-    default:
-      indicator.classList.add('sync-fade');
-  }
-}
-
-// ── Module sync ───────────────────────────────────────────────
-
-function syncModuleToSheets(module) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
-
-  const storeKey = STORE_KEYS[module];
-  if (!storeKey) return;
-
-  const records = getData(storeKey);
-
-  // Build field definitions — bypass permission filter for sync
-  // so decision/all fields always appear in the sheet regardless of who is logged in
-  const allModuleFields = {
-    rawMaterials: [
-      { key: 'date', labelKey: 'rm_receiveDate' },
-      { key: 'supplier', labelKey: 'rm_supplier' },
-      { key: 'category', labelKey: 'rm_category' },
-      { key: 'item', labelKey: 'rm_item' },
-      { key: 'weight', labelKey: 'rm_weight' },
-      { key: 'unit', labelKey: 'rm_unit' },
-      { key: 'expiry', labelKey: 'rm_expiry' },
-      { key: 'tithing', labelKey: 'rm_tithing' },
-      { key: 'healthCert', labelKey: 'rm_healthCert' },
-      { key: 'kosher', labelKey: 'rm_kosher' },
-    ],
-    dateReceiving: [
-      { key: 'date', labelKey: 'dr_receiveDate' },
-      { key: 'supplier', labelKey: 'dr_supplier' },
-      { key: 'weight', labelKey: 'dr_weight' },
-      { key: 'tithing', labelKey: 'dr_tithing' },
-      { key: 'expiryPeriod', labelKey: 'dr_expiryPeriod' },
-      { key: 'qtyInDate', labelKey: 'dr_qtyInDate' },
-    ],
-    fermentation: [
-      { key: 'date', labelKey: 'fm_date' },
-      { key: 'tankSize', labelKey: 'fm_tankSize' },
-      { key: 'datesCrates', labelKey: 'fm_datesCrates' },
-      { key: 'temperature', labelKey: 'fm_temperature' },
-      { key: 'sugar', labelKey: 'fm_sugar' },
-      { key: 'ph', labelKey: 'fm_ph' },
-      { key: 'sentToDistillation', labelKey: 'fm_sentToDistillation' },
-    ],
-    distillation1: [
-      { key: 'date', labelKey: 'd1_date' },
-      { key: 'type', labelKey: 'd1_type' },
-      { key: 'stillName', labelKey: 'd1_stillName' },
-      { key: 'fermDate', labelKey: 'd1_fermDate' },
-      { key: 'distQty', labelKey: 'd1_distQty' },
-      { key: 'initAlcohol', labelKey: 'd1_initAlcohol' },
-      { key: 'finalAlcohol', labelKey: 'd1_finalAlcohol' },
-      { key: 'temp', labelKey: 'd1_temp' },
-      { key: 'timeRange', labelKey: 'd1_timeRange' },
-      { key: 'distilledQty', labelKey: 'd1_distilledQty' },
-    ],
-    distillation2: [
-      { key: 'date', labelKey: 'd2_date' },
-      { key: 'productType', labelKey: 'd2_productType' },
-      { key: 'd1Dates', labelKey: 'd2_d1Dates' },
-      { key: 'batchNumber', labelKey: 'd2_batchNumber' },
-      { key: 'initAlcohol', labelKey: 'd2_initAlcohol' },
-      { key: 'headSep', labelKey: 'd2_headSep' },
-      { key: 'tailAlcohol', labelKey: 'd2_tailAlcohol' },
-      { key: 'temp', labelKey: 'd2_temp' },
-      { key: 'timeRange', labelKey: 'd2_timeRange' },
-      { key: 'quantity', labelKey: 'd2_quantity' },
-      { key: 'd1InputQty', labelKey: 'd2_d1InputQty' },
-    ],
-    bottling: [
-      { key: 'date', labelKey: 'bt_bottlingDate' },
-      { key: 'drinkType', labelKey: 'bt_drinkType' },
-      { key: 'batchNumber', labelKey: 'bt_batchNumber' },
-      { key: 'barrelNumber', labelKey: 'bt_barrelNumber' },
-      { key: 'd2Date', labelKey: 'bt_d2Date' },
-      { key: 'alcohol', labelKey: 'bt_alcohol' },
-      { key: 'filtered', labelKey: 'bt_filtered' },
-      { key: 'color', labelKey: 'bt_color' },
-      { key: 'taste', labelKey: 'bt_taste' },
-      { key: 'contaminants', labelKey: 'bt_contaminants' },
-      { key: 'bottleCount', labelKey: 'bt_bottleCount' },
-      { key: 'd2InputQty', labelKey: 'bt_d2InputQty' },
-      { key: 'decision', labelKey: 'bt_decision' },
-    ],
-  };
-
-  const fields = allModuleFields[module];
-  if (!fields) return;
-
-  const keys = [...fields.map(f => f.key), 'notes', 'createdAt'];
-  const labels = [...fields.map(f => tHe(f.labelKey)), tHe('notes'), 'Created At'];
-
-  // Map of dropdown field keys to their i18n option lists per module
-  const dropdownFields = {
-    rawMaterials: { supplier: SUPPLIERS_RAW, category: CATEGORIES, unit: null },
-    dateReceiving: { supplier: SUPPLIERS_DATES },
-    fermentation: {},
-    distillation1: { type: D1_TYPES, stillName: STILL_NAMES },
-    distillation2: { productType: D2_PRODUCT_TYPES },
-    bottling: { drinkType: DRINK_TYPES, filtered: null, color: null, taste: null, decision: null },
-  };
-  const dropdowns = dropdownFields[module] || {};
-
-  // Format dropdown values as "key (Hebrew label)" for the sheet
-  const formattedRecords = records.map(r => {
-    const copy = { ...r };
-    Object.keys(dropdowns).forEach(fieldKey => {
-      const val = copy[fieldKey];
-      if (val && typeof val === 'string' && I18N.he[val]) {
-        copy[fieldKey] = val + ' (' + tHe(val) + ')';
-      }
-    });
-    return copy;
-  });
-
-  postToSheets({
-    sheetName: tHe('mod_' + module),
-    keys,
-    labels,
-    records: formattedRecords,
-    freeTextKeys: ['notes'],
-  });
-}
-
-
-// ============================================================
-// THEME
-// ============================================================
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'light';
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('factory_theme', next);
-  const btn = document.querySelector('.theme-btn');
-  if (btn) btn.innerHTML = next === 'dark'
-    ? '<i data-feather="sun" class="icon-sm"></i>'
-    : '<i data-feather="moon" class="icon-sm"></i>';
-  if (typeof feather !== 'undefined') feather.replace();
-}
-
-function togglePalette() {
-  const palettes = ['terroir', 'desert', 'kiln', 'mono'];
-  const current = document.documentElement.getAttribute('data-palette') || 'terroir';
-  const idx = palettes.indexOf(current);
-  const next = palettes[(idx + 1) % palettes.length];
-  document.documentElement.setAttribute('data-palette', next);
-  localStorage.setItem('factory_palette', next);
-  renderApp();
-}
-
-// Sync bottle counts to the CRM stockLevels Firestore collection.
-// Called as fallback when the backend API is unavailable.
-// CRM products: 1=ערק, 2=ליקריץ, 3=ADV, 4=ג'ין, 5=ברנדי
-function syncCrmStockLevels(bottleInv) {
-  if (typeof fbSetDoc !== 'function') return;
-  var DRINK_TO_CRM = {
-    drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
-    drink_brandyVS: '5', drink_brandyVSOP: '5', drink_brandyMed: '5',
-  };
-  var aggregated = {};
-  Object.keys(bottleInv).forEach(function(dt) {
-    var pid = DRINK_TO_CRM[dt];
-    if (!pid) return;
-    aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
-  });
-  var now = new Date().toISOString();
-  Object.keys(aggregated).forEach(function(productId) {
-    fbSetDoc('stockLevels', productId, {
-      productId: productId,
-      currentStock: aggregated[productId],
-      unit: 'בקבוק',
-      lastUpdated: now,
-      factoryLastSync: now,
-    }, true).catch(function() {});
-  });
-}
-
-// Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
-// Called automatically after any record is saved, updated, or deleted.
-function syncInventorySnapshot(triggeredBy) {
-  const bottlingRecords = getData(STORE_KEYS.bottling);
-  const rawRecords = getData(STORE_KEYS.rawMaterials);
-  const dateRecords = getData(STORE_KEYS.dateReceiving);
-  const fermRecords = getData(STORE_KEYS.fermentation);
-  const d1Records = getData(STORE_KEYS.distillation1);
-  const d2Records = getData(STORE_KEYS.distillation2);
-
-  // Base inventory (read first so we can filter bottling by declaration date)
-  const baseRecords = getData(STORE_KEYS.inventoryBase);
-  const baseDeclaredAt = (baseRecords.length > 0 && baseRecords[0].declared_at) || null;
-
-  const bottleInv = {};
-  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
-  if (baseRecords.length > 0) {
-    const latestBase = baseRecords[0];
-    DRINK_TYPES.forEach(dt => {
-      bottleInv[dt] = (bottleInv[dt] || 0) + (parseInt(latestBase[dt]) || 0);
-    });
-  }
-  // Only count bottling records created after the last declaration
-  bottlingRecords.forEach(r => {
-    if (r.drinkType && r.decision === 'approved') {
-      if (!baseDeclaredAt || (r.createdAt && r.createdAt > baseDeclaredAt)) {
-        bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
-      }
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-  });
-
-  const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
-  const totalDatesInFerm = fermRecords.reduce((sum, r) => {
-    if (r.datesCrates !== undefined && r.datesCrates !== '') return sum + (parseFloat(r.datesCrates) || 0) * 20;
-    return sum + (parseFloat(r.datesKg) || 0);
-  }, 0);
-
-  const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
-  const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
-  const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
-  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
-
-  const session = getSession();
-  const record = {
-    timestamp: new Date().toISOString(),
-    user: session?.username || 'unknown',
-    triggeredBy: triggeredBy || 'save',
-    dates_available: Math.max(0, totalDatesReceived - totalDatesInFerm),
-    dates_received: totalDatesReceived,
-    dates_in_ferm: totalDatesInFerm,
-    d1_produced: d1Produced,
-    d1_available: Math.max(0, d1Produced - d1Consumed),
-    d2_produced: d2Produced,
-    d2_available: Math.max(0, d2Produced - d2Consumed),
-    ...DRINK_TYPES.reduce((acc, dt) => ({ ...acc, [dt]: bottleInv[dt] || 0 }), {}),
-  };
-
-  const keys = Object.keys(record);
-  const labels = [
-    'Timestamp', 'User', 'Triggered By',
-    tHe('inv_dates'), 'Dates Received (kg)', tHe('inv_datesUsed'),
-    'D1 Produced (L)', 'D1 Available (L)',
-    'D2 Produced (L)', 'D2 Available (L)',
-    ...DRINK_TYPES.map(dt => tHe(dt)),
-  ];
-
-  if (SHEETS_SYNC_URL) {
-    postToSheets({
-      sheetName: tHe('mod_inventory'),
-      action: 'append',
-      keys,
-      labels,
-      records: [record],
-    });
   }
-
-  // Write directly to Firestore (primary path — immediate, no backend dependency)
-  if (typeof fbSetDoc === 'function') {
-    fbSetDoc('factory_inventory', 'current', {
-      bottles: { ...bottleInv },
-      total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
-      updatedAt: new Date().toISOString(),
-      updatedBy: session?.username || 'system',
-      trigger: triggeredBy || 'save',
-    }).catch(function() {});
-  }
-
-  syncCrmStockLevels(bottleInv);
-
-  // Also notify backend (fire-and-forget for any server-side processing)
-  if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').catch(function() {});
-  }
+  modalEl.addEventListener('keydown', handler);
+  return function() { modalEl.removeEventListener('keydown', handler); };
 }
 
 // ---- Manager Password Modal (required for any delete action) ----
@@ -521,24 +54,27 @@ function showManagerPasswordModal(onSuccess) {
 
   const input = modal.querySelector('#mpd-password');
   const errorEl = modal.querySelector('#mpd-error');
-  input.focus();
 
-  const close = () => modal.remove();
+  const dialog = modal.querySelector('.manager-pwd-dialog');
+  const _releaseFocus = _trapFocus(dialog);
+
+  const close = () => { _releaseFocus(); modal.remove(); };
 
   modal.querySelector('.mpd-cancel').addEventListener('click', close);
   modal.querySelector('.manager-pwd-backdrop').addEventListener('click', close);
 
-  const doConfirm = () => {
+  const doConfirm = async () => {
     const pwd = input.value;
     if (!pwd) { errorEl.textContent = t('required'); return; }
 
     // Verify: must be a manager or admin password
     const users = getUsers();
-    const hashedPwd = typeof hashPassword === 'function' ? hashPassword(pwd) : pwd;
-    const authorized = users.find(
-      u => (u.role === 'manager' || u.role === 'admin') &&
-           (u.password === hashedPwd || u.password === pwd)
-    );
+    let authorized = null;
+    for (const u of users) {
+      if ((u.role === 'manager' || u.role === 'admin') && u.password) {
+        if (await verifyPassword(pwd, u.password)) { authorized = u; break; }
+      }
+    }
     if (!authorized) {
       errorEl.textContent = t('deleteWrongPassword');
       input.value = '';
@@ -655,7 +191,7 @@ function renderLogin() {
   if (authMode === 'request') return renderRequestAccess();
 
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -667,12 +203,12 @@ function renderLogin() {
 
       <div class="login-form">
         <div class="field">
-          <label class="label-form">${t('emailAddress')}</label>
+          <label class="label-form" for="login-user">${t('emailAddress')}</label>
           <input type="email" id="login-user" placeholder="${t('emailAddress')}"
             aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
         <div class="field">
-          <label class="label-form">${t('password')}</label>
+          <label class="label-form" for="login-pass">${t('password')}</label>
           <input type="password" id="login-pass" placeholder="${t('password')}"
             aria-label="${t('password')}" autocomplete="current-password">
         </div>
@@ -688,7 +224,7 @@ function renderLogin() {
 
 function renderRequestAccess() {
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -700,10 +236,12 @@ function renderRequestAccess() {
 
       <div class="login-form">
         <div class="field">
+          <label class="label-form" for="req-name">${t('fullName')}</label>
           <input type="text" id="req-name" placeholder="${t('fullName')}"
             aria-label="${t('fullName')}" autocomplete="name">
         </div>
         <div class="field">
+          <label class="label-form" for="req-email">${t('emailAddress')}</label>
           <input type="email" id="req-email" placeholder="${t('emailAddress')}"
             aria-label="${t('emailAddress')}" autocomplete="email" autocapitalize="none" spellcheck="false">
         </div>
@@ -723,7 +261,7 @@ function renderRequestAccess() {
 // ============================================================
 function renderInviteRegistration() {
   return `
-    <button class="login-lang-toggle" onclick="toggleLang()">${t('langToggle')}</button>
+    <button class="login-lang-toggle">${t('langToggle')}</button>
     <div class="login-screen">
 
       <div class="login-brand">
@@ -743,16 +281,20 @@ function renderInviteRegistration() {
 
       <div id="invite-form-wrap" class="login-form invite-form-hidden">
         <div class="field">
+          <label class="label-form" for="inv-email">${t('emailAddress')}</label>
           <input type="email" id="inv-email" placeholder="${t('emailAddress')}" disabled
             aria-label="${t('emailAddress')}" class="invite-email-locked" autocomplete="email">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-name">${t('nameEnglish')}</label>
           <input type="text" id="inv-name" placeholder="${t('nameEnglish')}" aria-label="${t('nameEnglish')}" autocomplete="name">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-nameHe">${t('nameHebrew')}</label>
           <input type="text" id="inv-nameHe" placeholder="${t('nameHebrew')}" aria-label="${t('nameHebrew')}" dir="rtl" autocomplete="off">
         </div>
         <div class="field">
+          <label class="label-form" for="inv-password">${t('password')}</label>
           <input type="password" id="inv-password" placeholder="${t('password')}" aria-label="${t('password')}" autocomplete="new-password">
         </div>
         <button class="login-btn" id="inv-submit-btn">${t('createAccount')}</button>
@@ -879,6 +421,12 @@ function bindLogin() {
       history.replaceState(null, '', location.pathname);
       renderApp();
     });
+  }
+
+  // --- Language toggle on login/request/invite screens ---
+  const loginLangBtn = $('.login-lang-toggle');
+  if (loginLangBtn) {
+    loginLangBtn.addEventListener('click', () => { toggleLang(); });
   }
 }
 
@@ -1058,10 +606,10 @@ function renderHeader() {
       </div>
       <span class="header-title t-serif">${esc(title)}</span>
       <div class="header-right">
-        <button class="theme-btn" onclick="toggleTheme()" aria-label="${t('toggleTheme') || 'Toggle theme'}">
+        <button class="theme-btn" aria-label="${t('toggleTheme') || 'Toggle theme'}">
           ${isDark ? '<i data-feather="sun" class="icon-sm"></i>' : '<i data-feather="moon" class="icon-sm"></i>'}
         </button>
-        <button class="lang-btn" onclick="toggleLang()">${t('langToggle')}</button>
+        <button class="lang-btn">${t('langToggle')}</button>
         <button class="logout-btn" id="logout-btn" aria-label="${t('logoutLabel') || 'Log out'}"><i data-feather="log-out" class="icon-sm"></i></button>
       </div>
     </header>
@@ -1169,11 +717,66 @@ function bindNav() {
       renderApp();
     });
   }
+
+  // Theme toggle (header)
+  const themeBtn = $('.theme-btn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => { toggleTheme(); });
+  }
+
+  // Language toggle (header)
+  const langBtn = $('.lang-btn');
+  if (langBtn) {
+    langBtn.addEventListener('click', () => { toggleLang(); });
+  }
 }
 
 // ============================================================
 // DASHBOARD
 // ============================================================
+
+function _renderDashboardBarChart(modules) {
+  const chartModules = modules.filter(m => m.store);
+  const counts = chartModules.map(m => getData(m.store).length);
+  const maxCount = Math.max(...counts, 1);
+
+  if (counts.every(c => c === 0)) {
+    return `<div class="dashboard-chart"><div class="chart-title">${t('recordsPerModule')}</div><p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">${t('noRecordsYet')}</p></div>`;
+  }
+
+  const barHeight = 28;
+  const labelWidth = 120;
+  const chartPadding = 8;
+  const gap = 6;
+  const svgHeight = chartModules.length * (barHeight + gap) + chartPadding * 2;
+  const svgWidth = 400;
+  const barAreaWidth = svgWidth - labelWidth - 50;
+
+  const bars = chartModules.map((m, i) => {
+    const count = counts[i];
+    const barW = Math.max((count / maxCount) * barAreaWidth, 2);
+    const y = chartPadding + i * (barHeight + gap);
+    const label = getModuleTitle(m.key);
+    // Use module CSS variable colors mapped to actual values for SVG
+    const colors = ['#3F5147', '#8B6914', '#2C332F', '#5C6E64', '#7D4E24', '#4A3728', '#3D5A52'];
+    const color = colors[i] || '#3F5147';
+    return `
+      <g class="chart-bar">
+        <text x="${labelWidth - 8}" y="${y + barHeight / 2 + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="11" font-family="var(--font-ui)">${esc(label)}</text>
+        <rect x="${labelWidth}" y="${y + 4}" width="${barW}" height="${barHeight - 8}" rx="3" fill="${color}" opacity="0.85"/>
+        <text x="${labelWidth + barW + 6}" y="${y + barHeight / 2 + 4}" fill="var(--text)" font-size="11" font-weight="600" font-family="var(--font-ui)">${count}</text>
+      </g>`;
+  }).join('');
+
+  return `
+    <div class="dashboard-chart">
+      <div class="chart-title">${t('recordsPerModule')}</div>
+      <svg viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${t('recordsPerModule')}">
+        ${bars}
+      </svg>
+    </div>`;
+}
+
 function renderDashboard(container) {
   const session = getSession();
   const modules = [
@@ -1271,6 +874,8 @@ function renderDashboard(container) {
         }).join('')}
       </div>
     ` : ''}
+
+    ${_renderDashboardBarChart(modules)}
   `;
 
   // Bind module cards
@@ -1408,6 +1013,9 @@ function renderHomeInventory(container) {
       <i data-feather="edit-3"></i> ${t('home_declareBtn')}
     </button>
     <div class="declare-hint">${t('home_declareHint')}</div>
+    <button class="btn btn-block" id="home-crm-sync-btn" style="margin-top:8px;font-size:13px;opacity:0.7">
+      <i data-feather="refresh-cw"></i> סנכרן מלאי ל-CRM
+    </button>
 
     <div class="v2-section-head" style="margin-top:6px">
       <div class="eyebrow">${t('home_goToMenu')}</div>
@@ -1431,6 +1039,12 @@ function renderHomeInventory(container) {
   const declareBtn = container.querySelector('#home-declare-btn');
   if (declareBtn) declareBtn.addEventListener('click', () => {
     currentScreen = 'declare'; _navDirection = 'forward'; renderApp();
+  });
+
+  const crmSyncBtn = container.querySelector('#home-crm-sync-btn');
+  if (crmSyncBtn) crmSyncBtn.addEventListener('click', () => {
+    syncInventorySnapshot('manual-crm-sync');
+    showToast('סנכרון CRM הופעל — בדוק קונסול');
   });
 
   container.querySelectorAll('.hub-tile').forEach(tile => {
@@ -1670,6 +1284,35 @@ function renderMenu(container) {
 // ============================================================
 // MODULE LIST VIEW
 // ============================================================
+// Pagination state per module
+const _listPageSize = 20;
+const _listPages = {};
+const _listSearch = {};
+let _batchSelected = new Set();
+
+function _filterRecords(records, query) {
+  if (!query) return records;
+  const q = query.toLowerCase();
+  return records.filter(r => {
+    return Object.values(r).some(v => v != null && String(v).toLowerCase().includes(q));
+  });
+}
+
+function _canBatchApprove() {
+  if (currentModule !== 'bottling') return false;
+  const session = getSession();
+  return session && (session.role === 'admin' || session.role === 'manager');
+}
+
+function _renderBatchActionBar() {
+  if (_batchSelected.size === 0) return '';
+  return `<div class="batch-action-bar" id="batch-action-bar">
+    <span class="batch-count">${t('selectedCount').replace('{count}', _batchSelected.size)}</span>
+    <button class="btn btn-primary" id="batch-approve-btn">${t('approveAll')}</button>
+    <button class="btn btn-secondary" id="batch-cancel-btn">${t('cancel')}</button>
+  </div>`;
+}
+
 function renderModuleList(container) {
   if (currentModule === 'inventory') {
     renderInventory(container);
@@ -1677,6 +1320,8 @@ function renderModuleList(container) {
   }
   const storeKey = STORE_KEYS[currentModule];
   if (!storeKey) { container.innerHTML = '<p>Unknown module</p>'; return; }
+
+  const showBatchCheckboxes = _canBatchApprove();
 
   // Sub-tabs for receiving and production
   let tabs = null;
@@ -1693,7 +1338,12 @@ function renderModuleList(container) {
     ];
   }
 
-  const records = getData(storeKey);
+  const allRecords = getData(storeKey);
+  const searchQuery = _listSearch[currentModule] || '';
+  const filtered = _filterRecords(allRecords, searchQuery);
+  const page = _listPages[currentModule] || 1;
+  const visible = filtered.slice(0, page * _listPageSize);
+  const hasMore = visible.length < filtered.length;
 
   container.innerHTML = `
     ${tabs ? `
@@ -1704,7 +1354,15 @@ function renderModuleList(container) {
       </div>
     ` : ''}
 
-    ${hasPermission('canExportData') && records.length ? `
+    ${allRecords.length > 5 ? `
+      <div class="search-bar">
+        <i data-feather="search" class="icon-sm search-icon"></i>
+        <input type="search" class="form-input search-input" id="list-search"
+          placeholder="${t('search')}" value="${esc(searchQuery)}" aria-label="${t('search')}">
+      </div>
+    ` : ''}
+
+    ${hasPermission('canExportData') && filtered.length ? `
       <div class="export-btn-wrap">
         <button class="btn btn-secondary btn-export" id="export-btn">
           <i data-feather="download" class="icon-sm icon-inline"></i>${t('exportCSV')}
@@ -1713,20 +1371,24 @@ function renderModuleList(container) {
     ` : ''}
 
     <div class="v2-section-head">
-      <div class="eyebrow">${t('recentEntries')} (${records.length})</div>
+      <div class="eyebrow">${t('recentEntries')} (${filtered.length})</div>
+      ${filtered.length > _listPageSize ? `<div class="list-paging">${t('showingXofY').replace('{x}', visible.length).replace('{y}', filtered.length)}</div>` : ''}
     </div>
 
-    ${records.length === 0 ? `
+    ${filtered.length === 0 ? `
       <div class="empty-state empty-state-v2">
         <div class="e-icon"><i data-feather="inbox"></i></div>
         <h3>${t('noData')}</h3>
-        ${hasPermission('canAddRecords') ? `<p>${t('tapPlusToAdd')}</p>` : ''}
+        ${hasPermission('canAddRecords') && !searchQuery ? `<p>${t('tapPlusToAdd')}</p>` : ''}
       </div>
     ` : `
       <div class="record-list">
-        ${records.map(r => renderRecordItem(r)).join('')}
+        ${visible.map(r => renderRecordItem(r, showBatchCheckboxes)).join('')}
       </div>
+      ${hasMore ? `<button class="btn btn-secondary load-more-btn" id="load-more">${t('showMore')}</button>` : ''}
     `}
+
+    ${showBatchCheckboxes ? _renderBatchActionBar() : ''}
   `;
 
   // FAB
@@ -1749,6 +1411,7 @@ function renderModuleList(container) {
       if (sc) _scrollPositions[(currentModule || currentScreen) + ':' + currentView] = sc.scrollTop;
       currentModule = btn.dataset.tab;
       currentView = 'list';
+      _batchSelected = new Set();
       renderApp();
     });
   });
@@ -1762,11 +1425,38 @@ function renderModuleList(container) {
     });
   }
 
+  // Bind search
+  const searchInput = container.querySelector('#list-search');
+  if (searchInput) {
+    let _searchTimeout = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(_searchTimeout);
+      _searchTimeout = setTimeout(() => {
+        _listSearch[currentModule] = searchInput.value.trim();
+        _listPages[currentModule] = 1;
+        renderModuleList(container);
+        if (typeof feather !== 'undefined') feather.replace();
+        const newInput = container.querySelector('#list-search');
+        if (newInput) { newInput.focus(); newInput.selectionStart = newInput.value.length; }
+      }, 300);
+    });
+  }
+
+  // Bind load more
+  const loadMoreBtn = container.querySelector('#load-more');
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      _listPages[currentModule] = (page || 1) + 1;
+      renderModuleList(container);
+      if (typeof feather !== 'undefined') feather.replace();
+    });
+  }
+
   // Bind approve buttons (bottling quick-approve for admin)
   container.querySelectorAll('.approve-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (records.find(r => r.id === btn.dataset.id)) {
+      if (filtered.find(r => r.id === btn.dataset.id)) {
         updateRecord(storeKey, btn.dataset.id, { decision: 'approved' });
         syncModuleToSheets(currentModule);
         syncInventorySnapshot('approve');
@@ -1775,10 +1465,34 @@ function renderModuleList(container) {
     });
   });
 
+  // Bind batch checkboxes
+  if (showBatchCheckboxes) {
+    container.querySelectorAll('.batch-checkbox').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const id = cb.dataset.id;
+        if (cb.checked) {
+          _batchSelected.add(id);
+        } else {
+          _batchSelected.delete(id);
+        }
+        // Re-render batch bar only
+        const existingBar = container.querySelector('#batch-action-bar');
+        if (existingBar) existingBar.remove();
+        if (_batchSelected.size > 0) {
+          container.insertAdjacentHTML('beforeend', _renderBatchActionBar());
+          _bindBatchBarButtons(container, storeKey);
+        }
+      });
+      cb.addEventListener('click', (e) => e.stopPropagation());
+    });
+    _bindBatchBarButtons(container, storeKey);
+  }
+
   // Bind record items
   container.querySelectorAll('.record-item').forEach(item => {
     item.addEventListener('click', () => {
-      editingRecord = records.find(r => r.id === item.dataset.id);
+      editingRecord = filtered.find(r => r.id === item.dataset.id);
       currentView = 'detail';
       _navDirection = 'forward';
       renderApp();
@@ -1786,7 +1500,33 @@ function renderModuleList(container) {
   });
 }
 
-function renderRecordItem(r) {
+function _bindBatchBarButtons(container, storeKey) {
+  const approveBtn = container.querySelector('#batch-approve-btn');
+  if (approveBtn) {
+    approveBtn.addEventListener('click', () => {
+      const session = getSession();
+      const approver = session ? (session.username || session.name || '') : '';
+      _batchSelected.forEach(id => {
+        updateRecord(storeKey, id, { decision: 'approved', approvedBy: approver });
+      });
+      if (typeof syncModuleToSheets === 'function') syncModuleToSheets(currentModule);
+      showToast(t('approveAll') + ' ✓');
+      _batchSelected = new Set();
+      renderApp();
+    });
+  }
+  const cancelBtn = container.querySelector('#batch-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      _batchSelected = new Set();
+      container.querySelectorAll('.batch-checkbox').forEach(cb => { cb.checked = false; });
+      const bar = container.querySelector('#batch-action-bar');
+      if (bar) bar.remove();
+    });
+  }
+}
+
+function renderRecordItem(r, showCheckbox) {
   let title = '';
   const chips = [];
 
@@ -1846,16 +1586,22 @@ function renderRecordItem(r) {
   const deletedClass = r._deleted ? ' record-deleted' : '';
   const deletedChip = r._deleted ? `<span class="ri-badge deleted v2-pill rejected">${t('deleted')}</span>` : '';
 
+  const checkboxHtml = showCheckbox ? `<input type="checkbox" class="batch-checkbox" data-id="${esc(r.id)}" ${_batchSelected.has(r.id) ? 'checked' : ''} aria-label="${t('batchApprove')}">` : '';
+  const hasCheckboxClass = showCheckbox ? ' has-checkbox' : '';
+
   return `
-    <div class="record-item v2${deletedClass}" data-id="${esc(r.id)}" data-module="${esc(currentModule)}">
-      <div class="ri-head">
-        <span class="ri-title">${title}</span>
-        <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
-      </div>
-      <div class="ri-chips">
-        ${chips.map(c => `<span class="v2-pill">${c}</span>`).join('')}
-        ${statusChip}
-        ${deletedChip}
+    <div class="record-item v2${deletedClass}${hasCheckboxClass}" data-id="${esc(r.id)}" data-module="${esc(currentModule)}">
+      ${checkboxHtml}
+      <div class="ri-content">
+        <div class="ri-head">
+          <span class="ri-title">${title}</span>
+          <span class="ri-date">${formatDate(r.date || r.createdAt)}</span>
+        </div>
+        <div class="ri-chips">
+          ${chips.map(c => `<span class="v2-pill">${c}</span>`).join('')}
+          ${statusChip}
+          ${deletedChip}
+        </div>
       </div>
     </div>
   `;
@@ -2082,21 +1828,22 @@ function renderFormField(f, val) {
     case 'date':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="date" class="form-input" id="field-${f.key}" value="${esc(val || todayStr())}">
         </div>`;
 
     case 'number':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="number" class="form-input" id="field-${f.key}" value="${esc(val)}" step="${f.step || 'any'}" min="${f.min ?? ''}" max="${f.max ?? ''}" placeholder="${f.placeholder || ''}">
+          ${f.hint ? '<div class="field-hint">' + esc(f.hint) + '</div>' : ''}
         </div>`;
 
     case 'text':
       return `
         <div class="form-group${f.hidden ? ' form-group-hidden' : ''}">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <input type="text" class="form-input" id="field-${f.key}" value="${esc(val)}" placeholder="${f.placeholder || ''}">
         </div>`;
 
@@ -2107,7 +1854,7 @@ function renderFormField(f, val) {
       const skipAddNew = f.noCustom === true;
       return `
         <div class="form-group custom-select-group" data-field-key="${f.key}">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <select class="form-select" id="field-${f.key}">
             <option value="">${t('selectOne')}</option>
             ${(f.options || []).map(o => {
@@ -2133,7 +1880,7 @@ function renderFormField(f, val) {
     case 'cascading-select':
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}${reqMark}</label>
+          <label class="form-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
           <select class="form-select" id="field-${f.key}" data-cascade-parent="${f.parentKey}">
             <option value="">${t('selectOne')}</option>
           </select>
@@ -2144,7 +1891,7 @@ function renderFormField(f, val) {
       return `
         <div class="form-group">
           <div class="toggle-row">
-            <span class="toggle-label">${t(f.labelKey)}${reqMark}</span>
+            <label class="toggle-label" for="field-${f.key}">${t(f.labelKey)}${reqMark}</label>
             <label class="toggle-switch">
               <input type="checkbox" id="field-${f.key}" ${checked}>
               <span class="toggle-slider"></span>
@@ -2156,7 +1903,7 @@ function renderFormField(f, val) {
       const parts = (val || '').split('-');
       return `
         <div class="form-group">
-          <label class="form-label">${t(f.labelKey)}</label>
+          <label class="form-label" for="field-${f.key}-start">${t(f.labelKey)}</label>
           <div class="time-range-row">
             <input type="time" class="form-input" id="field-${f.key}-start" value="${esc(parts[0] || '')}">
             <span>—</span>
@@ -2264,6 +2011,17 @@ function saveCurrentForm() {
       }
     }
   });
+  // Validate number field min/max constraints
+  fields.forEach(f => {
+    if (f.type === 'number') {
+      const fieldEl = document.querySelector(`#field-${f.key}`);
+      if (fieldEl && fieldEl.value !== '' && !fieldEl.validity.valid) {
+        missing.push(t(f.labelKey));
+        fieldEl.classList.add('field-error');
+      }
+    }
+  });
+
   if (missing.length > 0) {
     showToast(`${t('required')}: ${missing.join(', ')}`);
     // Scroll to first error
@@ -2674,7 +2432,10 @@ function showSignInventoryModal(bottleInv, baseInv) {
   document.body.appendChild(overlay);
   if (typeof feather !== 'undefined') feather.replace();
 
-  const close = () => overlay.remove();
+  const modalContent = overlay.querySelector('.modal-content');
+  const _releaseFocus = _trapFocus(modalContent);
+
+  const close = () => { _releaseFocus(); overlay.remove(); };
   overlay.querySelector('.modal-close').addEventListener('click', close);
   overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2745,7 +2506,10 @@ function showImportBaseInventoryModal() {
   document.body.appendChild(overlay);
   if (typeof feather !== 'undefined') feather.replace();
 
-  const close = () => overlay.remove();
+  const modalContent = overlay.querySelector('.modal-content');
+  const _releaseFocus = _trapFocus(modalContent);
+
+  const close = () => { _releaseFocus(); overlay.remove(); };
   overlay.querySelector('.modal-close').addEventListener('click', close);
   overlay.querySelector('.inv-sign-cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2816,694 +2580,3 @@ function renderSpiritStock(container) {
     </div>`;
 }
 
-// ============================================================
-// MODULE FIELD DEFINITIONS
-// ============================================================
-function getModuleFields(mod) {
-  switch (mod) {
-    case 'rawMaterials':
-      return [
-        {
-          key: 'supplier', labelKey: 'rm_supplier', type: 'select', required: true,
-          options: SUPPLIERS_RAW.map(s => ({ value: s, labelKey: s }))
-        },
-        { key: 'date', labelKey: 'rm_receiveDate', type: 'date', required: true, default: todayStr() },
-        {
-          key: 'category', labelKey: 'rm_category', type: 'select', required: true,
-          options: CATEGORIES.map(c => ({ value: c, labelKey: c }))
-        },
-        { key: 'item', labelKey: 'rm_item', type: 'cascading-select', required: true, parentKey: 'category' },
-        { key: 'weight', labelKey: 'rm_weight', type: 'number', required: true, step: '0.01', min: 0 },
-        { key: 'expiry', labelKey: 'rm_expiry', type: 'date' },
-        { key: 'tithing', labelKey: 'rm_tithing', type: 'toggle' },
-        { key: 'healthCert', labelKey: 'rm_healthCert', type: 'toggle' },
-        { key: 'kosher', labelKey: 'rm_kosher', type: 'toggle' },
-      ];
-
-    case 'dateReceiving':
-      return [
-        {
-          key: 'supplier', labelKey: 'dr_supplier', type: 'select', required: true,
-          options: SUPPLIERS_DATES.map(s => ({ value: s, labelKey: s }))
-        },
-        { key: 'date', labelKey: 'dr_receiveDate', type: 'date', required: true, default: todayStr() },
-        { key: 'weight', labelKey: 'dr_weight', type: 'number', required: true, step: '0.1', min: 0 },
-        { key: 'tithing', labelKey: 'dr_tithing', type: 'toggle' },
-        {
-          key: 'expiryPeriod', labelKey: 'dr_expiryPeriod', type: 'select',
-          options: [
-            { value: '1year', labelKey: 'dr_expiryPeriod_1year' },
-            { value: 'custom', labelKey: 'dr_expiryPeriod_custom' },
-          ]
-        },
-      ];
-
-    case 'fermentation':
-      return [
-        { key: 'date', labelKey: 'fm_date', type: 'date', required: true, default: todayStr() },
-        {
-          key: 'tankSize', labelKey: 'fm_tankSize', type: 'select', required: true, noCustom: true,
-          options: TANK_SIZES.map(s => ({ value: String(s), label: s + ' L' }))
-        },
-        { key: 'datesCrates', labelKey: 'fm_datesCrates', type: 'number', required: true, step: '1', min: '0' },
-        { key: 'temperature', labelKey: 'fm_temperature', type: 'number', step: '0.1' },
-        { key: 'sugar', labelKey: 'fm_sugar', type: 'number', step: '0.1' },
-        { key: 'ph', labelKey: 'fm_ph', type: 'number', step: '0.01', min: 0, max: 14 },
-        { key: 'sentToDistillation', labelKey: 'fm_sentToDistillation', type: 'toggle' },
-      ];
-
-    case 'distillation1':
-      return [
-        { key: 'date', labelKey: 'd1_date', type: 'date', required: true, default: todayStr() },
-        {
-          key: 'type', labelKey: 'd1_type', type: 'select', required: true,
-          options: D1_TYPES.map(t => ({ value: t, labelKey: t }))
-        },
-        {
-          key: 'stillName', labelKey: 'd1_stillName', type: 'select', required: true,
-          options: STILL_NAMES.map(s => ({ value: s, labelKey: s }))
-        },
-        { key: 'fermDate', labelKey: 'd1_fermDate', type: 'date' },
-        { key: 'distQty', labelKey: 'd1_distQty', type: 'number', step: '0.1' },
-        { key: 'initAlcohol', labelKey: 'd1_initAlcohol', type: 'number', step: '0.1', min: 0, max: 100 },
-        { key: 'finalAlcohol', labelKey: 'd1_finalAlcohol', type: 'number', step: '0.1', min: 0, max: 100 },
-        { key: 'temp', labelKey: 'd1_temp', type: 'number', step: '0.1', default: '99.9' },
-        { key: 'timeRange', labelKey: 'd1_timeRange', type: 'time-range' },
-        { key: 'distilledQty', labelKey: 'd1_distilledQty', type: 'number', required: true, step: '0.1' },
-      ];
-
-    case 'distillation2':
-      return [
-        { key: 'date', labelKey: 'd2_date', type: 'date', required: true, default: todayStr() },
-        {
-          key: 'productType', labelKey: 'd2_productType', type: 'select', required: true,
-          options: D2_PRODUCT_TYPES.map(t => ({ value: t, labelKey: t }))
-        },
-        { key: 'd1Dates', labelKey: 'd2_d1Dates', type: 'text', placeholder: 'e.g. 1.1 / 2.1 / 5.1' },
-        { key: 'batchNumber', labelKey: 'd2_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102, G7' },
-        { key: 'initAlcohol', labelKey: 'd2_initAlcohol', type: 'number', step: '0.1', min: 0, max: 100 },
-        { key: 'headSep', labelKey: 'd2_headSep', type: 'toggle', default: true },
-        { key: 'tailAlcohol', labelKey: 'd2_tailAlcohol', type: 'number', step: '0.01', default: '0.55' },
-        { key: 'temp', labelKey: 'd2_temp', type: 'number', step: '0.1', default: '99.9' },
-        { key: 'timeRange', labelKey: 'd2_timeRange', type: 'time-range' },
-        { key: 'quantity', labelKey: 'd2_quantity', type: 'number', required: true, step: '0.1' },
-        { key: 'd1InputQty', labelKey: 'd2_d1InputQty', type: 'number', step: '0.1', min: 0 },
-      ];
-
-    case 'bottling':
-      return [
-        {
-          key: 'drinkType', labelKey: 'bt_drinkType', type: 'select', required: true,
-          options: DRINK_TYPES.map(t => ({ value: t, labelKey: t }))
-        },
-        { key: 'date', labelKey: 'bt_bottlingDate', type: 'date', required: true, default: todayStr() },
-        { key: 'batchNumber', labelKey: 'bt_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102' },
-        { key: 'barrelNumber', labelKey: 'bt_barrelNumber', type: 'text', placeholder: 'e.g. B1, B2' },
-        { key: 'd2Date', labelKey: 'bt_d2Date', type: 'date' },
-        { key: 'alcohol', labelKey: 'bt_alcohol', type: 'number', required: true, step: '0.001', min: 0, max: 1 },
-        { key: 'filtered', labelKey: 'bt_filtered', type: 'toggle' },
-        {
-          key: 'color', labelKey: 'bt_color', type: 'select', noCustom: true,
-          options: [
-            { value: 'normal', labelKey: 'normal' },
-            { value: 'abnormal', labelKey: 'abnormal' },
-          ]
-        },
-        {
-          key: 'taste', labelKey: 'bt_taste', type: 'select', noCustom: true,
-          options: [
-            { value: 'normal', labelKey: 'normal' },
-            { value: 'abnormal', labelKey: 'abnormal' },
-          ]
-        },
-        { key: 'contaminants', labelKey: 'bt_contaminants', type: 'toggle' },
-        { key: 'bottleCount', labelKey: 'bt_bottleCount', type: 'number', required: true, min: 0 },
-        { key: 'd2InputQty', labelKey: 'bt_d2InputQty', type: 'number', step: '0.1', min: 0 },
-        ...(hasPermission('canApproveBottling') ? [
-          { key: 'decision', labelKey: 'bt_decision', type: 'decision', required: true },
-        ] : []),
-      ];
-
-    default:
-      return [];
-  }
-}
-
-// ============================================================
-// BACKOFFICE UI
-// ============================================================
-
-function renderBackoffice(container) {
-  if (!hasPermission('canManageUsers')) {
-    container.innerHTML = `<div class="perm-overlay"><i data-feather="lock"></i><p>${t('perm_denied')}</p></div>`;
-    return;
-  }
-
-  // Sync users from backend in background (updates localStorage, then re-renders)
-  if (typeof syncUsersFromBackend === 'function' && !container._syncStarted) {
-    container._syncStarted = true;
-    syncUsersFromBackend().then(synced => {
-      if (synced && synced.length !== getUsers().length) {
-        renderBackoffice(container); // re-render with merged data
-      }
-    }).catch(() => {});
-  }
-
-  const users = getUsers();
-
-  if (currentView === 'form') {
-    renderUserForm(container);
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="section-title">${t('userManagement')}</div>
-    <p class="backoffice-subtitle">${t('backofficeSubtitle')}</p>
-
-    <div class="record-list record-list-mt">
-      ${users.map(u => `
-        <div class="record-item user-item" data-username="${esc(u.username)}">
-          <div class="ri-top">
-            <span class="ri-title">
-              ${esc(u.username)}
-              <span class="role-pill role-pill-${esc(u.role)} role-pill-inline">${t('role_' + u.role)}</span>
-            </span>
-            <span class="ri-badge ${u.status === 'inactive' ? 'not-approved' : 'approved'}">
-              ${u.status === 'inactive' ? t('inactive') : t('active')}
-            </span>
-          </div>
-          <div class="ri-details">
-            ${u.email ? `<div class="bo-user-email">${esc(u.email)}</div>` : ''}
-            ${esc(currentLang === 'he' ? (u.nameHe || u.name || '-') : (u.name || '-'))}
-            <div class="bo-user-activity">
-              ${t('lastActivity')}: ${u.lastActivity ? formatDate(u.lastActivity) : '-'}
-            </div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-
-    <div class="invite-section bo-section">
-      <div class="section-title section-title-mb">${t('inviteUser')}</div>
-      <div class="bo-invite-row">
-        <div class="bo-invite-field">
-          <input type="email" class="form-input" id="invite-email" placeholder="${t('inviteEmailPlaceholder')}"
-            aria-label="${t('inviteEmailPlaceholder')}" autocomplete="off" autocapitalize="none" spellcheck="false">
-        </div>
-        <select class="form-select bo-role-select" id="invite-role" aria-label="${t('role')}"
-          <option value="worker">${t('role_worker')}</option>
-          <option value="manager">${t('role_manager')}</option>
-          <option value="admin">${t('role_admin')}</option>
-        </select>
-      </div>
-      <button class="btn btn-primary bo-invite-btn" id="btn-send-invite">
-        <i data-feather="send"></i> ${t('sendInvitation')}
-      </button>
-      <div class="login-error bo-feedback" id="invite-error" role="alert" aria-live="polite"></div>
-      <div class="login-success bo-feedback" id="invite-success" role="status" aria-live="polite"></div>
-    </div>
-
-    <div class="bo-section">
-      <div class="section-title section-title-mb">${t('invitationsTitle')}</div>
-      <div id="invitations-list" class="record-list">
-        <div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>
-      </div>
-    </div>
-
-    <div class="bo-section">
-      <div class="section-title section-title-mb">${t('sheetsIntegration')}</div>
-      <a href="${INVENTORY_SHEET_URL}" target="_blank" rel="noopener noreferrer"
-         id="inventory-sheet-link" class="btn btn-secondary bo-sheet-link">
-        <i data-feather="external-link"></i> ${t('viewInventorySheet')}
-      </a>
-      <div class="bo-btn-row">
-        <button class="btn btn-secondary bo-btn-flex" id="btn-sync-all-sheets">
-          <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}
-        </button>
-      </div>
-    </div>
-
-    <div class="bo-btn-row">
-      <button class="btn btn-secondary bo-btn-flex" id="btn-export-all">
-        <i data-feather="download"></i> ${t('exportAllData')}
-      </button>
-    </div>
-  `;
-
-  // Bind export
-  const exportBtn = container.querySelector('#btn-export-all');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-      if (confirm(t('confirmExport'))) {
-        exportAllData();
-      }
-    });
-  }
-
-  // Bind Sync All — pushes every module to Sheets at once
-  const syncAllBtn = container.querySelector('#btn-sync-all-sheets');
-  if (syncAllBtn) {
-    syncAllBtn.addEventListener('click', async () => {
-      syncAllBtn.disabled = true;
-      const origHtml = syncAllBtn.innerHTML;
-      syncAllBtn.innerHTML = `<i data-feather="loader"></i> ${t('syncInProgress')}`;
-      if (typeof feather !== 'undefined') feather.replace();
-
-      ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling']
-        .forEach(m => syncModuleToSheets(m));
-      syncInventorySnapshot('manual');
-
-      // Wait for GAS to process, then verify via GET
-      await new Promise(r => setTimeout(r, 4000));
-      const check = await verifySyncStatus(t('mod_bottling'));
-
-      syncAllBtn.disabled = false;
-      syncAllBtn.innerHTML = origHtml;
-      if (typeof feather !== 'undefined') feather.replace();
-
-      if (check.verified && check.exists) {
-        showToast(t('syncSuccess'));
-      } else {
-        showToast(t('sheetsSyncAll') + ' ✓');
-      }
-    });
-  }
-
-  // Bind user items to edit
-  container.querySelectorAll('.user-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const username = item.dataset.username;
-      editingRecord = users.find(u => u.username === username);
-      currentView = 'form';
-      renderApp();
-    });
-  });
-
-  // --- Invitation bindings ---
-  const sendInviteBtn = container.querySelector('#btn-send-invite');
-  if (sendInviteBtn) {
-    sendInviteBtn.addEventListener('click', () => {
-      const emailInput = container.querySelector('#invite-email');
-      const roleInput = container.querySelector('#invite-role');
-      const errEl = container.querySelector('#invite-error');
-      const successEl = container.querySelector('#invite-success');
-      errEl.textContent = '';
-      successEl.textContent = '';
-
-      const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
-      const role = roleInput ? roleInput.value : 'worker';
-
-      if (!email) { errEl.textContent = t('inviteError_fillEmail'); return; }
-      const emailCheck = validateEmail(email);
-      if (!emailCheck.valid) { errEl.textContent = t('inviteError_invalidEmail'); return; }
-
-      // Check duplicate in existing users
-      const existingUsers = getUsers();
-      if (existingUsers.find(u => u.email && u.email.toLowerCase() === email)) {
-        errEl.textContent = t('requestError_emailExists');
-        return;
-      }
-
-      // Check duplicate in local invitations
-      const invites = getInvitations();
-      if (invites.find(inv => inv.email === email && inv.status === 'pending')) {
-        errEl.textContent = t('inviteError_duplicate');
-        return;
-      }
-
-      // Generate token and send
-      const token = generateInviteToken();
-      const appUrl = location.origin + location.pathname;
-      const session = getSession();
-
-      // Save locally
-      addInvitation({
-        token,
-        email,
-        role,
-        status: 'pending',
-        sentAt: new Date().toISOString(),
-        sentBy: session ? session.username : '',
-        username: '',
-      });
-
-      // Also create invitation via backend (for Firestore storage, fire-and-forget)
-      if (typeof apiCreateInvitation === 'function') {
-        apiCreateInvitation({
-          email,
-          role,
-          app: 'factory',
-          sentBy: session ? session.username : '',
-        }).catch(function() {});
-      }
-
-      // Send to GAS (fire-and-forget)
-      const url = SHEETS_SYNC_URL;
-      if (url) {
-        sendInviteBtn.disabled = true;
-        sendInviteBtn.innerHTML = `<i data-feather="loader"></i> ${t('inviteSending')}`;
-        if (typeof feather !== 'undefined') feather.replace();
-
-        fetch(url, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'send_invite',
-            email,
-            token,
-            role,
-            appUrl,
-            sentBy: session ? session.username : '',
-          }),
-          mode: 'no-cors',
-        }).then(() => {
-          successEl.textContent = t('inviteSent');
-          emailInput.value = '';
-          sendInviteBtn.disabled = false;
-          sendInviteBtn.innerHTML = `<i data-feather="send"></i> ${t('sendInvitation')}`;
-          if (typeof feather !== 'undefined') feather.replace();
-          // Refresh invitations list
-          loadInvitationsList(container);
-        }).catch(() => {
-          sendInviteBtn.disabled = false;
-          sendInviteBtn.innerHTML = `<i data-feather="send"></i> ${t('sendInvitation')}`;
-          if (typeof feather !== 'undefined') feather.replace();
-          successEl.textContent = t('inviteSent');
-          emailInput.value = '';
-          loadInvitationsList(container);
-        });
-      } else {
-        successEl.textContent = t('inviteSent');
-        emailInput.value = '';
-        loadInvitationsList(container);
-      }
-    });
-  }
-
-  // Load invitations from GAS on backoffice render
-  loadInvitationsList(container);
-}
-
-// Fetch invitations from backend API (primary) or GAS (fallback) and render
-function loadInvitationsList(container) {
-  const listEl = container.querySelector('#invitations-list');
-  if (!listEl) return;
-
-  // Show local invitations immediately
-  const localInvites = getInvitations();
-  renderInvitationItems(listEl, localInvites);
-
-  // Try backend API first
-  if (typeof apiListInvitations === 'function') {
-    apiListInvitations('factory').then(result => {
-      if (result && result.invitations) {
-        // Map backend format to local format
-        const mapped = result.invitations.map(inv => ({
-          token: inv.token || inv._fbId,
-          email: inv.email,
-          role: inv.role,
-          status: inv.status,
-          sentAt: inv.createdAt || inv.sentAt,
-          sentBy: inv.createdBy || inv.sentBy || '',
-          username: inv.username || '',
-        }));
-        saveInvitations(mapped);
-        renderInvitationItems(listEl, mapped);
-        return; // backend succeeded, skip GAS
-      }
-      // Backend returned null (unavailable) — fallback to GAS
-      fetchInvitationsFromGAS(listEl);
-    }).catch(() => fetchInvitationsFromGAS(listEl));
-  } else {
-    fetchInvitationsFromGAS(listEl);
-  }
-}
-
-function fetchInvitationsFromGAS(listEl) {
-  const url = SHEETS_SYNC_URL;
-  if (!url) return;
-
-  fetch(`${url}?action=listInvites`)
-    .then(resp => { if (!resp.ok) throw new Error('http'); return resp.json(); })
-    .then(data => {
-      if (data.status === 'ok' && Array.isArray(data.invites)) {
-        saveInvitations(data.invites);
-        renderInvitationItems(listEl, data.invites);
-      }
-    })
-    .catch(() => {});
-}
-
-function renderInvitationItems(listEl, invites) {
-  if (!invites || invites.length === 0) {
-    listEl.innerHTML = `<div class="empty-state empty-state-compact"><p>${t('invitationsEmpty')}</p></div>`;
-    return;
-  }
-
-  listEl.innerHTML = invites.map(inv => `
-    <div class="record-item">
-      <div class="ri-top">
-        <span class="ri-title inv-item-title">
-          ${inv.username ? esc(inv.username) : esc(inv.email)}
-        </span>
-        <span class="inv-item-actions">
-          ${inv.status === 'pending' ? `<button class="inv-delete-btn" data-token="${esc(inv.token)}" title="${t('delete')}"><i data-feather="x-circle" class="icon-sm"></i></button>` : ''}
-          <span class="ri-badge ${inv.status === 'accepted' ? 'approved' : 'pending'}">
-            ${inv.status === 'accepted' ? t('inviteAccepted') : t('invitePending')}
-          </span>
-        </span>
-      </div>
-      <div class="ri-details">
-        ${inv.username ? `<div class="bo-user-email">${esc(inv.email)}</div>` : ''}
-        <span class="role-pill role-pill-${esc(inv.role || 'worker')} inv-item-role">${t('role_' + (inv.role || 'worker'))}</span>
-        <span class="inv-item-date">
-          ${inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : ''}
-        </span>
-      </div>
-    </div>
-  `).join('');
-
-  // Bind delete buttons
-  listEl.querySelectorAll('.inv-delete-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const token = btn.dataset.token;
-      if (!confirm(t('inviteDeleteConfirm'))) return;
-      deleteInvitation(token, listEl);
-    });
-  });
-
-  if (typeof feather !== 'undefined') feather.replace();
-}
-
-function deleteInvitation(token, listEl) {
-  // Remove from local storage
-  const invites = getInvitations().filter(i => i.token !== token);
-  saveInvitations(invites);
-  renderInvitationItems(listEl, invites);
-
-  // Remove from backend API (fire-and-forget)
-  if (typeof apiDeleteInvitation === 'function') {
-    apiDeleteInvitation(token).catch(() => {});
-  }
-
-  // Remove from GAS (fire-and-forget)
-  const url = SHEETS_SYNC_URL;
-  if (url) {
-    fetch(url, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'delete_invite', token }),
-      mode: 'no-cors',
-    }).catch(() => {});
-  }
-}
-
-function renderUserForm(container) {
-  const isEdit = !!editingRecord;
-  const u = editingRecord || {};
-
-  container.innerHTML = `
-    <div class="section-title">${isEdit ? t('editUser') : t('addUser')}</div>
-    <div class="form-container">
-      
-      <div class="form-group">
-        <label class="form-label">${t('username')} <span class="req">*</span></label>
-        <input type="text" class="form-input${isEdit ? ' input-disabled' : ''}" id="bo-username" value="${esc(u.username || '')}" ${isEdit ? 'disabled' : ''}>
-      </div>
-
-      ${!isEdit ? `
-      <div class="form-group">
-        <label class="form-label">${t('password')} <span class="req">*</span></label>
-        <input type="password" class="form-input" id="bo-password" placeholder="${t('password')}">
-      </div>
-      ` : `
-      <div class="form-group">
-        <label class="form-label">${t('password')} <small>(${t('optional')})</small></label>
-        <input type="password" class="form-input" id="bo-password" placeholder="${t('keepCurrentPassword')}">
-      </div>
-      `}
-
-      <div class="form-group">
-        <label class="form-label">${t('nameEnglish')} <span class="req">*</span></label>
-        <input type="text" class="form-input" id="bo-name" value="${esc(u.name || '')}">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">${t('nameHebrew')}</label>
-        <input type="text" class="form-input" id="bo-nameHe" value="${esc(u.nameHe || '')}" dir="rtl">
-      </div>
-
-      <!-- Thai name field removed (app now uses English/Hebrew only) -->
-
-      <div class="form-group">
-        <label class="form-label">${t('selectRole')} <span class="req">*</span></label>
-        <select class="form-select" id="bo-role">
-          <option value="worker" ${u.role === 'worker' ? 'selected' : ''}>${t('role_worker')}</option>
-          <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>${t('role_manager')}</option>
-          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role_admin') || 'Admin'}</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label class="form-label">${t('status')}</label>
-        <select class="form-select" id="bo-status">
-          <option value="active" ${u.status !== 'inactive' ? 'selected' : ''}>${t('active')}</option>
-          <option value="inactive" ${u.status === 'inactive' ? 'selected' : ''}>${t('inactive')}</option>
-        </select>
-      </div>
-
-      <div class="login-error" id="bo-error" role="alert" aria-live="polite"></div>
-
-      <div class="form-actions">
-        <button class="btn btn-secondary" id="bo-cancel">${t('cancel')}</button>
-        ${isEdit ? `<button class="btn btn-danger" id="bo-delete">${t('deleteUser')}</button>` : ''}
-        <button class="btn btn-primary" id="bo-save">${t('save')}</button>
-      </div>
-    </div>
-  `;
-
-  // Bind actions
-  const cancelBtn = container.querySelector('#bo-cancel');
-  if (cancelBtn) cancelBtn.addEventListener('click', () => {
-    currentView = 'list';
-    editingRecord = null;
-    renderApp();
-  });
-
-  const deleteBtn = container.querySelector('#bo-delete');
-  if (deleteBtn && isEdit) {
-    deleteBtn.addEventListener('click', () => {
-      if (u.username === 'admin') {
-        showToast(t('cannotDeleteAdmin'));
-        return;
-      }
-      if (u.username === getSession().username) {
-        showToast(t('cannotDeleteSelf'));
-        return;
-      }
-      showManagerPasswordModal(async () => {
-        const delResult = await deleteUserByUsername(u.username);
-        if (delResult && !delResult.success) {
-          showToast(delResult.error || t('error'));
-          return;
-        }
-        showToast(t('delete') + ' ✓');
-        currentView = 'list';
-        editingRecord = null;
-        renderApp();
-      });
-    });
-  }
-
-  const saveBtn = container.querySelector('#bo-save');
-  if (saveBtn) saveBtn.addEventListener('click', async () => {
-    const errorEl = container.querySelector('#bo-error');
-    errorEl.textContent = '';
-
-    const usernameInput = container.querySelector('#bo-username');
-    const passwordInput = container.querySelector('#bo-password');
-    const nameInput = container.querySelector('#bo-name');
-    const nameHeInput = container.querySelector('#bo-nameHe');
-    const roleInput = container.querySelector('#bo-role');
-    const statusInput = container.querySelector('#bo-status');
-
-    const username = usernameInput ? usernameInput.value.trim() : '';
-    const password = passwordInput ? passwordInput.value : '';
-    const name = nameInput ? nameInput.value.trim() : '';
-    const nameHe = nameHeInput ? nameHeInput.value.trim() : '';
-    const role = roleInput ? roleInput.value : '';
-    const status = statusInput ? statusInput.value : 'active';
-
-    if (!username || !name || (!isEdit && !password)) {
-      errorEl.textContent = t('signUpError_fillAll');
-      return;
-    }
-
-    saveBtn.disabled = true;
-
-    if (isEdit) {
-      // Update
-      const updates = { name, nameHe, role, status };
-      if (password) updates.password = password;
-
-      const res = await updateUser(username, updates);
-      if (res.success) {
-        showToast(t('saved'));
-        currentView = 'list';
-        editingRecord = null;
-        renderApp();
-      } else {
-        saveBtn.disabled = false;
-        errorEl.textContent = res.error;
-      }
-    } else {
-      // Create (async — may create Firebase Auth account)
-      const res = await createUser({ username, password, name, nameHe, role, status });
-      if (res.success) {
-        showToast(t('signUpSuccess'));
-        currentView = 'list';
-        editingRecord = null;
-        renderApp();
-      } else {
-        saveBtn.disabled = false;
-        errorEl.textContent = t(res.error) || res.error;
-      }
-    }
-  });
-}
-
-// ============================================================
-// ACCESS REQUESTS
-// ============================================================
-
-// ============================================================
-// AUTO HARD-REFRESH
-// ============================================================
-function scheduleHardRefresh(intervalMs = 30 * 60 * 1000) {
-  setInterval(() => {
-    // Don't reload if user is editing a form (BUG-030)
-    if (currentView === 'form' || document.querySelector('.modal-overlay')) return;
-    location.reload(true);
-  }, intervalMs);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof initFirebase === 'function') initFirebase();
-  if (typeof initFirestoreSync === 'function') initFirestoreSync();
-  // Check backend availability (non-blocking)
-  if (typeof apiHealthCheck === 'function') {
-    apiHealthCheck();
-  }
-  // Restore from URL hash if present, otherwise use sessionStorage state
-  if (location.hash && location.hash !== '#/') {
-    _restoreStateFromHash();
-  }
-  // On restore, if we're in form/detail view but have no editingRecord, fall back to list
-  if ((currentView === 'form' || currentView === 'detail') && !editingRecord) {
-    currentView = 'list';
-  }
-  renderApp();
-  scheduleHardRefresh();
-});

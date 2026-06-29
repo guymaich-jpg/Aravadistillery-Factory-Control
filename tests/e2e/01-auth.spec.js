@@ -2,7 +2,7 @@
 // Auth Tests: Login, Logout, Request Access, Session
 // ============================================================
 const { test, expect } = require('@playwright/test');
-const { freshApp, loginAsAdmin, loginAsManager, loginAsWorker, logout } = require('./helpers');
+const { freshApp, loginAsAdmin, loginAsManager, loginAsWorker, logout, seedTestUsers, TEST_ADMIN } = require('./helpers');
 
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
@@ -52,8 +52,10 @@ test.describe('Authentication', () => {
   });
 
   test('Enter key submits login form', async ({ page }) => {
-    await page.fill('#login-user', 'guymaich@gmail.com');
-    await page.fill('#login-pass', 'Guy12345');
+    // Use CI test account — owner accounts require Firebase Auth (not available in CI)
+    await seedTestUsers(page);
+    await page.fill('#login-user', TEST_ADMIN.email);
+    await page.fill('#login-pass', TEST_ADMIN.password);
     await page.press('#login-pass', 'Enter');
     await expect(page.locator('.app-header')).toBeVisible({ timeout: 5000 });
   });

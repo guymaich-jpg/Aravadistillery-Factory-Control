@@ -25,6 +25,9 @@ const I18N = {
     date: "Date",
     today: "Today",
     search: "Search…",
+    showMore: "Show more",
+    showingXofY: "Showing {x} of {y}",
+    offline: "Offline — changes saved locally",
     noData: "No records yet",
     addNew: "Add New",
     history: "History",
@@ -410,6 +413,28 @@ const I18N = {
     menu_inventorySub: "Stock counts & history",
     menu_spiritStockSub: "Distillation pipeline view",
     menu_backofficeSub: "Users, roles & permissions",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "Batch Approve",
+    selectedCount: "{count} selected",
+    approveAll: "Approve All",
+    recordsPerModule: "Records per Module",
+    noRecordsYet: "No records yet",
+
+    // ---------- Record Archiving ----------
+    archiveRecords: "Archive Records",
+    archiveOldRecords: "Archive old records",
+    recordsOlderThan: "Records older than {months} months",
+    archived: "Archived",
+    confirmArchive: "Archive {count} records?",
+    archiveCount: "{count} old records",
+    noOldRecords: "No old records to archive",
+    archiveSuccess: "{count} records archived successfully",
+
+    // ---------- Error Log ----------
+    errorLog: "Error Log",
+    clearLog: "Clear Log",
+    noErrors: "No errors",
   },
 
   he: {
@@ -435,6 +460,9 @@ const I18N = {
     date: "תאריך",
     today: "היום",
     search: "חיפוש…",
+    showMore: "הצג עוד",
+    showingXofY: "מציג {x} מתוך {y}",
+    offline: "לא מחובר — שינויים נשמרים מקומית",
     noData: "אין רשומות עדיין",
     addNew: "הוסף חדש",
     history: "היסטוריה",
@@ -819,6 +847,28 @@ const I18N = {
     menu_inventorySub: "ספירות מלאי והיסטוריה",
     menu_spiritStockSub: "תצוגת צנרת זיקוק",
     menu_backofficeSub: "משתמשים, תפקידים והרשאות",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "אישור קבוצתי",
+    selectedCount: "נבחרו {count}",
+    approveAll: "אשר הכל",
+    recordsPerModule: "רשומות למודול",
+    noRecordsYet: "אין רשומות עדיין",
+
+    // ---------- Record Archiving ----------
+    archiveRecords: "ארכיון רשומות",
+    archiveOldRecords: "העבר לארכיון רשומות ישנות",
+    recordsOlderThan: "רשומות ישנות מ-{months} חודשים",
+    archived: "הועבר לארכיון",
+    confirmArchive: "האם להעביר {count} רשומות לארכיון?",
+    archiveCount: "{count} רשומות ישנות",
+    noOldRecords: "אין רשומות ישנות לארכיון",
+    archiveSuccess: "{count} רשומות הועברו לארכיון בהצלחה",
+
+    // ---------- Error Log ----------
+    errorLog: "יומן שגיאות",
+    clearLog: "נקה יומן",
+    noErrors: "אין שגיאות",
   },
 
   th: {
@@ -1228,6 +1278,23 @@ const I18N = {
     menu_inventorySub: "ยอดสต็อกและประวัติ",
     menu_spiritStockSub: "ท่อส่งการกลั่น",
     menu_backofficeSub: "ผู้ใช้ บทบาท สิทธิ์",
+
+    // ---------- Batch Approve & Dashboard Chart ----------
+    batchApprove: "Batch Approve",
+    selectedCount: "{count} selected",
+    approveAll: "Approve All",
+    recordsPerModule: "Records per Module",
+    noRecordsYet: "No records yet",
+
+    // ---------- Record Archiving ----------
+    archiveRecords: "เก็บถาวร",
+    archiveOldRecords: "เก็บถาวรรายการเก่า",
+    recordsOlderThan: "รายการที่เก่ากว่า {months} เดือน",
+    archived: "เก็บถาวรแล้ว",
+    confirmArchive: "เก็บถาวร {count} รายการ?",
+    archiveCount: "{count} รายการเก่า",
+    noOldRecords: "ไม่มีรายการเก่าที่จะเก็บถาวร",
+    archiveSuccess: "เก็บถาวร {count} รายการเรียบร้อย",
   },
 };
 

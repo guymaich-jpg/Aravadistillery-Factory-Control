@@ -3,8 +3,9 @@ import { handleCors } from '../../lib/cors';
 import { verifyRequest, hasManagementAccess } from '../../lib/auth';
 import { adminDb } from '../../lib/firebase-admin';
 import { randomUUID } from 'crypto';
+import { withRateLimit } from '../../lib/ratelimit';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const decoded = await verifyRequest(req.headers.authorization);
@@ -98,3 +99,5 @@ async function handleCreate(
     return res.status(500).json({ error: 'Failed to create invitation: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);

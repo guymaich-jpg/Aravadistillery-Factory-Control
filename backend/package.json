@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc --noEmit && node -e \"const fs=require('fs'),p=require('path');const pub='public';fs.mkdirSync(pub,{recursive:true});const files=['index.html','style.css','manifest.json','script.js','firebase.js','i18n.js','auth.js','api-client.js','data.js','firestore-sync.js','sync.js','dashboard.js','inventory-ui.js','modals.js','module-fields.js','nav.js','google-apps-script.js'];files.forEach(f=>{const src=p.join('..',f);if(fs.existsSync(src))fs.copyFileSync(src,p.join(pub,f));});\"",
+    "build": "tsc --noEmit && node -e \"const fs=require('fs'),p=require('path');const pub='public';fs.mkdirSync(pub,{recursive:true});const files=['index.html','style.css','manifest.json','icon-192.svg','icon-512.svg','script.js','firebase.js','i18n.js','auth.js','api-client.js','data.js','firestore-sync.js','sync.js','dashboard.js','inventory-ui.js','modals.js','module-fields.js','nav.js','google-apps-script.js','robots.txt'];files.forEach(f=>{const src=p.join('..',f);if(fs.existsSync(src))fs.copyFileSync(src,p.join(pub,f));});fs.mkdirSync(p.join(pub,'.well-known'),{recursive:true});const secSrc=p.join('..', '.well-known','security.txt');if(fs.existsSync(secSrc))fs.copyFileSync(secSrc,p.join(pub,'.well-known','security.txt'));\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

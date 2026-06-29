@@ -3,13 +3,14 @@ import { handleCors } from '../lib/cors';
 import { verifyRequest } from '../lib/auth';
 import { adminDb, getFirebaseInitError } from '../lib/firebase-admin';
 import { syncToCrmStockLevels } from '../lib/crm-sync';
+import { withRateLimit } from '../lib/ratelimit';
 
 const DRINK_TYPES = [
   'drink_arak', 'drink_gin', 'drink_edv', 'drink_licorice',
   'drink_brandyVS', 'drink_brandyVSOP', 'drink_brandyMed',
 ];
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const initErr = getFirebaseInitError();
@@ -77,6 +78,10 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
 // ---- POST: receive inventory update from Factory Control ----
 async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: string) {
   try {
+    if (!adminDb) {
+      return res.status(503).json({ error: 'Firestore not available (adminDb is null)' });
+    }
+
     const { bottles, trigger } = req.body || {};
 
     if (!bottles || typeof bottles !== 'object') {
@@ -120,6 +125,12 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
 
     return res.status(200).json({ success: true, ...inventoryDoc });
   } catch (e: any) {
-    return res.status(500).json({ error: 'Failed to update inventory: ' + e.message });
+    console.error('[inventory POST]', e.code || '', e.message || e);
+    return res.status(500).json({
+      error: 'Failed to update inventory: ' + (e.message || 'unknown'),
+      code: e.code || undefined,
+    });
   }
 }
+
+export default withRateLimit(handler);

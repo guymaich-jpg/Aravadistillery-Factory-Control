@@ -54,11 +54,11 @@ function initFirebase() {
   }
 
   const BASE = 'https://www.gstatic.com/firebasejs/9.23.0';
-  Promise.all([
-    loadScript(BASE + '/firebase-app-compat.js'),
+  loadScript(BASE + '/firebase-app-compat.js')
+  .then(() => Promise.all([
     loadScript(BASE + '/firebase-firestore-compat.js'),
     loadScript(BASE + '/firebase-auth-compat.js'),
-  ]).then(() => {
+  ])).then(() => {
     try {
       if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
@@ -67,10 +67,10 @@ function initFirebase() {
       _auth = firebase.auth();
       _firebaseReady = true;
     } catch (e) {
-      // Init failed — localStorage fallback
+      console.error('[Firebase] Init failed, using localStorage fallback:', e.message || e);
     }
-  }).catch(() => {
-    // SDK load failed — localStorage fallback
+  }).catch((e) => {
+    console.error('[Firebase] SDK load failed, using localStorage fallback:', e.message || e);
   });
 }
 

@@ -40,17 +40,20 @@ cd backend && npm run dev    # vercel dev
 | File | Purpose |
 |------|---------|
 | `index.html` | SPA entry point, loads all scripts in order |
-| `script.js` | Main controller: routing, form rendering, record CRUD, views (list/form/detail) |
-| `auth.js` | Login, signup, RBAC (Admin/Manager/Worker), session management (12h timeout) |
+| `script.js` | Main controller: routing, form rendering, record CRUD, views |
+| `auth.js` | Login, RBAC (Admin/Manager/Worker), session management (12h timeout) |
 | `data.js` | localStorage CRUD, dropdown data, CSV export |
-| `firebase.js` | Firestore sync (always enabled: `FIREBASE_ENABLED = true`) |
+| `firebase.js` | Firebase init, Firestore CRUD, Firebase Auth helpers |
+| `firestore-sync.js` | Real-time Firestore ↔ localStorage sync |
 | `i18n.js` | Bilingual translations (English/Hebrew), `t('key')` lookup |
 | `api-client.js` | Backend API client for Vercel serverless |
-| `sync.js` | Google Sheets + CRM sync |
-| `inventory-ui.js` | Inventory dashboard rendering |
-| `dashboard.js` | Main dashboard view |
+| `sheets-sync.js` | Google Sheets export integration |
+| `storage.js` | IndexedDB + offline mutation queue |
+| `helpers.js` | Shared DOM utilities, date formatting, validators |
+| `init-theme.js` | Early theme detection (runs before CSS loads) |
 | `module-fields.js` | Field definitions for all 7 production modules |
-| `nav.js` | Navigation & tab management |
+| `backoffice.js` | Admin back-office panel (user management, system info) |
+| `sw.js` | Service Worker — offline caching, network strategies |
 | `style.css` | Full design system: mobile-first, dark theme, RTL support |
 
 ### Backend (`backend/`)
@@ -72,7 +75,7 @@ All data in `localStorage` under `factory_*` keys (e.g., `factory_rawMaterials`,
 
 ### Testing
 
-- **E2E** (Playwright): 8 test files in `tests/e2e/`, serial execution with 1 worker for localStorage isolation. Two projects: Desktop Chrome + Mobile Chrome (mobile skips security/sheets tests). CI runs on push/PR to main.
+- **E2E** (Playwright): 14 test files in `tests/e2e/`, serial execution with 1 worker for localStorage isolation. Two projects: Desktop Chrome + Mobile Chrome (mobile skips security/sheets tests). CI runs on push/PR to main.
 - **Browser tests**: `tests.html` — 42 inline unit tests.
 
 ## Code Conventions

@@ -2,7 +2,7 @@
 // i18n Tests: Language switching Hebrew ↔ Thai
 // ============================================================
 const { test, expect } = require('@playwright/test');
-const { freshApp } = require('./helpers');
+const { freshApp, seedTestUsers, TEST_ADMIN } = require('./helpers');
 
 test.describe('Language: Login screen', () => {
   test.beforeEach(async ({ page }) => {
@@ -36,8 +36,10 @@ test.describe('Language: Login screen', () => {
 test.describe('Language: In-app', () => {
   test.beforeEach(async ({ page }) => {
     await freshApp(page);
-    await page.fill('#login-user', 'guymaich@gmail.com');
-    await page.fill('#login-pass', 'Guy12345');
+    // Use CI test account (owner accounts require Firebase Auth, unavailable in CI)
+    await seedTestUsers(page);
+    await page.fill('#login-user', TEST_ADMIN.email);
+    await page.fill('#login-pass', TEST_ADMIN.password);
     await page.click('#login-btn');
     await expect(page.locator('.app-header')).toBeVisible();
   });

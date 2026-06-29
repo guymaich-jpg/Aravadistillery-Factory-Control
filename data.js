@@ -90,6 +90,20 @@ function addRecord(key, record) {
 }
 
 function updateRecord(key, id, updates) {
+  // Validate: reject prototype pollution keys
+  const dangerousKeys = ['__proto__', 'constructor'];
+  for (const k of Object.keys(updates)) {
+    if (dangerousKeys.includes(k)) {
+      return null;
+    }
+  }
+
+  // Validate: limit update size to 100KB
+  const updatesJSON = JSON.stringify(updates);
+  if (updatesJSON.length > 100 * 1024) {
+    return null;
+  }
+
   const data = getData(key);
   const idx = data.findIndex(r => r.id === id);
   if (idx !== -1) {
@@ -258,6 +272,87 @@ const D1_TYPES = [
 const STILL_NAMES = ['d1_still_amiti', 'd1_still_aladdin'];
 
 const D2_PRODUCT_TYPES = ['drink_edv', 'drink_arak', 'drink_gin'];
+
+// ---- Record Archiving ----
+// Moves records older than `monthsOld` months from the active store
+// to an archive key (factory_<module>_archive). Nothing is deleted —
+// records are COPIED first, then removed from the active set only if
+// the copy succeeded.
+
+function archiveOldRecords(moduleName, monthsOld) {
+  monthsOld = monthsOld || 6;
+  var key = STORE_KEYS[moduleName];
+  if (!key) return 0;
+
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsOld);
+  var cutoffISO = cutoff.toISOString();
+
+  var data = getData(key);
+  var toArchive = [];
+  var toKeep = [];
+
+  data.forEach(function (r) {
+    var ts = r.createdAt || '';
+    if (ts && new Date(ts).getTime() < cutoff.getTime()) {
+      toArchive.push(r);
+    } else {
+      toKeep.push(r);
+    }
+  });
+
+  if (toArchive.length === 0) return 0;
+
+  // Step 1: COPY to archive key (append to any existing archive)
+  var archiveKey = key + '_archive';
+  var existing;
+  try {
+    existing = JSON.parse(localStorage.getItem(archiveKey) || '[]');
+  } catch (e) {
+    existing = [];
+  }
+
+  // Avoid duplicates — only add records whose id isn't already archived
+  var archivedIds = {};
+  existing.forEach(function (r) { if (r.id) archivedIds[r.id] = true; });
+  var newArchived = [];
+  toArchive.forEach(function (r) {
+    if (r.id && !archivedIds[r.id]) {
+      newArchived.push(r);
+    }
+  });
+
+  var mergedArchive = existing.concat(newArchived);
+
+  try {
+    localStorage.setItem(archiveKey, JSON.stringify(mergedArchive));
+  } catch (e) {
+    // If storage fails, abort — don't remove from active set
+    return 0;
+  }
+
+  // Step 2: Remove archived records from active set
+  setData(key, toKeep);
+
+  return newArchived.length;
+}
+
+function countOldRecords(moduleName, monthsOld) {
+  monthsOld = monthsOld || 6;
+  var key = STORE_KEYS[moduleName];
+  if (!key) return 0;
+
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsOld);
+  var cutoffMs = cutoff.getTime();
+
+  var data = getData(key);
+  var count = 0;
+  data.forEach(function (r) {
+    if (r.createdAt && new Date(r.createdAt).getTime() < cutoffMs) count++;
+  });
+  return count;
+}
 
 // ---- CSV Export ----
 function exportToCSV(keyOrData, filename) {

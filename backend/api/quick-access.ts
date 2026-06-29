@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from '../lib/cors';
 import { verifyRequest, hasManagementAccess } from '../lib/auth';
 import { adminDb } from '../lib/firebase-admin';
+import { withRateLimit } from '../lib/ratelimit';
 
 const COLLECTION = 'factory_quickAccess';
 
@@ -18,7 +19,7 @@ interface QuickAccessDoc {
   updatedAt: string;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   // All quick-access operations require admin/manager auth
@@ -212,3 +213,5 @@ async function handleDelete(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to delete criterion: ' + e.message });
   }
 }
+
+export default withRateLimit(handler);

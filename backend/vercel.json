@@ -3,10 +3,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "status": 404, "dest": "/404.html" }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -18,7 +14,7 @@
         { "key": "Permissions-Policy",         "value": "camera=(), microphone=(), geolocation=(), payment=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://unpkg.com https://www.gstatic.com 'nonce-{{nonce}}'; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data: blob:; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' https://unpkg.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data: blob:; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         }
       ]
     }

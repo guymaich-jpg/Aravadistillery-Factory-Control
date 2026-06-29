@@ -3,7 +3,7 @@
 // Desktop-only — these test JS logic, not viewport behavior
 // ============================================================
 const { test, expect } = require('@playwright/test');
-const { freshApp, loginAsWorker, loginAsManager, loginAsAdmin } = require('./helpers');
+const { freshApp, loginAsWorker, loginAsManager, loginAsAdmin, seedTestUsers, TEST_ADMIN } = require('./helpers');
 
 test.describe('Security: Session Management', () => {
   test('cannot access app without login', async ({ page }) => {
@@ -14,8 +14,10 @@ test.describe('Security: Session Management', () => {
 
   test('clearing session redirects to login', async ({ page }) => {
     await freshApp(page);
-    await page.fill('#login-user', 'guymaich@gmail.com');
-    await page.fill('#login-pass', 'Guy12345');
+    // Use CI test account (owner accounts require Firebase Auth, unavailable in CI)
+    await seedTestUsers(page);
+    await page.fill('#login-user', TEST_ADMIN.email);
+    await page.fill('#login-pass', TEST_ADMIN.password);
     await page.click('#login-btn');
     await expect(page.locator('.app-header')).toBeVisible();
 
@@ -59,6 +61,7 @@ test.describe('Security: Input Handling', () => {
     await freshApp(page);
     await page.click('#go-request');
     await page.fill('#req-name', 'Copy');
+    // guymaich@gmail.com is a known owner account in DEFAULT_USERS
     await page.fill('#req-email', 'guymaich@gmail.com');
     await page.click('#req-btn');
     await expect(page.locator('#req-error')).not.toBeEmpty();
