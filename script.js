@@ -1502,15 +1502,6 @@ function renderDeclareInventory(container) {
       <textarea class="textarea" id="declare-note" placeholder="${t('declare_notePlaceholder')}"></textarea>
     </div>
 
-    <div class="field">
-      <label class="label-form">${t('declare_signature')}</label>
-      <div class="sig-pad-wrapper">
-        <canvas id="sig-canvas"></canvas>
-        <button class="sig-clear-btn" id="sig-clear">${t('sigClear') || 'Clear'}</button>
-      </div>
-      <div class="sig-meta" id="sig-meta"></div>
-    </div>
-
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-secondary" style="flex:1" id="declare-cancel">${t('cancel')}</button>
       <button class="btn btn-primary" style="flex:1" id="declare-confirm"><i data-feather="check"></i> ${t('declare_confirm')}</button>
@@ -1554,12 +1545,18 @@ function renderDeclareInventory(container) {
       }
     }
   }
-  container.querySelectorAll('.count-input').forEach(input => {
+  const countInputs = Array.from(container.querySelectorAll('.count-input'));
+  countInputs.forEach((input, idx) => {
     input.addEventListener('input', updateDiffs);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const next = countInputs[idx + 1];
+        if (next) next.focus();
+        else container.querySelector('#declare-confirm')?.focus();
+      }
+    });
   });
-
-  // Signature pad
-  setTimeout(() => initSignaturePad(), 50);
 
   // Cancel
   const cancelBtn = container.querySelector('#declare-cancel');
@@ -1570,17 +1567,6 @@ function renderDeclareInventory(container) {
   // Confirm
   const confirmBtn = container.querySelector('#declare-confirm');
   if (confirmBtn) confirmBtn.addEventListener('click', () => {
-    if (!signatureCanvas) return;
-    const pixels = sigCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
-    let hasSignature = false;
-    for (let i = 3; i < pixels.length; i += 4) {
-      if (pixels[i] > 0) { hasSignature = true; break; }
-    }
-    if (!hasSignature) {
-      alert(t('declare_errorSignature'));
-      return;
-    }
-
     const lines = [];
     let countedTotal = 0;
     let netDiff = 0;
@@ -1602,7 +1588,6 @@ function renderDeclareInventory(container) {
       counted_total: countedTotal,
       net_diff: netDiff,
       note: (container.querySelector('#declare-note') || {}).value || '',
-      signature: signatureCanvas.toDataURL(),
     };
     addRecord(STORE_KEYS.inventoryDeclarations, record);
 
