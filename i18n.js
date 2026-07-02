@@ -5,7 +5,7 @@ const I18N = {
   en: {
     // ---------- Global ----------
     appName: "Factory Control",
-    langToggle: "עב",
+    langToggle: "ไทย",
     toggleTheme: "Toggle theme",
     togglePalette: "Switch palette",
     logoutLabel: "Log out",
@@ -440,7 +440,7 @@ const I18N = {
   he: {
     // ---------- Global ----------
     appName: "בקרת מפעל",
-    langToggle: "ไทย",
+    langToggle: "EN",
     toggleTheme: "החלף ערכת נושא",
     togglePalette: "החלף פלטה",
     logoutLabel: "התנתק",
@@ -1319,6 +1319,6 @@ function setLang(lang) {
 }
 
 function toggleLang() {
-  // Toggle between Hebrew and Thai
-  setLang(currentLang === 'he' ? 'th' : 'he');
+  const cycle = { he: 'en', en: 'th', th: 'he' };
+  setLang(cycle[currentLang] || 'he');
 }
