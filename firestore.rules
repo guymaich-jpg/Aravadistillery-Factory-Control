@@ -25,15 +25,63 @@ service cloud.firestore {
     }
 
     // ── Factory production data ──────────────────────────────
-    // All authenticated factory users can read/write production records.
-    // Collections: factory_rawMaterials, factory_dateReceiving,
-    //   factory_fermentation, factory_distillation1, factory_distillation2,
-    //   factory_bottling
-    match /factory_{module}/{docId} {
+    // Workers can read and create; managers can also update/delete.
+    // Explicit per-collection blocks (partial-segment wildcards are
+    // not valid Firestore syntax).
+    match /factory_rawMaterials/{docId} {
       allow read: if isAuth();
       allow create: if isAuth();
-      allow update: if isAuth();
-      allow delete: if isManager();
+      allow update, delete: if isManager();
+    }
+    match /factory_dateReceiving/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_fermentation/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_distillation1/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_distillation2/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_bottling/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_inventoryVersions/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_inventoryCounts/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_inventoryBase/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_inventoryDeclarations/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
+    }
+    match /factory_customSuppliers/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isManager();
     }
 
     // ── Factory inventory (singleton doc: current) ───────────
