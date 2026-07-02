@@ -257,9 +257,8 @@ async function fbDeleteUser(username) {
 // ============================================================
 
 /**
- * Sign in to Firebase Auth (or auto-create account if user exists locally but
- * not yet in Firebase Auth). Called on every successful local login so existing
- * users are transparently migrated to Firebase Auth.
+ * Sign in to Firebase Auth. Returns the Firebase user on success, null on failure.
+ * Never auto-creates accounts — new users must go through the invitation flow.
  */
 async function fbAuthSignIn(email, password) {
   if (!_firebaseReady || !_auth) return null;
@@ -267,25 +266,6 @@ async function fbAuthSignIn(email, password) {
     const result = await _auth.signInWithEmailAndPassword(email, password);
     return result.user;
   } catch (e) {
-    // Newer Firebase SDK returns 'auth/invalid-login-credentials' instead of
-    // separate user-not-found / wrong-password codes. Handle all variants.
-    const notFound = [
-      'auth/user-not-found',
-      'auth/invalid-credential',
-      'auth/invalid-login-credentials',
-      'auth/wrong-password',
-    ];
-    if (notFound.includes(e.code)) {
-      // Try auto-create (lazy migration). If the user already exists in
-      // Firebase Auth with a different password, createUser will fail with
-      // email-already-in-use and we return null (wrong password).
-      try {
-        const result = await _auth.createUserWithEmailAndPassword(email, password);
-        return result.user;
-      } catch (createErr) {
-        return null;
-      }
-    }
     return null;
   }
 }
