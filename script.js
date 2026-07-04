@@ -2,6 +2,8 @@
 // script.js — Core UI Rendering (forms, lists, details, views)
 // ============================================================
 
+const APP_VERSION = '2.9';
+
 // ---- Focus Trap Utility (accessibility) ----
 function _trapFocus(modalEl) {
   var focusable = modalEl.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -198,7 +200,7 @@ function renderLogin() {
         <div class="login-mark">ע</div>
         <h1 class="login-brand-name">${t('loginTitle')}</h1>
         <p class="login-brand-sub">${t('loginSubtitle')}</p>
-        <div class="serif-rule" style="width:60%;margin:0 auto"><span>v 2.0</span></div>
+        <div class="serif-rule" style="width:60%;margin:0 auto"><span>v ${APP_VERSION}</span></div>
       </div>
 
       <div class="login-form">
@@ -974,7 +976,7 @@ function renderHomeInventory(container) {
   const dateStr = new Date().toLocaleDateString(currentLang === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const lastDeclStr = latestDecl
     ? `${formatDate(latestDecl.createdAt)} · ${esc(latestDecl.createdBy || '')}`
-    : '—';
+    : t('home_neverDeclared') || 'Never declared';
 
   container.innerHTML = `
     <h1 class="sr-only">${t('home_title')}</h1>
@@ -989,8 +991,8 @@ function renderHomeInventory(container) {
         <span class="t-serif">${grandTotal.toLocaleString()}</span>
         <span class="inv-hero-unit">${t('home_bottles')}<br>${t('home_inStock')}</span>
       </div>
-      <div class="inv-hero-status">
-        <i data-feather="alert-triangle"></i>
+      <div class="inv-hero-status ${countedToday ? 'inv-hero-status--ok' : ''}">
+        <i data-feather="${countedToday ? 'check-circle' : 'alert-triangle'}"></i>
         ${countedToday ? t('home_countedToday') : t('home_notCountedToday')}
       </div>
       <div class="inv-hero-foot">
@@ -1012,8 +1014,8 @@ function renderHomeInventory(container) {
         <div class="inv-bd-row">
           <div class="inv-bd-dot" style="background:${color}"></div>
           <div class="inv-bd-name">${esc(t(dt))}</div>
-          <div class="inv-bd-bar"><span style="width:${pct.toFixed(1)}%;background:${color}"></span></div>
-          <div class="inv-bd-num t-mono">${count}</div>
+          <div class="inv-bd-bar"><span style="width:max(${pct.toFixed(1)}%,${count > 0 ? '3px' : '0px'});background:${pct > 0 ? color : 'var(--border)'};opacity:${pct > 0 ? '1' : '0.4'}"></span></div>
+          <div class="inv-bd-num t-mono">${count > 0 ? count : '—'}</div>
         </div>`;
       }).join('')}
     </div>
