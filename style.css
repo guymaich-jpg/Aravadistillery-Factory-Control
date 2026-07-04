@@ -182,6 +182,25 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(-20px);
 }
 
+/* ── Skip to content ── */
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 10px 20px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 9999;
+  transition: top 0.15s;
+  text-decoration: none;
+}
+.skip-link:focus { top: 0; outline: none; box-shadow: 0 0 0 3px var(--accent-hover); }
+
 /* ── Screen-reader only utility ── */
 .sr-only {
   position: absolute;
@@ -1653,11 +1672,16 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
     align-items: flex-start;
     justify-content: center;
     overflow-x: hidden;
+    /* Subtle linen texture for the desktop backdrop */
+    background-image:
+      radial-gradient(ellipse 80% 60% at 20% 80%, rgba(44, 51, 47, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 20%, rgba(139, 105, 20, 0.04) 0%, transparent 55%);
+    background-attachment: fixed;
   }
 
   #app {
     border-inline: 1px solid var(--border);
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -1670,6 +1694,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
     min-height: 100vh;
     min-height: 100dvh;
     overflow: hidden;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 15% 85%, rgba(44, 51, 47, 0.08) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 70% at 85% 15%, rgba(139, 105, 20, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(44, 51, 47, 0.03) 0%, transparent 70%);
   }
 
   #app {
@@ -1686,6 +1714,18 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
 
   .app-header {
     border-radius: 20px 20px 0 0;
+  }
+}
+
+/* Dark mode desktop backdrop */
+@media (min-width: 481px) {
+  [data-theme="dark"] body {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 20% 80%, rgba(139, 175, 150, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 20%, rgba(196, 160, 64, 0.04) 0%, transparent 55%);
+  }
+  [data-theme="dark"] #app {
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.6), 0 2px 12px rgba(0, 0, 0, 0.4);
   }
 }
 

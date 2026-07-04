@@ -2,6 +2,8 @@
 // script.js — Core UI Rendering (forms, lists, details, views)
 // ============================================================
 
+const APP_VERSION = '2.9';
+
 // ---- Focus Trap Utility (accessibility) ----
 function _trapFocus(modalEl) {
   var focusable = modalEl.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -198,7 +200,7 @@ function renderLogin() {
         <div class="login-mark">ע</div>
         <h1 class="login-brand-name">${t('loginTitle')}</h1>
         <p class="login-brand-sub">${t('loginSubtitle')}</p>
-        <div class="serif-rule" style="width:60%;margin:0 auto"><span>v 2.0</span></div>
+        <div class="serif-rule" style="width:60%;margin:0 auto"><span>v ${APP_VERSION}</span></div>
       </div>
 
       <div class="login-form">
