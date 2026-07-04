@@ -24,6 +24,7 @@ const APP_SHELL = [
   '/helpers.js',
   '/module-fields.js',
   '/backoffice.js',
+  '/vendor/feather.min.js',
 ];
 
 // API domains — use network-first strategy
