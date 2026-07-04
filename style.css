@@ -1166,6 +1166,11 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   border-color: var(--separator);
 }
 
+.btn-block {
+  width: 100%;
+  display: block;
+}
+
 .btn-danger {
   background: var(--danger);
   color: #fff;
