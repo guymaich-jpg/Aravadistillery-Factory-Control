@@ -1013,9 +1013,7 @@ function renderHomeInventory(container) {
       <i data-feather="edit-3"></i> ${t('home_declareBtn')}
     </button>
     <div class="declare-hint">${t('home_declareHint')}</div>
-    <button class="btn btn-block" id="home-crm-sync-btn" style="margin-top:8px;font-size:13px;opacity:0.7">
-      <i data-feather="refresh-cw"></i> סנכרן מלאי ל-CRM
-    </button>
+    ${['admin','manager'].includes(getSession()?.role) ? `<button class="btn btn-block" id="home-crm-sync-btn" style="margin-top:8px;font-size:13px;opacity:0.7"><i data-feather="refresh-cw"></i> ${t('home_crmSync') || 'Sync inventory to CRM'}</button>` : ''}
 
     <div class="v2-section-head" style="margin-top:6px">
       <div class="eyebrow">${t('home_goToMenu')}</div>
@@ -1044,7 +1042,7 @@ function renderHomeInventory(container) {
   const crmSyncBtn = container.querySelector('#home-crm-sync-btn');
   if (crmSyncBtn) crmSyncBtn.addEventListener('click', () => {
     syncInventorySnapshot('manual-crm-sync');
-    showToast('סנכרון CRM הופעל — בדוק קונסול');
+    showToast(t('home_crmSyncTriggered') || 'CRM sync triggered');
   });
 
   container.querySelectorAll('.hub-tile').forEach(tile => {
