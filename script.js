@@ -795,6 +795,16 @@ function renderDashboard(container) {
   const bottlingRecords = getData(STORE_KEYS.bottling);
   const pendingApprovals = bottlingRecords.filter(r => !r.decision || (r.decision !== 'approved' && r.decision !== 'notApproved')).length;
 
+  // Build real 7-day sparkline data from localStorage records
+  const _last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10);
+  });
+  const _allRecords = Object.values(STORE_KEYS).flatMap(k => getData(k));
+  const _countsByDay = day => _allRecords.filter(r => r.createdAt && r.createdAt.startsWith(day)).length;
+  const sparkToday = _last7Days.map(_countsByDay);
+  const sparkTotal = _last7Days.map(day => _allRecords.filter(r => r.createdAt && r.createdAt <= day + 'T23:59:59').length);
+  // Pending approvals is a point-in-time count — no meaningful trend, skip sparkline
+
   const recentRecords = [];
   const moduleEntries = modules.filter(m => m.store);
   moduleEntries.forEach(m => {
@@ -820,17 +830,16 @@ function renderDashboard(container) {
       <div class="stat-card">
         <div class="stat-label">${t('todayActivity')}</div>
         <div class="stat-num">${todayTotal}</div>
-        ${_renderSparkline([3, 5, 4, 6, 5, 7, todayTotal || 1])}
+        ${_renderSparkline(sparkToday)}
       </div>
       <div class="stat-card">
         <div class="stat-label">${t('totalRecords')}</div>
         <div class="stat-num">${totalRecords}</div>
-        ${_renderSparkline([10, 12, 11, 14, 13, 15, totalRecords || 1])}
+        ${_renderSparkline(sparkTotal)}
       </div>
       <div class="stat-card">
         <div class="stat-label">${t('pendingApprovals')}</div>
         <div class="stat-num stat-num-warning">${pendingApprovals}</div>
-        ${_renderSparkline([2, 1, 3, 4, 2, 5, pendingApprovals || 1])}
       </div>
     </div>
 
