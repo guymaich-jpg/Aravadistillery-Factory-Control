@@ -81,9 +81,17 @@ function addRecord(key, record) {
   data.unshift(record);
   setData(key, data);
 
-  // Async sync to Firebase (fire-and-forget)
-  if (typeof fbAdd === 'function' && !_syncInProgress) {
-    fbAdd(key, record).catch(() => {});
+  // Sync to Firebase using record.id as doc ID (idempotent — safe to retry)
+  if (typeof fbSetDoc === 'function' && !_syncInProgress) {
+    fbSetDoc(key, record.id, record).then(ok => {
+      if (!ok && typeof queueOfflineAction === 'function') {
+        queueOfflineAction({ type: 'firestore-set', collection: key, docId: record.id, data: record, merge: false });
+      }
+    }).catch(() => {
+      if (typeof queueOfflineAction === 'function') {
+        queueOfflineAction({ type: 'firestore-set', collection: key, docId: record.id, data: record, merge: false });
+      }
+    });
   }
 
   return record;
@@ -110,8 +118,17 @@ function updateRecord(key, id, updates) {
     data[idx] = { ...data[idx], ...updates, updatedAt: new Date().toISOString() };
     setData(key, data);
 
-    if (typeof fbUpdate === 'function' && !_syncInProgress) {
-      fbUpdate(key, id, updates).catch(() => {});
+    if (typeof fbSetDoc === 'function' && !_syncInProgress) {
+      const payload = { ...updates, updatedAt: data[idx].updatedAt };
+      fbSetDoc(key, id, payload, true).then(ok => {
+        if (!ok && typeof queueOfflineAction === 'function') {
+          queueOfflineAction({ type: 'firestore-set', collection: key, docId: id, data: payload, merge: true });
+        }
+      }).catch(() => {
+        if (typeof queueOfflineAction === 'function') {
+          queueOfflineAction({ type: 'firestore-set', collection: key, docId: id, data: payload, merge: true });
+        }
+      });
     }
 
     return data[idx];
@@ -125,7 +142,15 @@ function deleteRecord(key, id) {
   setData(key, filtered);
 
   if (typeof fbDelete === 'function' && !_syncInProgress) {
-    fbDelete(key, id).catch(() => {});
+    fbDelete(key, id).then(ok => {
+      if (!ok && typeof queueOfflineAction === 'function') {
+        queueOfflineAction({ type: 'firestore-delete', collection: key, docId: id });
+      }
+    }).catch(() => {
+      if (typeof queueOfflineAction === 'function') {
+        queueOfflineAction({ type: 'firestore-delete', collection: key, docId: id });
+      }
+    });
   }
 }
 

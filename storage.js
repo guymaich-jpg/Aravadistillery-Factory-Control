@@ -30,7 +30,11 @@ async function flushOfflineQueue() {
       if (item.type === 'sheets-sync' && typeof postToSheets === 'function') {
         await postToSheets(item.payload);
       } else if (item.type === 'firestore-set' && typeof fbSetDoc === 'function') {
-        await fbSetDoc(item.collection, item.docId, item.data, item.merge);
+        const ok = await fbSetDoc(item.collection, item.docId, item.data, item.merge);
+        if (!ok) failed.push(item);
+      } else if (item.type === 'firestore-delete' && typeof fbDelete === 'function') {
+        const ok = await fbDelete(item.collection, item.docId);
+        if (!ok) failed.push(item);
       } else {
         failed.push(item);
       }
