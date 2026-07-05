@@ -16,11 +16,20 @@ if (!admin.apps.length) {
     console.error('[firebase-admin]', _initError);
   } else {
     try {
+      // Normalize the PEM: strip wrapping quotes (dashboard copy-paste),
+      // then collapse double-escaped (\\n) and single-escaped (\n) newlines.
+      // A key corrupted either way produces "DECODER routines::unsupported"
+      // at request time when the SDK signs its first token.
+      const privateKey = rawKey
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .replace(/\\\\n/g, '\n')
+        .replace(/\\n/g, '\n');
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId,
           clientEmail,
-          privateKey: rawKey.replace(/\\n/g, '\n'),
+          privateKey,
         }),
       });
     } catch (e: any) {

@@ -1225,11 +1225,15 @@ function renderDeclareInventory(container) {
     };
     addRecord(STORE_KEYS.inventoryDeclarations, record);
 
-    // Update inventoryBase with declared counts so Home reflects physical reality
+    // Update inventoryBase with declared counts so Home reflects physical reality.
+    // Must go through addRecord (not setData): addRecord assigns an id + createdAt
+    // and syncs the record to Firestore, so ALL devices receive the new base via
+    // hydration. A setData-only base lives on this device alone and other devices
+    // keep computing (and syncing) inventory from their stale base.
     const newBase = {};
     lines.forEach(l => { newBase[l.spirit_type] = l.counted_qty; });
     newBase.declared_at = record.declared_at;
-    setData(STORE_KEYS.inventoryBase, [newBase]);
+    addRecord(STORE_KEYS.inventoryBase, newBase);
     syncInventorySnapshot('declare');
 
     currentScreen = 'home'; _navDirection = 'back'; renderApp();
