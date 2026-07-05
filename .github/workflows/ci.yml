@@ -19,6 +19,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Verify version consistency (sw.js + index.html match package.json)
+        run: npm run version:check
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 

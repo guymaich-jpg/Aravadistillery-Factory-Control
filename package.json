@@ -1,6 +1,6 @@
 {
   "name": "factory-control-app",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "description": "Alcohol Production Documentation App - Bilingual (Hebrew/English) mobile-first web application for distillery production tracking",
   "main": "index.html",
   "scripts": {
@@ -11,6 +11,8 @@
     "test:e2e:ui": "npx playwright test --ui",
     "test:e2e:headed": "npx playwright test --headed",
     "test:qa": "node tests/qa/qa-runner.js",
+    "version:check": "node scripts/sync-version.js --check",
+    "version": "node scripts/sync-version.js && git add sw.js index.html",
     "release:staging": "bash scripts/release-staging.sh",
     "release:prod": "bash scripts/release-prod.sh"
   },
