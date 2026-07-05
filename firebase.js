@@ -1,22 +1,21 @@
 // ============================================================
 // firebase.js — Firebase / Firestore Database Layer
 // ============================================================
-// SETUP: Replace the config below with your Firebase project config.
-// Get it from: Firebase Console → Project Settings → Your Apps → SDK setup
-//
-// IMPORTANT: Before enabling Firebase, you MUST configure Firestore Security Rules
-// to require authentication and enforce role-based access. Default test-mode rules
-// allow anyone with the API key to read/write all data. See:
-// https://firebase.google.com/docs/firestore/security/get-started
+// Config is injected at runtime by /api/env.js (reads Vercel env vars).
+// If that script fails (local dev, first offline load), falls back to the
+// hardcoded production config below so the app still works.
 // ============================================================
 
+// window.__FC_CONFIG__ is set by <script defer src="/api/env.js"> in index.html
+const _env = (typeof window !== 'undefined' && window.__FC_CONFIG__) || {};
+
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDkUt6_q5s8vKOXedEG142U-uQgY_49SGI",
-  authDomain: "aravadistillery-crm.firebaseapp.com",
-  projectId: "aravadistillery-crm",
-  storageBucket: "aravadistillery-crm.firebasestorage.app",
-  messagingSenderId: "806102108846",
-  appId: "1:806102108846:web:ea6efb2363c1459dbdfb3f",
+  apiKey:            _env.firebaseApiKey            || "AIzaSyDkUt6_q5s8vKOXedEG142U-uQgY_49SGI",
+  authDomain:        _env.firebaseAuthDomain        || "aravadistillery-crm.firebaseapp.com",
+  projectId:         _env.firebaseProjectId         || "aravadistillery-crm",
+  storageBucket:     _env.firebaseStorageBucket     || "aravadistillery-crm.firebasestorage.app",
+  messagingSenderId: _env.firebaseMessagingSenderId || "806102108846",
+  appId:             _env.firebaseAppId             || "1:806102108846:web:ea6efb2363c1459dbdfb3f",
   measurementId: "G-JQ437N3LG4"
 };
 

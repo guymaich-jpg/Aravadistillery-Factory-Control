@@ -3,6 +3,17 @@
 // ============================================================
 
 const APP_VERSION = '2.9';
+const APP_ENV = (typeof window !== 'undefined' && window.__FC_CONFIG__?.environment) || 'development';
+
+// Inject staging banner so it's always visible on the staging URL
+if (APP_ENV === 'staging') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.createElement('div');
+    banner.id = 'staging-banner';
+    banner.textContent = '⚠ STAGING';
+    document.body.prepend(banner);
+  });
+}
 
 // ---- Focus Trap Utility (accessibility) ----
 function _trapFocus(modalEl) {

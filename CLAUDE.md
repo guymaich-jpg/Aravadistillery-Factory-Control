@@ -2,11 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Workflow
+## Workflow — Staging → Production
 
-1. **Develop** - Make changes on the feature branch
-2. **Create PR** - Open a pull request to merge into `main`
-3. **New Version** - After merge, bump the version and create a GitHub release
+```
+feature/* → PR → staging branch  (Vercel staging auto-deploys)
+                       ↓ QA passes
+              staging → PR → main  (Vercel production auto-deploys)
+                                      ↓
+                               git tag vX.Y.Z + GitHub Release
+```
+
+1. **Feature branch** — all work starts here, PR targets `staging`
+2. **Staging deploy** — Vercel deploys `staging` branch automatically to staging URL
+3. **QA on staging** — run E2E suite against staging URL; manual smoke
+4. **Version bump** — bump `package.json` + `sw.js` + `?v=` in `index.html` on `staging`
+5. **Promote to production** — PR `staging → main`, merge; Vercel auto-deploys
+6. **Tag the release** — `git tag vX.Y.Z && git push --tags && gh release create vX.Y.Z`
+
+### Environment config
+
+Firebase keys and other environment values are injected at runtime via `/api/env.js` (a Vercel serverless endpoint that reads env vars). The app code is identical in both environments — only Vercel env vars differ.
+
+**Required Vercel env vars** (set per project in Vercel dashboard):
+```
+FIREBASE_API_KEY
+FIREBASE_AUTH_DOMAIN
+FIREBASE_PROJECT_ID
+FIREBASE_STORAGE_BUCKET
+FIREBASE_MESSAGING_SENDER_ID
+FIREBASE_APP_ID
+APP_ENV          # "staging" or "production"
+```
+
+When `APP_ENV=staging`, a yellow "⚠ STAGING" banner appears at the top of the app.
+
+Local dev (`npm run dev`) works without these — `firebase.js` falls back to the hardcoded production config.
 
 ## Commands
 
@@ -59,7 +89,7 @@ cd backend && npm run dev    # vercel dev
 ### Backend (`backend/`)
 
 Vercel serverless TypeScript functions:
-- `api/` — Endpoints: health, inventory, quick-access, users/*, invitations/*
+- `api/` — Endpoints: env (config injection), health, inventory, quick-access, users/*, invitations/*
 - `lib/` — Shared: Firebase Admin SDK, auth (ID token verification), CORS, CRM sync
 
 ### Routing & State

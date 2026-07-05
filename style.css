@@ -182,6 +182,25 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(-20px);
 }
 
+/* ── Staging environment banner ── */
+#staging-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  background: #C4A040;
+  color: #1A1E1B;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 4px 0;
+  pointer-events: none;
+}
+body:has(#staging-banner) #app { margin-top: 22px; height: calc(100dvh - 22px); }
+
 /* ── Skip to content ── */
 .skip-link {
   position: fixed;
