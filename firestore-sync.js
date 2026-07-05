@@ -18,6 +18,11 @@ var _SYNC_COLLECTIONS = [
   'factory_distillation1',
   'factory_distillation2',
   'factory_bottling',
+  // Inventory base + declarations must reach every device: the dashboard and
+  // the CRM stock sync are computed from inventoryBase, so a declaration made
+  // on one device is meaningless to others until they hydrate it.
+  'factory_inventoryBase',
+  'factory_inventoryDeclarations',
 ];
 
 // ── Initialization ───────────────────────────────────────────
@@ -60,6 +65,22 @@ function _hydrateAllCollections() {
     }
   });
 }
+
+// ── Visibility re-hydration ──────────────────────────────────
+// A device left open (e.g. tablet on the distillery floor) only subscribes to
+// the active module. Re-hydrate everything when the tab regains focus so
+// declarations made on other devices are reflected without a manual reload.
+
+var _lastHydrationAt = 0;
+
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState !== 'visible') return;
+  if (!_initialHydrationDone) return;
+  if (typeof currentView !== 'undefined' && currentView === 'form') return;
+  if (Date.now() - _lastHydrationAt < 30000) return; // throttle: 30s
+  _lastHydrationAt = Date.now();
+  _hydrateAllCollections();
+});
 
 // ── Module subscription management ───────────────────────────
 
@@ -146,7 +167,14 @@ function _mergeFirestoreIntoLocal(storeKey, fbRecords) {
   // Local-only records: keep them, but mark as _deleted if they previously
   // existed in Firestore (had been synced) and are now gone from the snapshot.
   local.forEach(function (localRec) {
-    if (!localRec.id || seenIds[localRec.id]) return;
+    if (!localRec.id) {
+      // Legacy record with no id (pre-sync data, e.g. an old declared base):
+      // it can never appear in Firestore, so dropping or tombstoning it would
+      // silently destroy local-only data. Preserve as-is.
+      merged.push(localRec);
+      return;
+    }
+    if (seenIds[localRec.id]) return;
     // Record exists locally but not in Firestore
     var age = Date.now() - new Date(localRec.createdAt || 0).getTime();
     if (age < 15000) {
