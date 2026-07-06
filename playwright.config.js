@@ -16,6 +16,10 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
+    // The PWA service worker re-registers itself after freshApp() unregisters
+    // it, and SW-mediated fetches bypass page.route() — breaking the hermetic
+    // stubs (/api/env.js, fake Sheets endpoint). Block SWs at the driver level.
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'python3 -m http.server 8099',

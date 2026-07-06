@@ -3,10 +3,12 @@
 // Desktop-only — verifies the Google Sheet link on management screen
 // ============================================================
 const { test, expect } = require('@playwright/test');
-const { freshApp, loginAsAdmin, loginAsManager } = require('./helpers');
+const { freshApp, loginAsAdmin, loginAsManager, E2E_INVENTORY_SHEET_URL } = require('./helpers');
 
+// Live GAS endpoint — used only by the direct-connectivity tests below (they
+// soft-skip offline). The app itself gets its URLs from the stubbed /api/env.js.
 const SHEETS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz4IIUXvDoo7qJH1Ytn7hEWZ85Ek7hViA9riSezMZCXQbjKQG3VwfppQlq0kuTwOHT3/exec';
-const EXPECTED_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
+const EXPECTED_SHEET_URL = E2E_INVENTORY_SHEET_URL;
 
 test.describe('Google Sheets: Inventory link', () => {
   test('inventory sheet link is present on management screen with correct attributes', async ({ page }) => {
