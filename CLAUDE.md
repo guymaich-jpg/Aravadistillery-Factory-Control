@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Deployment URLs
+
+| Environment | URL |
+|-------------|-----|
+| **Production** | https://aravadistillery-factory-control.vercel.app |
+| **Staging** | https://aravadistillery-factory-control-staging.vercel.app |
+
 ## Workflow — Staging → Production
 
 ```
