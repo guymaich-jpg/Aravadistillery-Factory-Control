@@ -3,3 +3,5 @@ node_modules/
 test-results/
 tests/e2e/report/
 .claude/settings.local.json
+.claude/worktrees/
+.vercel/
