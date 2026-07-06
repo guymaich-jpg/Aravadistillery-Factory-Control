@@ -1556,6 +1556,10 @@ html[dir="rtl"] .toggle-switch input:checked + .toggle-slider::before {
   font-weight: 500;
   z-index: 2000;
   opacity: 0;
+  /* Status toast is purely informational — never let it intercept taps.
+     It sits over the bottom nav; without this, clicks on nav items right
+     after a save (while the toast shows/fades) are swallowed. */
+  pointer-events: none;
   transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
   white-space: nowrap;
   backdrop-filter: blur(12px);
