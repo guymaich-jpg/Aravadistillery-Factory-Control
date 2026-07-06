@@ -34,11 +34,33 @@ const TEST_WORKER = {
 };
 
 /**
- * Clear app state (localStorage) and navigate to the app
+ * Clear app state (localStorage) and navigate to the app.
+ *
+ * Tests run HERMETICALLY: the Firebase SDK network load is blocked so the app
+ * falls back to its localStorage-only path. This isolates the suite from the
+ * shared production Firestore — previously the app connected to prod on load,
+ * hydrated real records into localStorage, and tests saw accumulated prod data
+ * (e.g. `.record-item` resolving to 20 elements) → flaky, order-dependent
+ * failures, and test runs polluting production. Blocking the SDK makes every
+ * test deterministic and side-effect-free. Must be registered before goto().
  */
 async function freshApp(page) {
+  await page.route(/gstatic\.com\/firebasejs/, route => route.abort());
+  await page.route('**/api/env*', route => route.abort());
   await page.goto('/');
-  await page.evaluate(() => {
+  // Tear down any service worker + caches first: the PWA's SW can serve a
+  // cached Firebase SDK past the network route above, letting the app connect
+  // to prod and hydrate real records. Unregister it and clear caches so the
+  // block is airtight and each test starts from a truly empty state.
+  await page.evaluate(async () => {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
     Object.keys(localStorage)
       .filter(k => k.startsWith('factory_'))
       .forEach(k => localStorage.removeItem(k));

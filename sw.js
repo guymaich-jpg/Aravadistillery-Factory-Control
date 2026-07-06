@@ -2,7 +2,7 @@
 // Service Worker — Factory Control PWA
 // ============================================================
 
-const APP_VERSION = '2.9.2';
+const APP_VERSION = '2.9.3';
 const CACHE_NAME = 'factory-v' + APP_VERSION;
 
 // App shell files to pre-cache on install
