@@ -944,32 +944,18 @@ const SPIRIT_COLORS = {
   drink_brandyMed: 'var(--m-inv)',
 };
 
+// Per-item stock is declaration-driven: the counts entered in the last
+// inventory declaration ARE the current stock, keyed by catalog product id.
+// (Bottling is a spirit-level production log and no longer feeds stock.)
 function _computeBottleInventoryTotals() {
   const baseRecords = getData(STORE_KEYS.inventoryBase);
-  const baseInv = {};
-  let baseDeclaredAt = null;
-  if (baseRecords.length > 0) {
-    DRINK_TYPES.forEach(dt => { baseInv[dt] = parseInt(baseRecords[0][dt]) || 0; });
-    baseDeclaredAt = baseRecords[0].declared_at || null;
-  }
-
-  // Only count bottling records created AFTER the last declaration
-  const bottlingRecords = getData(STORE_KEYS.bottling);
-  const bottleInv = {};
-  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
-  bottlingRecords.forEach(r => {
-    if (r.drinkType && r.decision === 'approved') {
-      if (!baseDeclaredAt || (r.createdAt && r.createdAt > baseDeclaredAt)) {
-        bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
-      }
-    }
-  });
-
+  const base = baseRecords.length > 0 ? baseRecords[0] : {};
   const totals = {};
   let grandTotal = 0;
-  DRINK_TYPES.forEach(dt => {
-    totals[dt] = (bottleInv[dt] || 0) + (baseInv[dt] || 0);
-    grandTotal += totals[dt];
+  getCatalog().forEach(item => {
+    const n = parseInt(base[item.id]) || 0;
+    totals[item.id] = n;
+    grandTotal += n;
   });
   return { totals, grandTotal };
 }
@@ -1107,17 +1093,18 @@ function renderDeclareInventory(container) {
         <span>${t('declare_counted')}</span>
         <span>${t('declare_diff')}</span>
       </div>
-      ${DRINK_TYPES.map(dt => {
-        const sys = totals[dt] || 0;
-        const color = SPIRIT_COLORS[dt] || 'var(--accent)';
+      <div class="declare-list" style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
+      ${getCatalog().map(item => {
+        const sys = totals[item.id] || 0;
         return `
-        <div class="count-row" data-dt="${esc(dt)}">
-          <div class="count-cname"><span class="inv-bd-dot" style="background:${color}"></span> ${esc(t(dt))}</div>
+        <div class="count-row" data-pid="${esc(item.id)}">
+          <div class="count-cname">${esc(item.name)}</div>
           <div class="count-sys t-mono">${sys}</div>
-          <input class="input count-input t-mono" type="number" data-dt="${esc(dt)}" data-sys="${sys}" value="" placeholder="—" inputmode="numeric">
+          <input class="input count-input t-mono" type="number" data-pid="${esc(item.id)}" data-sys="${sys}" value="" placeholder="—" inputmode="numeric">
           <div class="count-diff t-mono zero">—</div>
         </div>`;
       }).join('')}
+      </div>
     </div>
 
     <div class="count-total" id="declare-totals">
@@ -1205,12 +1192,13 @@ function renderDeclareInventory(container) {
     let countedTotal = 0;
     let netDiff = 0;
     container.querySelectorAll('.count-input').forEach(input => {
-      const dt = input.dataset.dt;
+      const pid = input.dataset.pid;
       const sys = parseInt(input.dataset.sys) || 0;
       const val = input.value.trim();
       const counted = val !== '' ? (parseInt(val) || 0) : sys;
       const diff = counted - sys;
-      lines.push({ spirit_type: dt, system_qty: sys, counted_qty: counted, diff });
+      const item = getCatalog().find(c => c.id === pid);
+      lines.push({ product_id: pid, product_name: item ? item.name : pid, system_qty: sys, counted_qty: counted, diff });
       countedTotal += counted;
       netDiff += diff;
     });
@@ -1225,13 +1213,12 @@ function renderDeclareInventory(container) {
     };
     addRecord(STORE_KEYS.inventoryDeclarations, record);
 
-    // Update inventoryBase with declared counts so Home reflects physical reality.
-    // Must go through addRecord (not setData): addRecord assigns an id + createdAt
-    // and syncs the record to Firestore, so ALL devices receive the new base via
-    // hydration. A setData-only base lives on this device alone and other devices
-    // keep computing (and syncing) inventory from their stale base.
+    // Update inventoryBase with declared counts (keyed by catalog product id) so
+    // Home + the CRM sync reflect physical reality. Must go through addRecord so
+    // the record gets an id + createdAt and syncs to Firestore — all devices then
+    // receive the new base via hydration.
     const newBase = {};
-    lines.forEach(l => { newBase[l.spirit_type] = l.counted_qty; });
+    lines.forEach(l => { newBase[l.product_id] = l.counted_qty; });
     newBase.declared_at = record.declared_at;
     addRecord(STORE_KEYS.inventoryBase, newBase);
     syncInventorySnapshot('declare');
@@ -1663,7 +1650,7 @@ function renderModuleDetail(container) {
     if (f.type === 'toggle') val = val ? t('yes') : t('no');
     else if (f.type === 'select' && val) {
       const opt = f.options?.find(o => o.value === val);
-      val = opt?.labelKey ? t(opt.labelKey) : val;
+      val = opt?.labelKey ? t(opt.labelKey) : (opt?.label || val);
     }
     else if (f.type === 'date') val = formatDate(val);
     if (val === undefined || val === null || val === '') val = '-';

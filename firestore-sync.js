@@ -58,6 +58,9 @@ function _hydrateAllCollections() {
       .catch(function () {});
   });
 
+  // Load the shared product catalog (names only) from Firestore alongside hydration.
+  if (typeof loadCatalog === 'function') promises.push(loadCatalog().catch(function () {}));
+
   Promise.all(promises).then(function () {
     _initialHydrationDone = true;
     if (typeof renderApp === 'function' && typeof currentView !== 'undefined' && currentView !== 'form') {
