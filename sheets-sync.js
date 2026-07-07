@@ -6,11 +6,17 @@
 // ============================================================
 // Per-environment endpoints served by /api/env.js (Vercel env vars
 // SHEETS_SYNC_URL / INVENTORY_SHEET_URL) — loads before this script (defer
-// order in index.html). Empty in environments without a spreadsheet
-// (e.g. staging); every call site guards on a falsy URL, disabling sync.
+// order in index.html). Staging must never write to the production business
+// spreadsheet, so on staging only explicit config is used (empty disables
+// sync; every call site guards on a falsy URL). Everywhere else the
+// production URLs are the fallback, so production and local dev keep
+// working with no Vercel env vars configured.
 const _sheetsCfg = (typeof window !== 'undefined' && window.__FC_CONFIG__) || {};
-const SHEETS_SYNC_URL = _sheetsCfg.sheetsSyncUrl || '';
-const INVENTORY_SHEET_URL = _sheetsCfg.inventorySheetUrl || '';
+const _isStaging = _sheetsCfg.environment === 'staging';
+const SHEETS_SYNC_URL = _sheetsCfg.sheetsSyncUrl ||
+  (_isStaging ? '' : 'https://script.google.com/macros/s/AKfycbz4IIUXvDoo7qJH1Ytn7hEWZ85Ek7hViA6riSezMZCXQbjKQG3VwfppQlq0kuTwOHT3/exec');
+const INVENTORY_SHEET_URL = _sheetsCfg.inventorySheetUrl ||
+  (_isStaging ? '' : 'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365');
 
 // Sync state for the visual indicator
 let _syncQueue = 0;
