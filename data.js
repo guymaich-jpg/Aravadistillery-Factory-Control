@@ -289,6 +289,43 @@ const DRINK_TYPES = [
   'drink_brandyVS', 'drink_brandyVSOP', 'drink_brandyMed'
 ];
 
+// ---- Product catalog (the 19 finished-product SKUs) ----------------------
+// Single source of truth shared with the CRM (Firestore `products` collection).
+// Factory Control uses NAME + id only — never price. `_catalog` is loaded live
+// from Firestore on startup; CATALOG_FALLBACK keeps the app working offline.
+const CATALOG_FALLBACK = [
+  { id: '1',  name: 'ערק 500 מ"ל' },      { id: '2',  name: 'ליקריץ 500 מ"ל' },
+  { id: '3',  name: 'או-דה-וי 500 מ"ל' },  { id: '4',  name: 'ג\'ין 500 מ"ל' },
+  { id: '5',  name: 'ברנדי VS 500 מ"ל' },  { id: '6',  name: 'ערק 200 מ"ל' },
+  { id: '7',  name: 'ג\'ין 200 מ"ל' },      { id: '8',  name: 'ברנדי 200 מ"ל' },
+  { id: '9',  name: 'ליקר ערק תאנים' },     { id: '10', name: 'ליקר ג\'ין הדרים' },
+  { id: '11', name: 'ערק גלי' },           { id: '12', name: 'ליקריץ גלי' },
+  { id: '13', name: 'גין גלי' },           { id: '14', name: 'ערק רואי' },
+  { id: '15', name: 'ליקריץ אורי' },       { id: '16', name: 'גין רואי' },
+  { id: '17', name: 'ערק עידו' },          { id: '18', name: 'ליקריץ עידו' },
+  { id: '19', name: 'גין עידו' },
+];
+
+var _catalog = CATALOG_FALLBACK.slice();
+
+function getCatalog() { return _catalog; }
+
+// Load the live catalog from Firestore (active products only), sorted by id.
+// Falls back silently to CATALOG_FALLBACK if Firestore is unavailable.
+async function loadCatalog() {
+  if (typeof fbGetAll !== 'function' || (typeof isFirebaseReady === 'function' && !isFirebaseReady())) return;
+  try {
+    const products = await fbGetAll('products');
+    if (products && products.length) {
+      const active = products
+        .filter(p => p && p.isActive !== false && p.id != null)
+        .map(p => ({ id: String(p.id), name: p.name || String(p.id) }))
+        .sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+      if (active.length) _catalog = active;
+    }
+  } catch (e) { /* keep fallback */ }
+}
+
 const D1_TYPES = [
   'd1_type_dist1', 'd1_type_tailsArak', 'd1_type_tailsGin',
   'd1_type_tailsEDV', 'd1_type_cleaning'

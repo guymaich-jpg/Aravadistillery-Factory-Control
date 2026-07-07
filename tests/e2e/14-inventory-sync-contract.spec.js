@@ -54,44 +54,26 @@ test.describe('Cross-App Inventory Sync Contract', () => {
     }
   });
 
-  test('product ID mapping is correct (Factory drink types to CRM IDs)', async ({ page }) => {
+  test('per-item stock writes doc ids that equal the product id (1:1)', async ({ page }) => {
     const result = await page.evaluate(() => {
       const calls = [];
       window.fbSetDoc = (collection, docId, data, merge) => {
         calls.push({ collection, docId, data, merge });
         return Promise.resolve();
       };
-
-      const bottleInv = {
-        drink_arak: 10,
-        drink_licorice: 5,
-        drink_edv: 8,
-        drink_gin: 3,
-      };
-
-      syncCrmStockLevels(bottleInv);
+      // Per-item counts keyed by catalog product id — written 1:1 (no mapping).
+      syncCrmStockLevels({ '1': 10, '2': 5, '3': 8, '4': 3 });
       return calls;
     });
 
     const byDocId = {};
     result.forEach(c => { byDocId[c.docId] = c.data; });
 
-    // Verify the documented mapping: drink_arak=1, drink_licorice=2, drink_edv=3, drink_gin=4
-    expect(byDocId['1']).toBeDefined();
-    expect(byDocId['1'].productId).toBe('1');
-    expect(byDocId['1'].currentStock).toBe(10); // arak
-
-    expect(byDocId['2']).toBeDefined();
-    expect(byDocId['2'].productId).toBe('2');
-    expect(byDocId['2'].currentStock).toBe(5); // licorice
-
-    expect(byDocId['3']).toBeDefined();
-    expect(byDocId['3'].productId).toBe('3');
-    expect(byDocId['3'].currentStock).toBe(8); // edv
-
-    expect(byDocId['4']).toBeDefined();
-    expect(byDocId['4'].productId).toBe('4');
-    expect(byDocId['4'].currentStock).toBe(3); // gin
+    for (const [id, stock] of [['1', 10], ['2', 5], ['3', 8], ['4', 3]]) {
+      expect(byDocId[id]).toBeDefined();
+      expect(byDocId[id].productId).toBe(id); // doc id === productId
+      expect(byDocId[id].currentStock).toBe(stock);
+    }
   });
 
   test('stock values are non-negative numbers', async ({ page }) => {
