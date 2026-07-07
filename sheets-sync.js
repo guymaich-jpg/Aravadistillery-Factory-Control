@@ -171,82 +171,57 @@ function togglePalette() {
   renderApp();
 }
 
-// Sync bottle counts to the CRM stockLevels Firestore collection.
-// Called as fallback when the backend API is unavailable.
-// CRM products: 1=ערק, 2=ליקוריץ, 3=EDV, 4=ג'ין, 5=ברנדי VS, 6=ברנדי VSOP, 7=ברנדי ים תיכוני
-function syncCrmStockLevels(bottleInv) {
+// Write per-item bottle stock to the CRM `stockLevels` collection (1:1 by
+// product id — no drink-type aggregation). `itemCounts` = { productId: count }.
+function syncCrmStockLevels(itemCounts) {
   if (typeof fbSetDoc !== 'function') {
     console.warn('[CRM-sync] fbSetDoc not available — skipping stock sync');
     return;
   }
-  var DRINK_TO_CRM = {
-    drink_arak: '1', drink_licorice: '2', drink_edv: '3', drink_gin: '4',
-    drink_brandyVS: '5', drink_brandyVSOP: '6', drink_brandyMed: '7',
-  };
-  var aggregated = {};
-  Object.keys(bottleInv).forEach(function(dt) {
-    var pid = DRINK_TO_CRM[dt];
-    if (!pid) return;
-    aggregated[pid] = (aggregated[pid] || 0) + (bottleInv[dt] || 0);
-  });
-  console.info('[CRM-sync] Writing stockLevels →', JSON.stringify(aggregated), '| input:', JSON.stringify(bottleInv));
+  console.info('[CRM-sync] Writing stockLevels (per item) →', JSON.stringify(itemCounts));
   var now = new Date().toISOString();
-  Object.keys(aggregated).forEach(function(productId) {
+  Object.keys(itemCounts).forEach(function(productId) {
     fbSetDoc('stockLevels', productId, {
       productId: productId,
-      currentStock: aggregated[productId],
+      currentStock: itemCounts[productId] || 0,
       unit: 'בקבוק',
       lastUpdated: now,
       factoryLastSync: now,
     }, true).then(function() {
-      console.info('[CRM-sync] ✓ stockLevels/' + productId + ' → ' + aggregated[productId]);
+      console.info('[CRM-sync] ✓ stockLevels/' + productId + ' → ' + (itemCounts[productId] || 0));
     }).catch(function(err) {
       console.error('[CRM-sync] ✗ stockLevels/' + productId + ' FAILED:', err && (err.code || err.message || err));
     });
   });
 }
 
-// Append a timestamped inventory snapshot row to the Sheets Inventory ledger.
-// Called automatically after any record is saved, updated, or deleted.
+// After a declaration/save, push current per-item stock to Firestore + the CRM,
+// and log a production snapshot to the Sheets ledger.
+// Per-item stock is the count from the latest inventory declaration (keyed by
+// catalog product id); bottling remains a spirit-level production log.
 function syncInventorySnapshot(triggeredBy) {
-  const bottlingRecords = getData(STORE_KEYS.bottling);
-  const rawRecords = getData(STORE_KEYS.rawMaterials);
   const dateRecords = getData(STORE_KEYS.dateReceiving);
   const fermRecords = getData(STORE_KEYS.fermentation);
   const d1Records = getData(STORE_KEYS.distillation1);
   const d2Records = getData(STORE_KEYS.distillation2);
+  const bottlingRecords = getData(STORE_KEYS.bottling);
 
-  // Base inventory (read first so we can filter bottling by declaration date)
   const baseRecords = getData(STORE_KEYS.inventoryBase);
-  const baseDeclaredAt = (baseRecords.length > 0 && baseRecords[0].declared_at) || null;
+  const base = baseRecords.length > 0 ? baseRecords[0] : {};
+  const catalog = (typeof getCatalog === 'function') ? getCatalog() : [];
+  const itemCounts = {};
+  catalog.forEach(function(item) { itemCounts[item.id] = parseInt(base[item.id]) || 0; });
+  const bottlesTotal = Object.keys(itemCounts).reduce(function(s, k) { return s + itemCounts[k]; }, 0);
 
-  const bottleInv = {};
-  DRINK_TYPES.forEach(dt => { bottleInv[dt] = 0; });
-  if (baseRecords.length > 0) {
-    const latestBase = baseRecords[0];
-    DRINK_TYPES.forEach(dt => {
-      bottleInv[dt] = (bottleInv[dt] || 0) + (parseInt(latestBase[dt]) || 0);
-    });
-  }
-  // Only count bottling records created after the last declaration
-  bottlingRecords.forEach(r => {
-    if (r.drinkType && r.decision === 'approved') {
-      if (!baseDeclaredAt || (r.createdAt && r.createdAt > baseDeclaredAt)) {
-        bottleInv[r.drinkType] = (bottleInv[r.drinkType] || 0) + (parseInt(r.bottleCount) || 0);
-      }
-    }
-  });
-
+  // Production metrics (spirit-level, unchanged — for the Sheets ledger)
   const totalDatesReceived = dateRecords.reduce((sum, r) => sum + (parseFloat(r.weight) || 0), 0);
   const totalDatesInFerm = fermRecords.reduce((sum, r) => {
     if (r.datesCrates !== undefined && r.datesCrates !== '') return sum + (parseFloat(r.datesCrates) || 0) * 20;
     return sum + (parseFloat(r.datesKg) || 0);
   }, 0);
-
   const d1Produced = d1Records.reduce((sum, r) => sum + (parseFloat(r.distilledQty) || 0), 0);
   const d1Consumed = d2Records.reduce((sum, r) => sum + (parseFloat(r.d1InputQty) || 0), 0);
   const d2Produced = d2Records.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
-  const d2Consumed = bottlingRecords.reduce((sum, r) => sum + (parseFloat(r.d2InputQty) || 0), 0);
 
   const session = getSession();
   const record = {
@@ -259,34 +234,28 @@ function syncInventorySnapshot(triggeredBy) {
     d1_produced: d1Produced,
     d1_available: Math.max(0, d1Produced - d1Consumed),
     d2_produced: d2Produced,
-    d2_available: Math.max(0, d2Produced - d2Consumed),
-    ...DRINK_TYPES.reduce((acc, dt) => ({ ...acc, [dt]: bottleInv[dt] || 0 }), {}),
+    bottles_total: bottlesTotal,
+    ...catalog.reduce((acc, item) => ({ ...acc, ['item_' + item.id]: itemCounts[item.id] || 0 }), {}),
   };
-
   const keys = Object.keys(record);
   const labels = [
     'Timestamp', 'User', 'Triggered By',
     tHe('inv_dates'), 'Dates Received (kg)', tHe('inv_datesUsed'),
     'D1 Produced (L)', 'D1 Available (L)',
-    'D2 Produced (L)', 'D2 Available (L)',
-    ...DRINK_TYPES.map(dt => tHe(dt)),
+    'D2 Produced (L)',
+    'Bottles Total',
+    ...catalog.map(item => item.name),
   ];
 
   if (SHEETS_SYNC_URL) {
-    postToSheets({
-      sheetName: tHe('mod_inventory'),
-      action: 'append',
-      keys,
-      labels,
-      records: [record],
-    });
+    postToSheets({ sheetName: tHe('mod_inventory'), action: 'append', keys, labels, records: [record] });
   }
 
-  // Write directly to Firestore (primary path — immediate, no backend dependency)
+  // Firestore: current inventory doc (per item) — cross-device
   if (typeof fbSetDoc === 'function') {
     fbSetDoc('factory_inventory', 'current', {
-      bottles: { ...bottleInv },
-      total: Object.values(bottleInv).reduce((s, v) => s + v, 0),
+      bottles: { ...itemCounts },
+      total: bottlesTotal,
       updatedAt: new Date().toISOString(),
       updatedBy: session?.username || 'system',
       trigger: triggeredBy || 'save',
@@ -295,18 +264,6 @@ function syncInventorySnapshot(triggeredBy) {
     });
   }
 
-  syncCrmStockLevels(bottleInv);
-
-  // Also notify backend (fire-and-forget for any server-side processing)
-  if (typeof apiUpdateInventory === 'function') {
-    apiUpdateInventory(bottleInv, triggeredBy || 'save').then(function(result) {
-      if (result && result.error) {
-        console.warn('[inventory-sync] Backend API returned error:', result.error, '(HTTP ' + (result.status || '?') + ')');
-      } else if (result && result.success) {
-        console.info('[inventory-sync] Backend API synced OK');
-      }
-    }).catch(function(err) {
-      console.warn('[inventory-sync] Backend API network error:', err && (err.message || err));
-    });
-  }
+  // CRM per-item stock (client-side write; allowed by the current dual-write rules)
+  syncCrmStockLevels(itemCounts);
 }

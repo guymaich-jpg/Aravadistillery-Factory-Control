@@ -99,7 +99,8 @@ function getModuleFields(mod) {
       return [
         {
           key: 'drinkType', labelKey: 'bt_drinkType', type: 'select', required: true,
-          options: DRINK_TYPES.map(t => ({ value: t, labelKey: t }))
+          // The specific finished-product SKU (from the shared catalog).
+          options: (typeof getCatalog === 'function' ? getCatalog() : []).map(item => ({ value: item.id, label: item.name }))
         },
         { key: 'date', labelKey: 'bt_bottlingDate', type: 'date', required: true, default: todayStr() },
         { key: 'batchNumber', labelKey: 'bt_batchNumber', type: 'text', required: true, placeholder: 'e.g. E51, A102' },
