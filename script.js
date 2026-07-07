@@ -1003,14 +1003,14 @@ function renderHomeInventory(container) {
       <div class="see-all" id="home-full-inv">${t('home_fullInventory')}</div>
     </div>
     <div class="card" style="padding:4px 14px">
-      ${DRINK_TYPES.map(dt => {
-        const count = totals[dt] || 0;
-        const color = SPIRIT_COLORS[dt] || 'var(--accent)';
+      ${getCatalog().map(item => {
+        const count = totals[item.id] || 0;
+        const color = 'var(--accent)';
         const pct = maxCount > 0 ? (count / maxCount * 100) : 0;
         return `
         <div class="inv-bd-row">
           <div class="inv-bd-dot" style="background:${color}"></div>
-          <div class="inv-bd-name">${esc(t(dt))}</div>
+          <div class="inv-bd-name">${esc(item.name)}</div>
           <div class="inv-bd-bar"><span style="width:max(${pct.toFixed(1)}%,${count > 0 ? '3px' : '0px'});background:${pct > 0 ? color : 'var(--border)'};opacity:${pct > 0 ? '1' : '0.4'}"></span></div>
           <div class="inv-bd-num t-mono">${count > 0 ? count : '—'}</div>
         </div>`;
