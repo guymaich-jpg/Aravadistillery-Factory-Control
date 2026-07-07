@@ -84,10 +84,10 @@ function renderBackoffice(container) {
 
     <div class="bo-section">
       <div class="section-title section-title-mb">${t('sheetsIntegration')}</div>
-      <a href="${INVENTORY_SHEET_URL}" target="_blank" rel="noopener noreferrer"
+      ${INVENTORY_SHEET_URL ? `<a href="${INVENTORY_SHEET_URL}" target="_blank" rel="noopener noreferrer"
          id="inventory-sheet-link" class="btn btn-secondary bo-sheet-link">
         <i data-feather="external-link"></i> ${t('viewInventorySheet')}
-      </a>
+      </a>` : ''}
       <div class="bo-btn-row">
         <button class="btn btn-secondary bo-btn-flex" id="btn-sync-all-sheets">
           <i data-feather="refresh-cw"></i> ${t('sheetsSyncAll')}

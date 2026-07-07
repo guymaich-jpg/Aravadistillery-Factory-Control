@@ -33,6 +33,13 @@ const TEST_WORKER = {
   status: 'active',
 };
 
+// Fake per-env config served to the app in place of /api/env.js.
+// The sync URL must stay on script.google.com to satisfy the app's CSP
+// connect-src; Playwright intercepts it before any real request leaves.
+const E2E_SHEETS_SYNC_URL = 'https://script.google.com/macros/s/E2E-FAKE-ENDPOINT/exec';
+const E2E_INVENTORY_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/14rYu6QgRD2r4X4ZjOs45Rqtl4p0XOPvJfcs5BpY54EE/edit?gid=1634965365#gid=1634965365';
+
 /**
  * Clear app state (localStorage) and navigate to the app.
  *
@@ -46,7 +53,25 @@ const TEST_WORKER = {
  */
 async function freshApp(page) {
   await page.route(/gstatic\.com\/firebasejs/, route => route.abort());
-  await page.route('**/api/env*', route => route.abort());
+  // Stub /api/env.js instead of aborting it: the client reads the Sheets URLs
+  // from window.__FC_CONFIG__ (per-env config), so tests provide a fake sync
+  // endpoint (routed below — nothing leaves the browser) and the expected
+  // sheet link. Firebase keys stay empty → localStorage-only path, as before.
+  await page.route('**/api/env*', route => route.fulfill({
+    contentType: 'application/javascript',
+    body: `window.__FC_CONFIG__ = ${JSON.stringify({
+      environment: 'development',
+      sheetsSyncUrl: E2E_SHEETS_SYNC_URL,
+      inventorySheetUrl: E2E_INVENTORY_SHEET_URL,
+    })};`,
+  }));
+  // Fake Sheets endpoint — sync POSTs/GETs succeed hermetically (no real
+  // spreadsheet writes; the old live test wrote marker rows into prod).
+  await page.route('**/script.google.com/macros/s/E2E-FAKE-ENDPOINT/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '{"ok":true}',
+  }));
   await page.goto('/');
   // Tear down any service worker + caches first: the PWA's SW can serve a
   // cached Firebase SDK past the network route above, letting the app connect
@@ -124,4 +149,5 @@ async function logout(page) {
 module.exports = {
   freshApp, login, loginAsAdmin, loginAsManager, loginAsWorker, logout, seedTestUsers,
   TEST_ADMIN, TEST_MANAGER, TEST_WORKER,
+  E2E_SHEETS_SYNC_URL, E2E_INVENTORY_SHEET_URL,
 };

@@ -13,6 +13,10 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
     firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
     firebaseAppId:             process.env.FIREBASE_APP_ID             || '',
     environment:               process.env.APP_ENV                     || 'development',
+    // Google Sheets integration — per environment so staging never writes to
+    // the production business spreadsheet. Empty string disables sync.
+    sheetsSyncUrl:             process.env.SHEETS_SYNC_URL             || '',
+    inventorySheetUrl:         process.env.INVENTORY_SHEET_URL         || '',
   };
 
   // 5-minute browser cache, 60-second CDN cache — config rarely changes
