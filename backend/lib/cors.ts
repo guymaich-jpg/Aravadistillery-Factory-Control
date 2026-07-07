@@ -4,6 +4,7 @@ const ALLOWED_ORIGINS = [
   'https://guymaich-jpg.github.io',                            // both apps on GitHub Pages
   'https://aravadistillery-factory-control.vercel.app',         // Factory Control production
   'https://aravadistillery-factory-control-staging.vercel.app', // Factory Control staging
+  'https://aravadistillery-crm-staging.vercel.app',              // CRM staging
   'http://localhost:8080',                                      // Factory Control local dev
   'http://localhost:5173',                                      // CRM local dev (Vite)
   'http://localhost:3000',                                      // alternative local dev
