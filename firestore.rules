@@ -180,7 +180,11 @@ service cloud.firestore {
     // ── Audit log — append only ──────────────────────────────
     match /audit_log/{docId} {
       allow read: if isManager();
-      allow create: if isAuth();
+      // userEmail must match the writer's own token — without this, any
+      // authed client could forge an entry under someone else's identity.
+      // Existing entries are still fully immutable (no update/delete).
+      allow create: if isAuth() &&
+        request.resource.data.userEmail == request.auth.token.email;
       allow update, delete: if false; // Immutable
     }
 
