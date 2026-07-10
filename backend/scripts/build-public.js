@@ -10,7 +10,13 @@ fs.mkdirSync(pub, { recursive: true });
 
 // Copy every file in root that matches these extensions
 const EXTS = new Set(['.html', '.css', '.js', '.json', '.svg', '.png', '.ico', '.webmanifest', '.txt']);
-const SKIP = new Set(['node_modules', 'backend', 'tests', '.git', '.github', '.claude']);
+const SKIP = new Set([
+  'node_modules', 'backend', 'tests', '.git', '.github', '.claude',
+  // Not referenced by index.html/sw.js — no reason to ship these to every
+  // visitor. preview.html/tests.html are dev-only pages; google-apps-script.js
+  // is deployed separately, directly to Google Apps Script.
+  'preview.html', 'tests.html', 'google-apps-script.js',
+]);
 
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
