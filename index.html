@@ -10,8 +10,14 @@
     <meta name="theme-color" content="#1A1E1B" media="(prefers-color-scheme: dark)">
     <meta name="color-scheme" content="light dark">
     <meta name="description" content="Arava Distillery — Production Control System">
-    <!-- Security: CSP via meta tag (note: frame-ancestors requires HTTP header, not supported in meta tags) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.firebaseio.com https://*.googleapis.com https://*.gstatic.com https://aravadistillery-factory-control.vercel.app; img-src 'self' data: blob:;">
+    <!-- Security: CSP via meta tag — the only CSP local dev (python3 -m http.server,
+         no custom headers) ever gets, so this must stay a superset of what the app
+         needs. Vercel deployments also get the authoritative header CSP in
+         backend/vercel.json — keep the two in sync (allowed sources, not directives
+         meta can't set, like frame-ancestors). No hardcoded cross-origin backend URL
+         here: the backend is same-origin in every hosted environment (see
+         api-client.js), so 'self' already covers it. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.firebaseio.com https://*.googleapis.com https://*.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data: blob:;">
     <link rel="icon" href="data:,">
     <link rel="manifest" href="manifest.json">
     <title>Arava Distillery · ייצור</title>
