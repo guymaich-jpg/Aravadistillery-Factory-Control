@@ -45,11 +45,14 @@ test.describe('CRM Integration: Inventory Sync', () => {
   });
 
   test('syncInventorySnapshot pushes the declared per-item counts to the CRM', async ({ page }) => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const sheetsCalls = [];
       const firestoreCalls = [];
       window.postToSheets = (payload) => { sheetsCalls.push(payload); };
       window.fbSetDoc = (col, id, data) => { firestoreCalls.push({ col, id, data }); return Promise.resolve(); };
+      // No backend success — falls through to the direct client writes below,
+      // which is what this test asserts on. syncInventorySnapshot is async.
+      window.apiUpdateInventory = () => Promise.resolve();
 
       // The latest declaration = per-item stock, keyed by product id.
       localStorage.setItem('factory_inventoryBase', JSON.stringify([
@@ -58,7 +61,7 @@ test.describe('CRM Integration: Inventory Sync', () => {
       ['rawMaterials', 'dateReceiving', 'fermentation', 'distillation1', 'distillation2', 'bottling']
         .forEach(m => localStorage.setItem('factory_' + m, '[]'));
 
-      syncInventorySnapshot('test');
+      await syncInventorySnapshot('test');
       return { sheetsCalls, firestoreCalls };
     });
 
