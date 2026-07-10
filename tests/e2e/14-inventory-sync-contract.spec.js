@@ -14,13 +14,17 @@ test.describe('Cross-App Inventory Sync Contract', () => {
 
   test('valid stock sync format after inventory calculation', async ({ page }) => {
     // Trigger inventory calculation and capture CRM stock data
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const calls = [];
       window.fbSetDoc = (collection, docId, data, merge) => {
         calls.push({ collection, docId, data, merge });
         return Promise.resolve();
       };
       window.postToSheets = () => {};
+      // Resolves with no `success` field, so syncInventorySnapshot() falls
+      // through to the direct client writes below — same as a real backend
+      // miss/failure. syncInventorySnapshot is async (awaits the backend
+      // call before falling back), so it must be awaited here too.
       window.apiUpdateInventory = () => Promise.resolve();
 
       // Seed bottling records so inventory has stock
@@ -34,7 +38,7 @@ test.describe('Cross-App Inventory Sync Contract', () => {
       localStorage.setItem('factory_distillation1', '[]');
       localStorage.setItem('factory_distillation2', '[]');
 
-      syncInventorySnapshot('test');
+      await syncInventorySnapshot('test');
 
       // Return only CRM stockLevels calls
       return calls.filter(c => c.collection === 'stockLevels');
@@ -77,7 +81,7 @@ test.describe('Cross-App Inventory Sync Contract', () => {
   });
 
   test('stock values are non-negative numbers', async ({ page }) => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const calls = [];
       window.fbSetDoc = (collection, docId, data, merge) => {
         calls.push({ collection, docId, data, merge });
@@ -97,7 +101,7 @@ test.describe('Cross-App Inventory Sync Contract', () => {
       localStorage.setItem('factory_distillation1', '[]');
       localStorage.setItem('factory_distillation2', '[]');
 
-      syncInventorySnapshot('test');
+      await syncInventorySnapshot('test');
       return calls.filter(c => c.collection === 'stockLevels');
     });
 

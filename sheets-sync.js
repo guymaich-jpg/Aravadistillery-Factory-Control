@@ -210,7 +210,7 @@ function syncCrmStockLevels(itemCounts) {
 // and log a production snapshot to the Sheets ledger.
 // Per-item stock is the count from the latest inventory declaration (keyed by
 // catalog product id); bottling remains a spirit-level production log.
-function syncInventorySnapshot(triggeredBy) {
+async function syncInventorySnapshot(triggeredBy) {
   const dateRecords = getData(STORE_KEYS.dateReceiving);
   const fermRecords = getData(STORE_KEYS.fermentation);
   const d1Records = getData(STORE_KEYS.distillation1);
@@ -262,7 +262,25 @@ function syncInventorySnapshot(triggeredBy) {
     postToSheets({ sheetName: tHe('mod_inventory'), action: 'append', keys, labels, records: [record] });
   }
 
-  // Firestore: current inventory doc (per item) — cross-device
+  // Prefer the backend (single authoritative Firestore writer — avoids every
+  // client having direct write access to stockLevels/factory_inventory).
+  // Fall back to the direct client writes below only when the backend call
+  // is unavailable or fails, so behavior is unchanged while this path is
+  // verified on staging. See docs on the staging/production stabilization
+  // plan for why single-writer matters here.
+  var backendResult = (typeof apiUpdateInventory === 'function')
+    ? await apiUpdateInventory(itemCounts, triggeredBy)
+    : null;
+
+  if (backendResult && backendResult.success) {
+    return;
+  }
+
+  if (backendResult && backendResult.error) {
+    console.warn('[inventory-sync] Backend inventory sync failed, using direct client write:', backendResult.error);
+  }
+
+  // Firestore: current inventory doc (per item) — cross-device (fallback)
   if (typeof fbSetDoc === 'function') {
     fbSetDoc('factory_inventory', 'current', {
       bottles: { ...itemCounts },
@@ -275,6 +293,7 @@ function syncInventorySnapshot(triggeredBy) {
     });
   }
 
-  // CRM per-item stock (client-side write; allowed by the current dual-write rules)
+  // CRM per-item stock (client-side write fallback; allowed by the current
+  // interim dual-write rules)
   syncCrmStockLevels(itemCounts);
 }

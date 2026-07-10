@@ -199,7 +199,7 @@ async function apiDeleteInvitation(id) {
 
 /**
  * Get current bottle inventory.
- * Returns { bottles: { drink_arak: N, ... }, total: N, updatedAt: string } or null.
+ * Returns { bottles: { <catalogProductId>: N, ... }, total: N, updatedAt: string } or null.
  */
 async function apiGetInventory() {
   return apiCall('GET', '/api/inventory');
@@ -207,9 +207,11 @@ async function apiGetInventory() {
 
 /**
  * Push an inventory snapshot to the backend.
- * Called by syncInventorySnapshot() after every record change.
- * The backend writes to factory_inventory/current so the CRM can read it.
- * Returns { success: true, ... } or null if backend unavailable.
+ * Called by syncInventorySnapshot() after every record change. `bottles` is
+ * keyed by catalog product id (1:1, no drink-type aggregation).
+ * The backend writes to factory_inventory/current and CRM stockLevels.
+ * Returns { success: true, ... } or { error } on failure, or null if the
+ * backend is unavailable — callers should fall back to a direct client write.
  */
 async function apiUpdateInventory(bottles, trigger) {
   return apiCall('POST', '/api/inventory', { bottles: bottles, trigger: trigger });
