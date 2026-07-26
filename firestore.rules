@@ -190,8 +190,26 @@ service cloud.firestore {
 
     // ── CRM user invitations ─────────────────────────────────
     match /invitations/{docId} {
-      allow read: if isAuth();
-      allow write: if isManager();
+      // A brand-new user has no Firestore auth yet when they open their
+      // invite link — validateInvitation() must run unauthenticated. The
+      // doc id (token) is a crypto.randomUUID(), i.e. the actual secret;
+      // a single-doc get by exact id is safe to leave open. Enumerating
+      // the whole collection stays manager-only.
+      allow get: if true;
+      allow list: if isManager();
+      allow create, delete: if isManager();
+      // Self-service accept: the newly-registered user (now authenticated,
+      // not yet a manager) must be able to flip their OWN pending invite to
+      // accepted — narrowly scoped to that one transition, only the
+      // lifecycle fields, and only by the email the invite was issued to.
+      allow update: if isManager() || (
+        isAuth() &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'accepted' &&
+        resource.data.email == request.auth.token.email &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'acceptedAt', 'userName'])
+      );
     }
 
     // ── Users ────────────────────────────────────────────────
