@@ -5,11 +5,6 @@ import { adminDb, getFirebaseInitError } from '../lib/firebase-admin';
 import { syncToCrmStockLevels } from '../lib/crm-sync';
 import { withRateLimit } from '../lib/ratelimit';
 
-const DRINK_TYPES = [
-  'drink_arak', 'drink_gin', 'drink_edv', 'drink_licorice',
-  'drink_brandyVS', 'drink_brandyVSOP', 'drink_brandyMed',
-];
-
 async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
@@ -34,10 +29,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-// ---- GET: return current inventory ----
+// ---- GET: return current per-item inventory ----
 async function handleGet(_req: VercelRequest, res: VercelResponse) {
   try {
-    // Read pre-computed inventory doc (written by POST or frontend fallback)
+    // Read pre-computed inventory doc (written by POST)
     const doc = await adminDb.collection('factory_inventory').doc('current').get();
     if (doc.exists) {
       const data = doc.data()!;
@@ -49,23 +44,23 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Fallback: compute from factory_bottling if doc doesn't exist yet
-    const snap = await adminDb.collection('factory_bottling').get();
-    const bottles: Record<string, number> = {};
-    DRINK_TYPES.forEach(dt => { bottles[dt] = 0; });
-
-    snap.docs.forEach((doc: any) => {
-      const r = doc.data();
-      if (r.drinkType && r.decision === 'approved') {
-        const count = parseInt(r.bottleCount, 10) || 0;
-        bottles[r.drinkType] = (bottles[r.drinkType] || 0) + count;
+    // Fallback: compute from the latest inventory declaration base doc —
+    // matches the client's own computation (syncInventorySnapshot() in
+    // sheets-sync.js reads STORE_KEYS.inventoryBase the same way).
+    const snap = await adminDb.collection('factory_inventoryBase').limit(1).get();
+    const itemCounts: Record<string, number> = {};
+    if (!snap.empty) {
+      const base = snap.docs[0].data();
+      for (const [key, val] of Object.entries(base)) {
+        if (key === '_id' || key === 'id') continue;
+        const n = parseInt(String(val), 10);
+        if (!isNaN(n)) itemCounts[key] = n;
       }
-    });
-
-    const total = Object.values(bottles).reduce((sum, n) => sum + n, 0);
+    }
+    const total = Object.values(itemCounts).reduce((sum, n) => sum + n, 0);
 
     return res.status(200).json({
-      bottles,
+      bottles: itemCounts,
       total,
       updatedAt: new Date().toISOString(),
       updatedBy: null,
@@ -75,7 +70,7 @@ async function handleGet(_req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// ---- POST: receive inventory update from Factory Control ----
+// ---- POST: receive per-item inventory update from Factory Control ----
 async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: string) {
   try {
     if (!adminDb) {
@@ -84,15 +79,18 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
 
     const { bottles, trigger } = req.body || {};
 
-    if (!bottles || typeof bottles !== 'object') {
+    if (!bottles || typeof bottles !== 'object' || Array.isArray(bottles)) {
       return res.status(400).json({ error: 'Missing or invalid "bottles" object' });
     }
 
-    // Validate: only allow known drink types, values must be non-negative integers
+    // Catalog ids are dynamic (loaded from Firestore `products`), so accept
+    // any string key here — just sanitize values to non-negative integers.
+    // Cap key count as a sanity bound against malformed/oversized payloads.
+    const keys = Object.keys(bottles).slice(0, 200);
     const cleanBottles: Record<string, number> = {};
-    for (const dt of DRINK_TYPES) {
-      const val = parseInt(bottles[dt], 10);
-      cleanBottles[dt] = isNaN(val) || val < 0 ? 0 : val;
+    for (const key of keys) {
+      const val = parseInt(bottles[key], 10);
+      cleanBottles[key] = isNaN(val) || val < 0 ? 0 : val;
     }
 
     const total = Object.values(cleanBottles).reduce((sum, n) => sum + n, 0);
@@ -112,7 +110,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
     let crmSynced = false;
     for (let attempt = 0; attempt < 3 && !crmSynced; attempt++) {
       try {
-        await syncToCrmStockLevels(cleanBottles, callerEmail);
+        await syncToCrmStockLevels(cleanBottles);
         crmSynced = true;
       } catch (crmErr: any) {
         if (attempt < 2) {
@@ -123,7 +121,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse, callerEmail: 
       }
     }
 
-    return res.status(200).json({ success: true, ...inventoryDoc });
+    return res.status(200).json({ success: true, ...inventoryDoc, crmSynced });
   } catch (e: any) {
     console.error('[inventory POST]', e.code || '', e.message || e);
     return res.status(500).json({

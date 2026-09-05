@@ -1,16 +1,22 @@
 // ============================================================
 // api-client.js — Backend API Client
 // ============================================================
-// Calls the shared Vercel backend for privileged operations
-// (user CRUD, invitations, role management).
+// Calls the backend for privileged operations (user CRUD, invitations,
+// role management, inventory sync).
 //
-// Set API_BASE to the deployed Vercel URL to enable.
-// When API_BASE is empty, all operations fall back to local logic.
+// The backend API and this frontend are ONE Vercel deployment per
+// environment — same origin in prod, in staging, and in every PR preview.
+// API_BASE must therefore resolve to the CURRENT origin, never a hardcoded
+// URL: a fixed prod URL here would make staging (and every preview) call
+// the production backend — writing into the production Firestore project
+// with the production admin credentials. Local dev (`python3 -m http.server`)
+// serves no /api routes, so calls stay disabled there and everything falls
+// back to local-only logic, same as before.
 // ============================================================
 
-// Backend URL — set after deploying to Vercel.
-// Leave empty to disable backend calls (all operations use local fallback).
-const API_BASE = 'https://aravadistillery-factory-control.vercel.app';
+const API_BASE = (typeof window !== 'undefined' && /\.vercel\.app$/.test(window.location.hostname))
+  ? window.location.origin
+  : '';
 
 // Request timeout in milliseconds
 const API_TIMEOUT = 8000;
@@ -199,7 +205,7 @@ async function apiDeleteInvitation(id) {
 
 /**
  * Get current bottle inventory.
- * Returns { bottles: { drink_arak: N, ... }, total: N, updatedAt: string } or null.
+ * Returns { bottles: { <catalogProductId>: N, ... }, total: N, updatedAt: string } or null.
  */
 async function apiGetInventory() {
   return apiCall('GET', '/api/inventory');
@@ -207,9 +213,11 @@ async function apiGetInventory() {
 
 /**
  * Push an inventory snapshot to the backend.
- * Called by syncInventorySnapshot() after every record change.
- * The backend writes to factory_inventory/current so the CRM can read it.
- * Returns { success: true, ... } or null if backend unavailable.
+ * Called by syncInventorySnapshot() after every record change. `bottles` is
+ * keyed by catalog product id (1:1, no drink-type aggregation).
+ * The backend writes to factory_inventory/current and CRM stockLevels.
+ * Returns { success: true, ... } or { error } on failure, or null if the
+ * backend is unavailable — callers should fall back to a direct client write.
  */
 async function apiUpdateInventory(bottles, trigger) {
   return apiCall('POST', '/api/inventory', { bottles: bottles, trigger: trigger });
